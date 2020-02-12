@@ -1,54 +1,53 @@
-# Copyright (C) 2011-2019 (see AUTHORS file for a list of contributors)
+# Copyright (C) 2011-2020  (see AUTHORS file for a list of contributors)
+#
+# GNSS-SDR is a software-defined Global Navigation Satellite Systems receiver
 #
 # This file is part of GNSS-SDR.
 #
-# GNSS-SDR is free software: you can redistribute it and/or modify
-# it under the terms of the GNU General Public License as published by
-# the Free Software Foundation, either version 3 of the License, or
-# (at your option) any later version.
-#
-# GNSS-SDR is distributed in the hope that it will be useful,
-# but WITHOUT ANY WARRANTY; without even the implied warranty of
-# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-# GNU General Public License for more details.
-#
-# You should have received a copy of the GNU General Public License
-# along with GNSS-SDR. If not, see <https://www.gnu.org/licenses/>.
+# SPDX-License-Identifier: GPL-3.0-or-later
 
 ########################################################################
 # Find  GR-GNMAX Module
 ########################################################################
 
+#
+# Provides the following imported target:
+# Gnuradio::gnmax
+#
+
+set(PKG_CONFIG_USE_CMAKE_PREFIX_PATH TRUE)
 include(FindPkgConfig)
 pkg_check_modules(PC_GR_GNMAX gr-gnmax)
 
 find_path(
     GR_GNMAX_INCLUDE_DIRS
     NAMES gnMAX2769/api.h
-    HINTS $ENV{GR_GNMAX_DIR}/include
-          ${PC_GR_GNMAX_INCLUDEDIR}
-    PATHS ${CMAKE_INSTALL_PREFIX}/include
+    HINTS ${PC_GR_GNMAX_INCLUDEDIR}
+    PATHS /usr/include
           /usr/local/include
-          /usr/include
+          /opt/local/include
+          ${CMAKE_INSTALL_PREFIX}/include
           ${GRGNMAX_ROOT}/include
           $ENV{GRGNMAX_ROOT}/include
+          $ENV{GR_GN3S_DIR}/include
 )
 
 find_library(
     GR_GNMAX_LIBRARIES
     NAMES gnuradio-gnMAX2769
-    HINTS $ENV{GR_GNMAX_DIR}/lib
-          ${PC_GR_GNMAX_LIBDIR}
-    PATHS ${CMAKE_INSTALL_PREFIX}/lib
-          ${CMAKE_INSTALL_PREFIX}/lib64
+    HINTS ${PC_GR_GNMAX_LIBDIR}
+    PATHS /usr/lib
+          /usr/lib64
           /usr/local/lib
           /usr/local/lib64
-          /usr/lib
-          /usr/lib64
+          /opt/local/lib
+          ${CMAKE_INSTALL_PREFIX}/lib
+          ${CMAKE_INSTALL_PREFIX}/lib64
           ${GRGNMAX_ROOT}/lib
           $ENV{GRGNMAX_ROOT}/lib
           ${GRGNMAX_ROOT}/lib64
           $ENV{GRGNMAX_ROOT}/lib64
+          $ENV{GR_GN3S_DIR}/lib
 )
 
 include(FindPackageHandleStandardArgs)
