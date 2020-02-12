@@ -131,10 +131,6 @@
 #include "gn3s_signal_source.h"
 #endif
 
-#if GNMAX_DRIVER
-#include "gnmax_signal_source.h"
-#endif
-
 #if RAW_ARRAY_DRIVER
 #include "raw_array_signal_source.h"
 #endif
@@ -1398,14 +1394,6 @@ std::unique_ptr<GNSSBlockInterface> GNSSBlockFactory::GetBlock(
     else if (implementation == "GN3S_Signal_Source")
         {
             std::unique_ptr<GNSSBlockInterface> block_(new Gn3sSignalSource(configuration.get(), role, in_streams,
-                out_streams, queue));
-            block = std::move(block_);
-        }
-#endif
-#if GNMAX_DRIVER
-    else if (implementation == "GNMAX_Signal_Source")
-        {
-            std::unique_ptr<GNSSBlockInterface> block_(new GnMaxSignalSource(configuration.get(), role, in_streams,
                 out_streams, queue));
             block = std::move(block_);
         }
