@@ -18,15 +18,15 @@
 //
 // Cross-platform attribute macros not included in VOLK
 //
-#if defined __clang__
-#define __VOLK_GNSSSDR_PREFETCH(addr) __builtin_prefetch(addr)
-#define __VOLK_GNSSSDR_PREFETCH_LOCALITY(addr, rw, locality) __builtin_prefetch(addr, rw, locality)
-#elif defined __GNUC__
-#define __VOLK_GNSSSDR_PREFETCH(addr) __builtin_prefetch(addr)
-#define __VOLK_GNSSSDR_PREFETCH_LOCALITY(addr, rw, locality) __builtin_prefetch(addr, rw, locality)
-#elif _MSC_VER
+#if _MSC_VER
 #define __VOLK_GNSSSDR_PREFETCH(addr)
 #define __VOLK_GNSSSDR_PREFETCH_LOCALITY(addr, rw, locality)
+#elif defined(__clang__)
+#define __VOLK_GNSSSDR_PREFETCH(addr) __builtin_prefetch(addr)
+#define __VOLK_GNSSSDR_PREFETCH_LOCALITY(addr, rw, locality) __builtin_prefetch(addr, rw, locality)
+#elif defined(__GNUC__)
+#define __VOLK_GNSSSDR_PREFETCH(addr) __builtin_prefetch(addr)
+#define __VOLK_GNSSSDR_PREFETCH_LOCALITY(addr, rw, locality) __builtin_prefetch(addr, rw, locality)
 #else
 #define __VOLK_GNSSSDR_PREFETCH(addr)
 #define __VOLK_GNSSSDR_PREFETCH_LOCALITY(addr, rw, locality)
@@ -38,7 +38,17 @@
 //
 // Cross-platform attribute macros
 //
-#if defined(__clang__) && (!defined(_MSC_VER))
+#if _MSC_VER
+#define __VOLK_ATTR_ALIGNED(x) __declspec(align(x))
+#define __VOLK_ATTR_UNUSED
+#define __VOLK_ATTR_INLINE __forceinline
+#define __VOLK_ATTR_DEPRECATED __declspec(deprecated)
+#define __VOLK_ATTR_EXPORT __declspec(dllexport)
+#define __VOLK_ATTR_IMPORT __declspec(dllimport)
+#define __VOLK_PREFETCH(addr)
+#define __VOLK_ASM __asm
+#define __VOLK_VOLATILE
+#elif defined(__clang__)
 // AppleClang also defines __GNUC__, so do this check first.  These
 // will probably be the same as for __GNUC__, but let's keep them
 // separate just to be safe.
@@ -51,7 +61,7 @@
 #define __VOLK_ATTR_EXPORT __attribute__((visibility("default")))
 #define __VOLK_ATTR_IMPORT __attribute__((visibility("default")))
 #define __VOLK_PREFETCH(addr) __builtin_prefetch(addr)
-#elif defined __GNUC__
+#elif defined(__GNUC__)
 #define __VOLK_ATTR_ALIGNED(x) __attribute__((aligned(x)))
 #define __VOLK_ATTR_UNUSED __attribute__((unused))
 #define __VOLK_ATTR_INLINE __attribute__((always_inline))
@@ -66,17 +76,8 @@
 #define __VOLK_ATTR_IMPORT
 #endif
 #define __VOLK_PREFETCH(addr) __builtin_prefetch(addr)
-#elif _MSC_VER
-#define __VOLK_ATTR_ALIGNED(x) __declspec(align(x))
-#define __VOLK_ATTR_UNUSED
-#define __VOLK_ATTR_INLINE __forceinline
-#define __VOLK_ATTR_DEPRECATED __declspec(deprecated)
-#define __VOLK_ATTR_EXPORT __declspec(dllexport)
-#define __VOLK_ATTR_IMPORT __declspec(dllimport)
-#define __VOLK_PREFETCH(addr)
-#define __VOLK_ASM __asm
-#define __VOLK_VOLATILE
 #else
+#warning "Unknown compiler. Using default VOLK macros, which may or not work."
 #define __VOLK_ATTR_ALIGNED(x)
 #define __VOLK_ATTR_UNUSED
 #define __VOLK_ATTR_INLINE
@@ -100,7 +101,7 @@
 // C-linkage declaration macros
 // FIXME: due to the usage of complex.h, require gcc for c-linkage
 //
-#if defined(__cplusplus) && (__GNUC__)
+#if defined(__cplusplus) && (defined(__GNUC__) || defined(__clang__))
 #define __VOLK_DECL_BEGIN \
     extern "C"            \
     {

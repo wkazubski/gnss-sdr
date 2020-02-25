@@ -1,0 +1,84 @@
+obsdiff
+-------
+
+[comment]: # (
+SPDX-License-Identifier: GPL-3.0-or-later
+)
+
+[comment]: # (
+SPDX-FileCopyrightText: Javier Arribas, 2020. <jarribas@cttc.es>
+)
+
+This program computes single-differences and double-differences from RINEX observation files.
+
+### Building
+
+Requirements:
+ * [Armadillo](http://arma.sourceforge.net/): A C++ library for linear algebra and scientific computing. This program requires version 9.800 or higher. If your installed Armadillo version is older, see below.
+ * [Gflags](https://github.com/gflags/gflags): A C++ library that implements command-line flags processing. If not found in your system, the latest version will be downloaded, built and linked for you at building time.
+ * [GPSTK](https://github.com/SGL-UT/GPSTk): The GPS Toolkit, used for RINEX files reading. If not found in your system, the latest version will be downloaded, built and linked for you at building time.
+ * [Matio](https://github.com/tbeu/matio): A MATLAB MAT File I/O Library, version >= 1.5.3. If it is not found, or an older version is found, CMake will download, build and link a recent version for you at building time.
+
+Optional:
+ * [Gnuplot](http://www.gnuplot.info/): a portable command-line driven graphing utility.
+
+This program is built along with GNSS-SDR if the options `ENABLE_UNIT_TESTING_EXTRA` or `ENABLE_SYSTEM_TESTING_EXTRA` are set to `ON` when calling CMake:
+
+```
+$ cmake -DENABLE_SYSTEM_TESTING_EXTRA=ON ..
+$ make obsdiff
+$ sudo make install
+```
+
+The last step is optional. Without it, you still will get the executable at `../install/obsdiff`.
+
+This program requires Armadillo 9.800 or higher. If the available Armadillo version is older, this program will not be built. If your local Armadillo installed version is older than 9.800, you can force CMake to download, build and link a recent one:
+
+```
+$ cmake -DENABLE_SYSTEM_TESTING_EXTRA=ON -DENABLE_OWN_ARMADILLO=ON ..
+$ make obsdiff
+$ sudo make install
+```
+
+This later option requires [BLAS](http://www.netlib.org/blas/), [LAPACK](http://www.netlib.org/lapack/) and [GFortran](https://gcc.gnu.org/fortran/) already installed in your system.
+
+### Usage
+
+```
+$ obsdiff --ref_rinex_obs=reference.20o --test_rinex_obs=rover.20o
+```
+
+There is some flexibility in how command-line flags may be specified. The following examples are equivalent:
+
+```
+$ obsdiff -ref_rinex_obs=reference.20o
+$ obsdiff --ref_rinex_obs=reference.20o
+$ obsdiff -ref_rinex_obs reference.20o
+$ obsdiff --ref_rinex_obs reference.20o
+```
+
+For boolean flags, the possibilities are slightly different:
+```
+$ obsdiff --single_diffs
+$ obsdiff --nosingle_diffs
+$ obsdiff --single_diffs=true
+$ obsdiff --single_diffs=false
+```
+
+(as well as the single-dash variant on all of these).
+
+Despite this flexibility, we recommend using only a single form: `--variable=value` for non-boolean flags, and `--variable/--novariable` for boolean flags.
+
+Available command-line flags:
+
+| **Command-line flag**          | **Default value** | **Description**  |
+|:------------------------------:|:-----------------:|:-----------------|
+| `--skip_obs_transitory_s` | `30.0`            | Skip the initial observable outputs to avoid transitory results [s]. |
+| `--skip_obs_ends_s`       | `5.0`             | Skip the lasts observable outputs to avoid transitory results [s]. |
+| `--single_diffs`          | `false`           | [`true`, `false`]: If `true`, the program also computes the single difference errors for [Carrier Phase](https://gnss-sdr.org/docs/sp-blocks/observables/#carrier-phase-measurement) and [Doppler](https://gnss-sdr.org/docs/sp-blocks/observables/#doppler-shift-measurement) measurements (requires LO synchronization between receivers). |
+| `--compare_with_5X`       | `false`           | [`true`, `false`]: If `true`, the program compares the E5a Doppler and Carrier Phases with the E5 full Bw in RINEX (expect discrepancy due to the center frequencies difference). |
+| `--dupli_sat`             | `false`           | [`true`, `false`]: If `true`, this flag enables special observable test mode where the scenario contains duplicated satellite orbits. |
+| `--dupli_sat_prns`        | `1,2,3,4`         | List of duplicated satellites PRN pairs (_i.e._, `1,2,3,4` indicates that the PRNs 1,2 share the same orbit. The same applies for PRNs 3,4). |
+| `--ref_rinex_obs`         | `reference.obs`   | Filename of reference RINEX observation file. |
+| `--test_rinex_obs`        | `test.obs`        | Filename of tested RINEX observation file. |
+| `--show_plots`            | `true`            | [`true`, `false`]: If `true`, and if [gnuplot](http://www.gnuplot.info/) is found on the system, displays results plots on screen. Please set it to `false` for non-interactive testing. |

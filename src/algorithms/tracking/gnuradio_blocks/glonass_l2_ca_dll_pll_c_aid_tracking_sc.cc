@@ -242,7 +242,7 @@ void glonass_l2_ca_dll_pll_c_aid_tracking_sc::start_tracking()
     d_acq_code_phase_samples = corrected_acq_phase_samples;
 
     d_carrier_frequency_hz = d_acq_carrier_doppler_hz + (DFRQ2_GLO * static_cast<double>(GLONASS_PRN.at(d_acquisition_gnss_synchro->PRN)));
-    ;
+
     d_carrier_doppler_hz = d_acq_carrier_doppler_hz;
 
     d_carrier_phase_step_rad = GLONASS_TWO_PI * d_carrier_frequency_hz / static_cast<double>(d_fs_in);
@@ -692,7 +692,7 @@ int glonass_l2_ca_dll_pll_c_aid_tracking_sc::general_work(int noutput_items __at
 
                     // ################## DLL ##########################################################
                     // DLL discriminator
-                    d_code_error_chips_Ti = dll_nc_e_minus_l_normalized(std::complex<float>(d_correlator_outs_16sc[0].real(), d_correlator_outs_16sc[0].imag()), std::complex<float>(d_correlator_outs_16sc[2].real(), d_correlator_outs_16sc[2].imag()));  // [chips/Ti] //early and late
+                    d_code_error_chips_Ti = dll_nc_e_minus_l_normalized(std::complex<float>(d_correlator_outs_16sc[0].real(), d_correlator_outs_16sc[0].imag()), std::complex<float>(d_correlator_outs_16sc[2].real(), d_correlator_outs_16sc[2].imag()), d_early_late_spc_chips, 1.0);  // [chips/Ti] //early and late
                     // Code discriminator filter
                     d_code_error_filt_chips_s = d_code_loop_filter.get_code_nco(d_code_error_chips_Ti);  // input [chips/Ti] -> output [chips/second]
                     d_code_error_filt_chips_Ti = d_code_error_filt_chips_s * CURRENT_INTEGRATION_TIME_S;

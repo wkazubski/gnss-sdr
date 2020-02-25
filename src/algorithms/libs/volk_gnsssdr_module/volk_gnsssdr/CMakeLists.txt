@@ -150,6 +150,19 @@ if(NOT ((CMAKE_CXX_COMPILER_ID STREQUAL "GNU") AND NOT WIN32) AND NOT (CMAKE_CXX
     endif()
 endif()
 
+# Disable complex math NaN/INFO range checking for performance
+include(CheckCXXCompilerFlag)
+check_cxx_compiler_flag(-fcx-limited-range HAVE_CX_LIMITED_RANGE)
+if(HAVE_CX_LIMITED_RANGE)
+    set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -fcx-limited-range")
+endif()
+
+include(CheckCCompilerFlag)
+check_c_compiler_flag(-fcx-limited-range HAVE_C_LIMITED_RANGE)
+if(HAVE_C_LIMITED_RANGE)
+    set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -fcx-limited-range")
+endif()
+
 set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} ${MY_CXX_FLAGS} -Wall")
 set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -Wall")
 
@@ -249,7 +262,24 @@ if(NOT ${FILESYSTEM_FOUND})
     endif()
 endif()
 
-# Orc
+
+########################################################################
+# check for aligned_alloc, since some compilers lack this C11 feature.
+# For Apple-clang use `posix_memalign`
+# For MSVC use `_aligned_malloc`.
+########################################################################
+include(CheckSymbolExists)
+if(NOT (${CMAKE_SYSTEM_NAME} MATCHES "Darwin"))
+    check_symbol_exists(aligned_alloc stdlib.h USE_ALIGNED_ALLOC)
+endif()
+if(NOT USE_ALIGNED_ALLOC)
+    check_symbol_exists(posix_memalign stdlib.h HAVE_POSIX_MEMALIGN)
+endif()
+
+
+########################################################################
+# Check if Orc is available
+########################################################################
 option(ENABLE_ORC "Enable Orc" TRUE)
 if(ENABLE_ORC)
     find_package(ORC)
