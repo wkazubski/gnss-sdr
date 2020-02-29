@@ -81,7 +81,7 @@ bool file_exist(const char* fileName)
 }
 
 
-std::map<int, arma::mat> ReadRinexObs(std::string rinex_file, char system, std::string signal)
+std::map<int, arma::mat> ReadRinexObs(const std::string& rinex_file, char system, const std::string& signal)
 {
     std::map<int, arma::mat> obs_map;
     if (not file_exist(rinex_file.c_str()))
@@ -93,7 +93,7 @@ std::map<int, arma::mat> ReadRinexObs(std::string rinex_file, char system, std::
     try
         {
             gpstk::Rinex3ObsStream r_ref(rinex_file);
-            r_ref.exceptions(std::ios::failbit);
+
             gpstk::Rinex3ObsData r_ref_data;
             gpstk::Rinex3ObsHeader r_ref_header;
 
@@ -121,9 +121,9 @@ std::map<int, arma::mat> ReadRinexObs(std::string rinex_file, char system, std::
             std::cout << "Reading RINEX OBS file " << rinex_file << " ...\n";
             while (r_ref >> r_ref_data)
                 {
-                    for (std::set<int>::iterator prn_it = PRN_set.begin(); prn_it != PRN_set.end(); ++prn_it)
+                    for (auto& prn_it : PRN_set)
                         {
-                            prn.id = *prn_it;
+                            prn.id = prn_it;
                             gpstk::CommonTime time = r_ref_data.time;
                             double sow(static_cast<gpstk::GPSWeekSecond>(time).sow);
 
@@ -219,7 +219,12 @@ std::map<int, arma::mat> ReadRinexObs(std::string rinex_file, char system, std::
             std::cout << "unknown error.  I don't feel so well..." << std::endl;
             return obs_map;
         }
-
+    if (obs_map.empty())
+        {
+            std::cout << "Warning: file "
+                      << rinex_file
+                      << " contains no data." << std::endl;
+        }
     return obs_map;
 }
 
@@ -311,9 +316,9 @@ void carrier_phase_double_diff(
     arma::vec meas_ch1_carrier_phase_interp;
     arma::interp1(measured_ch1.col(0), measured_ch1.col(3), measurement_time, meas_ch1_carrier_phase_interp);
     // generate double difference accumulated carrier phases
-    // compute error without the accumulated carrier phase offsets (which depends on the receiver starting time)
-    arma::vec delta_true_carrier_phase_cycles = (true_ch0_carrier_phase_interp - true_ch0_carrier_phase_interp(0)) - (true_ch1_carrier_phase_interp - true_ch1_carrier_phase_interp(0));
-    arma::vec delta_measured_carrier_phase_cycles = (measured_ch0.col(3) - measured_ch0.col(3)(0)) - (meas_ch1_carrier_phase_interp - meas_ch1_carrier_phase_interp(0));
+
+    arma::vec delta_true_carrier_phase_cycles = true_ch0_carrier_phase_interp - true_ch1_carrier_phase_interp;
+    arma::vec delta_measured_carrier_phase_cycles = measured_ch0.col(3) - meas_ch1_carrier_phase_interp;
 
     // remove NaN
     arma::uvec NaN_in_true_data = arma::find_nonfinite(delta_true_carrier_phase_cycles);
@@ -334,7 +339,7 @@ void carrier_phase_double_diff(
     std::vector<double>
         time_vector(measurement_time.colptr(0), measurement_time.colptr(0) + measurement_time.n_rows);
 
-    if (measurement_time.size() > 0)
+    if (!measurement_time.empty())
         {
             // debug
             //    std::vector<double> tmp_time_vec(measurement_time.colptr(0),
@@ -349,6 +354,10 @@ void carrier_phase_double_diff(
             // 2. RMSE
             arma::vec err;
             err = delta_measured_carrier_phase_cycles - delta_true_carrier_phase_cycles;
+
+            // compute error without the accumulated carrier phase offsets (which depends on the receiver starting time)
+            err = err - arma::mean(err);
+
             arma::vec err2 = arma::square(err);
             double rmse = sqrt(arma::mean(err2));
 
@@ -408,8 +417,8 @@ void carrier_phase_single_diff(
     arma::interp1(measured_ch1.col(0), measured_ch1.col(3), measurement_time, meas_ch1_carrier_phase_interp);
     // generate single difference accumulated carrier phases
     // compute error without the accumulated carrier phase offsets (which depends on the receiver starting time)
-    arma::vec delta_measured_carrier_phase_cycles = (measured_ch0.col(3) - measured_ch0.col(3)(0)) - (meas_ch1_carrier_phase_interp - meas_ch1_carrier_phase_interp(0));
-
+    arma::vec delta_measured_carrier_phase_cycles = measured_ch0.col(3) - meas_ch1_carrier_phase_interp;
+    delta_measured_carrier_phase_cycles = delta_measured_carrier_phase_cycles - arma::mean(delta_measured_carrier_phase_cycles);
     // remove NaN
     arma::uvec NaN_in_measured_data = arma::find_nonfinite(delta_measured_carrier_phase_cycles);
 
@@ -424,7 +433,7 @@ void carrier_phase_single_diff(
     std::vector<double>
         time_vector(measurement_time.colptr(0), measurement_time.colptr(0) + measurement_time.n_rows);
 
-    if (measurement_time.size() > 0)
+    if (!measurement_time.empty())
         {
             // 2. RMSE
             arma::vec err;
@@ -517,7 +526,7 @@ void carrier_doppler_double_diff(
     std::vector<double>
         time_vector(measurement_time.colptr(0), measurement_time.colptr(0) + measurement_time.n_rows);
 
-    if (measurement_time.size() > 0)
+    if (!measurement_time.empty())
         {
             // debug
             //    std::vector<double> tmp_time_vec(measurement_time.colptr(0),
@@ -606,7 +615,7 @@ void carrier_doppler_single_diff(
     std::vector<double>
         time_vector(measurement_time.colptr(0), measurement_time.colptr(0) + measurement_time.n_rows);
 
-    if (measurement_time.size() > 0)
+    if (!measurement_time.empty())
         {
             // 2. RMSE
             arma::vec err;
@@ -698,7 +707,7 @@ void code_pseudorange_double_diff(
     std::vector<double>
         time_vector(measurement_time.colptr(0), measurement_time.colptr(0) + measurement_time.n_rows);
 
-    if (measurement_time.size() > 0)
+    if (!measurement_time.empty())
         {
             // debug
             //    std::vector<double> tmp_time_vec(measurement_time.colptr(0),
@@ -789,7 +798,7 @@ void code_pseudorange_single_diff(
     std::vector<double>
         time_vector(measurement_time.colptr(0), measurement_time.colptr(0) + measurement_time.n_rows);
 
-    if (measurement_time.size() > 0)
+    if (!measurement_time.empty())
         {
             // 2. RMSE
             arma::vec err;
@@ -843,7 +852,223 @@ void code_pseudorange_single_diff(
 }
 
 
-double compute_rx_clock_error(std::string rinex_nav_filename, std::string rinex_obs_file)
+void coderate_phaserate_consistence(
+    arma::mat& measured_ch0,
+    const std::string& data_title)
+{
+    arma::vec measurement_time = measured_ch0.col(0);
+    arma::vec delta_time = measurement_time.subvec(1, measurement_time.n_elem - 1) - measurement_time.subvec(0, measurement_time.n_elem - 2);
+    // Test 4 is for the pseudorange phase consistency
+    //
+    // 1) Checks for the value of the pseudoranges to be within a certain threshold.
+    arma::vec prange = measured_ch0.col(1);
+    // todo: This code is only valid for L1/E1 carrier frequency.
+    arma::vec phase = measured_ch0.col(3) * (gpstk::C_MPS / gpstk::L1_FREQ_GPS);
+
+    double mincodeval = 5000000.0;
+    double maxcodeval = 40000000.0;
+    arma::uvec idx = arma::find(prange < mincodeval);
+    if (idx.n_elem > 0)
+        {
+            std::cout << "Warning: Pseudorange measurement is less than minimum acceptable value of " << mincodeval << " meters.\n";
+        }
+
+    idx = arma::find(prange > maxcodeval);
+    if (idx.n_elem > 0)
+        {
+            std::cout << "Warning: Pseudorange measurement is above than maximum acceptable value of " << maxcodeval << " meters.\n";
+        }
+
+    // 2) It checks that the pseduorange rate is within a certain threshold
+    // check code rate
+    arma::vec coderate = prange.subvec(1, prange.n_elem - 1) - prange.subvec(0, prange.n_elem - 2) / delta_time;
+
+    // remove NaN
+    arma::uvec NaN_in_measured_data = arma::find_nonfinite(coderate);
+
+    if (NaN_in_measured_data.n_elem > 0)
+        {
+            std::cout << "Warning: Pseudorange rate have NaN values. \n";
+        }
+
+    double mincoderate = 0.001;
+    double maxcoderate = 5000.0;
+
+    idx = arma::find(coderate > maxcoderate and coderate < mincoderate);
+    if (idx.n_elem > 0)
+        {
+            std::cout << "Warning: bad code rate \n";
+        }
+
+    // 3) It checks that the phase rate is within a certain threshold
+    arma::vec phaserate = phase.subvec(1, prange.n_elem - 1) - phase.subvec(0, prange.n_elem - 2) / delta_time;
+
+    // remove NaN
+    NaN_in_measured_data = arma::find_nonfinite(phase);
+
+    if (NaN_in_measured_data.n_elem > 0)
+        {
+            std::cout << "Warning: Carrier phase rate have NaN values. \n";
+        }
+
+    double minphaserate = 0.001;
+    double maxphaserate = 5000.0;
+
+    idx = arma::find(phaserate > maxphaserate and phaserate < minphaserate);
+    if (idx.n_elem > 0)
+        {
+            std::cout << "Warning: bad phase rate \n";
+        }
+
+    // 4) It checks the difference between code and phase rates
+    // check difference between code and phase rates
+    arma::vec ratediff = phaserate - coderate;
+
+    double maxratediff = 5;
+
+    idx = arma::find(ratediff > maxratediff);
+    if (idx.n_elem > 0)
+        {
+            std::cout << "Warning: bad code and phase rate difference \n";
+        }
+
+    std::vector<double>
+        time_vector(measurement_time.colptr(0) + 1, measurement_time.colptr(0) + measurement_time.n_rows);
+
+    // 2. RMSE
+    arma::vec err;
+
+    err = ratediff;
+
+    arma::vec err2 = arma::square(err);
+    double rmse = sqrt(arma::mean(err2));
+
+    // 3. Mean err and variance
+    double error_mean = arma::mean(err);
+    double error_var = arma::var(err);
+
+    // 4. Peaks
+    double max_error = arma::max(err);
+    double min_error = arma::min(err);
+
+    // 5. report
+    std::streamsize ss = std::cout.precision();
+    std::cout << std::setprecision(10) << data_title << " RMSE = "
+              << rmse << ", mean = " << error_mean
+              << ", stdev = " << sqrt(error_var)
+              << " (max,min) = " << max_error
+              << "," << min_error
+              << " [meters]" << std::endl;
+    std::cout.precision(ss);
+
+    // plots
+    if (FLAGS_show_plots)
+        {
+            Gnuplot g3("linespoints");
+            g3.set_title(data_title + "Code rate - phase rate [m/s]");
+            g3.set_grid();
+            g3.set_xlabel("Time [s]");
+            g3.set_ylabel("Code rate - phase rate [m/s]");
+            // conversion between arma::vec and std:vector
+            std::vector<double> range_error_m(err.colptr(0), err.colptr(0) + err.n_rows);
+            g3.cmd("set key box opaque");
+            g3.plot_xy(time_vector, range_error_m,
+                "Code rate - phase rate");
+            g3.set_legend();
+            g3.savetops(data_title + "Code_rate_minus_phase_rate");
+
+            g3.showonscreen();  // window output
+        }
+}
+
+
+void code_phase_diff(
+    arma::mat& measured_ch0,
+    arma::mat& measured_ch1,
+    const std::string& data_title)
+{
+    // 1. True value interpolation to match the measurement times
+    arma::vec measurement_time = measured_ch0.col(0);
+
+    arma::vec code_range_ch1_obs_interp;
+    arma::interp1(measured_ch1.col(0), measured_ch1.col(1), measurement_time, code_range_ch1_obs_interp);
+    arma::vec carrier_phase_ch1_obs_interp;
+    arma::interp1(measured_ch1.col(0), measured_ch1.col(3), measurement_time, carrier_phase_ch1_obs_interp);
+
+    // generate Code - Phase vector
+    arma::vec code_minus_phase = (measured_ch0.col(1) - code_range_ch1_obs_interp) - (measured_ch0.col(3) - carrier_phase_ch1_obs_interp) * (gpstk::C_MPS / gpstk::L1_FREQ_GPS);
+
+    // remove NaN
+    arma::uvec NaN_in_measured_data = arma::find_nonfinite(code_minus_phase);
+
+    arma::mat tmp_mat = arma::conv_to<arma::mat>::from(code_minus_phase);
+    tmp_mat.shed_rows(NaN_in_measured_data);
+    code_minus_phase = tmp_mat.col(0);
+
+    code_minus_phase = code_minus_phase - code_minus_phase(0);
+
+    tmp_mat = arma::conv_to<arma::mat>::from(measurement_time);
+    tmp_mat.shed_rows(NaN_in_measured_data);
+    measurement_time = tmp_mat.col(0);
+
+    std::vector<double>
+        time_vector(measurement_time.colptr(0), measurement_time.colptr(0) + measurement_time.n_rows);
+
+    if (!measurement_time.empty())
+        {
+            // 2. RMSE
+            arma::vec err;
+
+            err = code_minus_phase;
+
+            arma::vec err2 = arma::square(err);
+            double rmse = sqrt(arma::mean(err2));
+
+            // 3. Mean err and variance
+            double error_mean = arma::mean(err);
+            double error_var = arma::var(err);
+
+            // 4. Peaks
+            double max_error = arma::max(err);
+            double min_error = arma::min(err);
+
+            // 5. report
+            std::streamsize ss = std::cout.precision();
+            std::cout << std::setprecision(10) << data_title << " RMSE = "
+                      << rmse << ", mean = " << error_mean
+                      << ", stdev = " << sqrt(error_var)
+                      << " (max,min) = " << max_error
+                      << "," << min_error
+                      << " [meters]" << std::endl;
+            std::cout.precision(ss);
+
+            // plots
+            if (FLAGS_show_plots)
+                {
+                    Gnuplot g3("linespoints");
+                    g3.set_title(data_title + "Code range - Carrier phase range [m]");
+                    g3.set_grid();
+                    g3.set_xlabel("Time [s]");
+                    g3.set_ylabel("Code range - Carrier phase range [m]");
+                    // conversion between arma::vec and std:vector
+                    std::vector<double> range_error_m(err.colptr(0), err.colptr(0) + err.n_rows);
+                    g3.cmd("set key box opaque");
+                    g3.plot_xy(time_vector, range_error_m,
+                        "Code range - Carrier phase range");
+                    g3.set_legend();
+                    g3.savetops(data_title + "Code_range_Carrier_phase_range");
+
+                    g3.showonscreen();  // window output
+                }
+        }
+    else
+        {
+            std::cout << "No valid data\n";
+        }
+}
+
+
+double compute_rx_clock_error(const std::string& rinex_nav_filename, const std::string& rinex_obs_file)
 {
     std::cout << "Computing receiver's clock error..." << std::endl;
     if (not file_exist(rinex_nav_filename.c_str()))
@@ -879,7 +1104,10 @@ double compute_rx_clock_error(std::string rinex_nav_filename, std::string rinex_
             rnffs >> hdr;
 
             // Storing the ephemeris in "bcstore"
-            while (rnffs >> rne) bcestore.addEphemeris(rne);
+            while (rnffs >> rne)
+                {
+                    bcestore.addEphemeris(rne);
+                }
 
             // Setting the criteria for looking up ephemeris
             bcestore.SearchNear();
@@ -887,9 +1115,6 @@ double compute_rx_clock_error(std::string rinex_nav_filename, std::string rinex_
             // Open and read the observation file one epoch at a time.
             // For each epoch, compute and print a position solution
             gpstk::Rinex3ObsStream roffs(rinex_obs_file.c_str());  // Open observations data file
-
-            // In order to throw exceptions, it is necessary to set the failbit
-            roffs.exceptions(std::ios::failbit);
 
             gpstk::Rinex3ObsHeader roh;
             gpstk::Rinex3ObsData rod;
@@ -1007,7 +1232,7 @@ double compute_rx_clock_error(std::string rinex_nav_filename, std::string rinex_
 
                                     // return iret;
                                 }
-                            catch (gpstk::Exception& e)
+                            catch (const gpstk::Exception& e)
                                 {
                                 }
 
@@ -1045,7 +1270,11 @@ double compute_rx_clock_error(std::string rinex_nav_filename, std::string rinex_
                         }          // End of 'if( rod.epochFlag == 0 || rod.epochFlag == 1 )'
                 }                  // End of 'while( roffs >> rod )'
         }
-    catch (gpstk::Exception& e)
+    catch (const gpstk::FFStreamError& e)
+        {
+            std::cout << "GPSTK exception: " << e << std::endl;
+        }
+    catch (const gpstk::Exception& e)
         {
             std::cout << "GPSTK exception: " << e << std::endl;
         }
@@ -1063,7 +1292,7 @@ void RINEX_doublediff_dupli_sat()
     // special test mode for duplicated satellites
     // read rinex receiver-under-test observations
     std::map<int, arma::mat> test_obs = ReadRinexObs(FLAGS_test_rinex_obs, 'G', std::string("1C\0"));
-    if (test_obs.size() == 0)
+    if (test_obs.empty())
         {
             return;
         }
@@ -1071,12 +1300,12 @@ void RINEX_doublediff_dupli_sat()
     double initial_transitory_s = FLAGS_skip_obs_transitory_s;
     std::cout << "Skipping initial transitory of " << initial_transitory_s << " [s]" << std::endl;
     arma::uvec index;
-    for (std::map<int, arma::mat>::iterator it = test_obs.begin(); it != test_obs.end(); ++it)
+    for (auto& test_ob : test_obs)
         {
-            index = arma::find(it->second.col(0) >= (it->second.col(0)(0) + initial_transitory_s), 1, "first");
+            index = arma::find(test_ob.second.col(0) >= (test_ob.second.col(0)(0) + initial_transitory_s), 1, "first");
             if ((!index.empty()) and (index(0) > 0))
                 {
-                    it->second.shed_rows(0, index(0));
+                    test_ob.second.shed_rows(0, index(0));
                 }
         }
 
@@ -1134,7 +1363,7 @@ void RINEX_doublediff(bool remove_rx_clock_error)
     // read rinex receiver-under-test observations
     std::map<int, arma::mat> test_obs = ReadRinexObs(FLAGS_test_rinex_obs, 'G', std::string("1C\0"));
 
-    if (ref_obs.size() == 0 or test_obs.size() == 0)
+    if (ref_obs.empty() or test_obs.empty())
         {
             return;
         }
@@ -1150,17 +1379,16 @@ void RINEX_doublediff(bool remove_rx_clock_error)
 
     double common_clock_error_s = test_rx_clock_error_s - ref_rx_clock_error_s;
 
-
     // Cut measurement initial transitory of the measurements
     double initial_transitory_s = FLAGS_skip_obs_transitory_s;
     std::cout << "Skipping initial transitory of " << initial_transitory_s << " [s]" << std::endl;
     arma::uvec index;
-    for (std::map<int, arma::mat>::iterator it = test_obs.begin(); it != test_obs.end(); ++it)
+    for (auto& test_ob : test_obs)
         {
-            index = arma::find(it->second.col(0) >= (it->second.col(0)(0) + initial_transitory_s), 1, "first");
+            index = arma::find(test_ob.second.col(0) >= (test_ob.second.col(0)(0) + initial_transitory_s), 1, "first");
             if ((!index.empty()) and (index(0) > 0))
                 {
-                    it->second.shed_rows(0, index(0));
+                    test_ob.second.shed_rows(0, index(0));
                 }
         }
 
@@ -1174,12 +1402,12 @@ void RINEX_doublediff(bool remove_rx_clock_error)
             // cut rover vector
             std::cout << "Cutting rover observations vector end.." << std::endl;
             arma::uvec index2;
-            for (std::map<int, arma::mat>::iterator it = test_obs.begin(); it != test_obs.end(); ++it)
+            for (auto& test_ob : test_obs)
                 {
-                    index = arma::find(it->second.col(0) >= ref_obs_time.back(), 1, "first");
+                    index = arma::find(test_ob.second.col(0) >= ref_obs_time.back(), 1, "first");
                     if ((!index.empty()) and (index(0) > 0))
                         {
-                            it->second.shed_rows(index(0), it->second.n_rows - 1);
+                            test_ob.second.shed_rows(index(0), test_ob.second.n_rows - 1);
                         }
                 }
         }
@@ -1188,12 +1416,12 @@ void RINEX_doublediff(bool remove_rx_clock_error)
             // there are more base observations than rover observations
             // cut base vector
             std::cout << "Cutting base observations vector end.." << std::endl;
-            for (std::map<int, arma::mat>::iterator it = ref_obs.begin(); it != ref_obs.end(); ++it)
+            for (auto& ref_ob : ref_obs)
                 {
-                    index = arma::find(it->second.col(0) >= test_obs_time.back(), 1, "first");
+                    index = arma::find(ref_ob.second.col(0) >= test_obs_time.back(), 1, "first");
                     if ((!index.empty()) and (index(0) > 0))
                         {
-                            it->second.shed_rows(index(0), it->second.n_rows - 1);
+                            ref_ob.second.shed_rows(index(0), ref_ob.second.n_rows - 1);
                         }
                 }
         }
@@ -1204,74 +1432,74 @@ void RINEX_doublediff(bool remove_rx_clock_error)
 
     double skip_ends_s = FLAGS_skip_obs_ends_s;
     std::cout << "Skipping last " << skip_ends_s << " [s] of observations" << std::endl;
-    for (std::map<int, arma::mat>::iterator it = test_obs.begin(); it != test_obs.end(); ++it)
+    for (auto& test_ob : test_obs)
         {
-            index = arma::find(it->second.col(0) >= (test_obs_time.back() - skip_ends_s), 1, "first");
+            index = arma::find(test_ob.second.col(0) >= (test_obs_time.back() - skip_ends_s), 1, "first");
             if ((!index.empty()) and (index(0) > 0))
                 {
-                    it->second.shed_rows(index(0), it->second.n_rows - 1);
+                    test_ob.second.shed_rows(index(0), test_ob.second.n_rows - 1);
                 }
         }
-    for (std::map<int, arma::mat>::iterator it = ref_obs.begin(); it != ref_obs.end(); ++it)
+    for (auto& ref_ob : ref_obs)
         {
-            index = arma::find(it->second.col(0) >= (ref_obs_time.back() - skip_ends_s), 1, "first");
+            index = arma::find(ref_ob.second.col(0) >= (ref_obs_time.back() - skip_ends_s), 1, "first");
             if ((!index.empty()) and (index(0) > 0))
                 {
-                    it->second.shed_rows(index(0), it->second.n_rows - 1);
+                    ref_ob.second.shed_rows(index(0), ref_ob.second.n_rows - 1);
                 }
         }
 
     // Save observations in .mat files
     std::cout << "Saving RAW observables inputs to .mat files...\n";
-    for (std::map<int, arma::mat>::iterator it = ref_obs.begin(); it != ref_obs.end(); ++it)
+    for (auto& ref_ob : ref_obs)
         {
             //            std::cout << it->first << " => " << it->second.n_rows << '\n';
             //            std::cout << it->first << " has NaN values: " << it->second.has_nan() << '\n';
-            std::vector<double> tmp_time_vec(it->second.col(0).colptr(0),
-                it->second.col(0).colptr(0) + it->second.n_rows);
-            std::vector<double> tmp_vector(it->second.col(2).colptr(0),
-                it->second.col(2).colptr(0) + it->second.n_rows);
-            save_mat_xy(tmp_time_vec, tmp_vector, std::string("ref_doppler_sat" + std::to_string(it->first)));
+            std::vector<double> tmp_time_vec(ref_ob.second.col(0).colptr(0),
+                ref_ob.second.col(0).colptr(0) + ref_ob.second.n_rows);
+            std::vector<double> tmp_vector(ref_ob.second.col(2).colptr(0),
+                ref_ob.second.col(2).colptr(0) + ref_ob.second.n_rows);
+            save_mat_xy(tmp_time_vec, tmp_vector, std::string("ref_doppler_sat" + std::to_string(ref_ob.first)));
 
-            std::vector<double> tmp_vector2(it->second.col(3).colptr(0),
-                it->second.col(3).colptr(0) + it->second.n_rows);
-            save_mat_xy(tmp_time_vec, tmp_vector2, std::string("ref_carrier_phase_sat" + std::to_string(it->first)));
+            std::vector<double> tmp_vector2(ref_ob.second.col(3).colptr(0),
+                ref_ob.second.col(3).colptr(0) + ref_ob.second.n_rows);
+            save_mat_xy(tmp_time_vec, tmp_vector2, std::string("ref_carrier_phase_sat" + std::to_string(ref_ob.first)));
 
-            std::vector<double> tmp_vector3(it->second.col(1).colptr(0),
-                it->second.col(1).colptr(0) + it->second.n_rows);
-            save_mat_xy(tmp_time_vec, tmp_vector3, std::string("ref_pseudorange_sat" + std::to_string(it->first)));
+            std::vector<double> tmp_vector3(ref_ob.second.col(1).colptr(0),
+                ref_ob.second.col(1).colptr(0) + ref_ob.second.n_rows);
+            save_mat_xy(tmp_time_vec, tmp_vector3, std::string("ref_pseudorange_sat" + std::to_string(ref_ob.first)));
         }
-    for (std::map<int, arma::mat>::iterator it = test_obs.begin(); it != test_obs.end(); ++it)
+    for (auto& test_ob : test_obs)
         {
             //            std::cout << it->first << " => " << it->second.n_rows << '\n';
             //            std::cout << it->first << " has NaN values: " << it->second.has_nan() << '\n';
-            std::vector<double> tmp_time_vec(it->second.col(0).colptr(0),
-                it->second.col(0).colptr(0) + it->second.n_rows);
-            std::vector<double> tmp_vector(it->second.col(2).colptr(0),
-                it->second.col(2).colptr(0) + it->second.n_rows);
-            save_mat_xy(tmp_time_vec, tmp_vector, std::string("measured_doppler_sat" + std::to_string(it->first)));
+            std::vector<double> tmp_time_vec(test_ob.second.col(0).colptr(0),
+                test_ob.second.col(0).colptr(0) + test_ob.second.n_rows);
+            std::vector<double> tmp_vector(test_ob.second.col(2).colptr(0),
+                test_ob.second.col(2).colptr(0) + test_ob.second.n_rows);
+            save_mat_xy(tmp_time_vec, tmp_vector, std::string("measured_doppler_sat" + std::to_string(test_ob.first)));
 
-            std::vector<double> tmp_vector2(it->second.col(3).colptr(0),
-                it->second.col(3).colptr(0) + it->second.n_rows);
-            save_mat_xy(tmp_time_vec, tmp_vector2, std::string("measured_carrier_phase_sat" + std::to_string(it->first)));
+            std::vector<double> tmp_vector2(test_ob.second.col(3).colptr(0),
+                test_ob.second.col(3).colptr(0) + test_ob.second.n_rows);
+            save_mat_xy(tmp_time_vec, tmp_vector2, std::string("measured_carrier_phase_sat" + std::to_string(test_ob.first)));
 
-            std::vector<double> tmp_vector3(it->second.col(1).colptr(0),
-                it->second.col(1).colptr(0) + it->second.n_rows);
-            save_mat_xy(tmp_time_vec, tmp_vector3, std::string("measured_pseudorange_sat" + std::to_string(it->first)));
+            std::vector<double> tmp_vector3(test_ob.second.col(1).colptr(0),
+                test_ob.second.col(1).colptr(0) + test_ob.second.n_rows);
+            save_mat_xy(tmp_time_vec, tmp_vector3, std::string("measured_pseudorange_sat" + std::to_string(test_ob.first)));
         }
 
     // select reference satellite
     std::set<int> PRN_set = available_gps_prn;
     double min_range = std::numeric_limits<double>::max();
     int ref_sat_id = 1;
-    for (std::set<int>::iterator ref_prn_it = PRN_set.begin(); ref_prn_it != PRN_set.end(); ++ref_prn_it)
+    for (auto& ref_prn_it : PRN_set)
         {
-            if (ref_obs.find(*ref_prn_it) != ref_obs.end() and test_obs.find(*ref_prn_it) != test_obs.end())
+            if (ref_obs.find(ref_prn_it) != ref_obs.end() and test_obs.find(ref_prn_it) != test_obs.end())
                 {
-                    if (test_obs.at(*ref_prn_it).at(0, 1) < min_range)
+                    if (test_obs.at(ref_prn_it).at(0, 1) < min_range)
                         {
-                            min_range = test_obs.at(*ref_prn_it).at(0, 1);
-                            ref_sat_id = *ref_prn_it;
+                            min_range = test_obs.at(ref_prn_it).at(0, 1);
+                            ref_sat_id = ref_prn_it;
                         }
                 }
         }
@@ -1280,9 +1508,8 @@ void RINEX_doublediff(bool remove_rx_clock_error)
     if (ref_obs.find(ref_sat_id) != ref_obs.end() and test_obs.find(ref_sat_id) != test_obs.end())
         {
             std::cout << "Using reference satellite SV " << ref_sat_id << " with minimum range of " << min_range << " [meters]" << std::endl;
-            for (std::set<int>::iterator current_prn_it = PRN_set.begin(); current_prn_it != PRN_set.end(); ++current_prn_it)
+            for (auto& current_sat_id : PRN_set)
                 {
-                    int current_sat_id = *current_prn_it;
                     if (current_sat_id != ref_sat_id)
                         {
                             if (ref_obs.find(current_sat_id) != ref_obs.end() and test_obs.find(current_sat_id) != test_obs.end())
@@ -1318,14 +1545,93 @@ void RINEX_doublediff(bool remove_rx_clock_error)
         }
 }
 
+void RINEX_singlediff()
+{
+    // read rinex receiver-under-test observations
+    std::map<int, arma::mat> test_obs = ReadRinexObs(FLAGS_test_rinex_obs, 'G', std::string("1C\0"));
+
+    if (test_obs.empty())
+        {
+            return;
+        }
+
+    // Cut measurement initial transitory of the measurements
+    double initial_transitory_s = FLAGS_skip_obs_transitory_s;
+    std::cout << "Skipping initial transitory of " << initial_transitory_s << " [s]" << std::endl;
+    arma::uvec index;
+    for (auto& test_ob : test_obs)
+        {
+            index = arma::find(test_ob.second.col(0) >= (test_ob.second.col(0)(0) + initial_transitory_s), 1, "first");
+            if ((!index.empty()) and (index(0) > 0))
+                {
+                    test_ob.second.shed_rows(0, index(0));
+                }
+        }
+
+    // also skip last seconds of the observations (some artifacts are present in some RINEX endings)
+    arma::colvec test_obs_time = test_obs.begin()->second.col(0);
+
+    double skip_ends_s = FLAGS_skip_obs_ends_s;
+    std::cout << "Skipping last " << skip_ends_s << " [s] of observations" << std::endl;
+    for (auto& test_ob : test_obs)
+        {
+            index = arma::find(test_ob.second.col(0) >= (test_obs_time.back() - skip_ends_s), 1, "first");
+            if ((!index.empty()) and (index(0) > 0))
+                {
+                    test_ob.second.shed_rows(index(0), test_ob.second.n_rows - 1);
+                }
+        }
+
+    // Save observations in .mat files
+    std::cout << "Saving RAW observables inputs to .mat files...\n";
+
+    for (auto& test_ob : test_obs)
+        {
+            //            std::cout << it->first << " => " << it->second.n_rows << '\n';
+            //            std::cout << it->first << " has NaN values: " << it->second.has_nan() << '\n';
+            std::vector<double> tmp_time_vec(test_ob.second.col(0).colptr(0),
+                test_ob.second.col(0).colptr(0) + test_ob.second.n_rows);
+            std::vector<double> tmp_vector(test_ob.second.col(2).colptr(0),
+                test_ob.second.col(2).colptr(0) + test_ob.second.n_rows);
+            save_mat_xy(tmp_time_vec, tmp_vector, std::string("measured_doppler_sat" + std::to_string(test_ob.first)));
+
+            std::vector<double> tmp_vector2(test_ob.second.col(3).colptr(0),
+                test_ob.second.col(3).colptr(0) + test_ob.second.n_rows);
+            save_mat_xy(tmp_time_vec, tmp_vector2, std::string("measured_carrier_phase_sat" + std::to_string(test_ob.first)));
+
+            std::vector<double> tmp_vector3(test_ob.second.col(1).colptr(0),
+                test_ob.second.col(1).colptr(0) + test_ob.second.n_rows);
+            save_mat_xy(tmp_time_vec, tmp_vector3, std::string("measured_pseudorange_sat" + std::to_string(test_ob.first)));
+        }
+
+    // compute single differences
+    std::set<int> PRN_set = available_gps_prn;
+    std::cout << "Computing Code Pseudorange rate vs. Carrier phase rate difference..." << std::endl;
+    for (auto& current_sat_id : PRN_set)
+        {
+            if (test_obs.find(current_sat_id) != test_obs.end())
+                {
+                    std::cout << "RateError = PR_rate(SV" << current_sat_id << ") - Phase_rate(SV" << current_sat_id << ")" << std::endl;
+                    coderate_phaserate_consistence(test_obs.at(current_sat_id), "PRN " + std::to_string(current_sat_id) + " ");
+                }
+        }
+}
+
 
 int main(int argc, char** argv)
 {
     std::cout << "Running RINEX observables difference tool..." << std::endl;
     google::ParseCommandLineFlags(&argc, &argv, true);
-    if (FLAGS_dupli_sat)
+    if (FLAGS_single_diff)
         {
-            RINEX_doublediff_dupli_sat();
+            if (FLAGS_dupli_sat)
+                {
+                    RINEX_doublediff_dupli_sat();
+                }
+            else
+                {
+                    RINEX_singlediff();
+                }
         }
     else
         {

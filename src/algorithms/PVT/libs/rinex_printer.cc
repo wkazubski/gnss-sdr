@@ -75,7 +75,7 @@ namespace errorlib = boost::system;
 #endif
 
 
-Rinex_Printer::Rinex_Printer(int32_t conf_version, const std::string& base_path)
+Rinex_Printer::Rinex_Printer(int32_t conf_version, const std::string& base_path, const std::string& base_name)
 {
     pre_2009_file_ = false;
     std::string base_rinex_path = base_path;
@@ -108,13 +108,13 @@ Rinex_Printer::Rinex_Printer(int32_t conf_version, const std::string& base_path)
             std::cout << "RINEX files will be stored at " << base_rinex_path << std::endl;
         }
 
-    navfilename = base_rinex_path + fs::path::preferred_separator + Rinex_Printer::createFilename("RINEX_FILE_TYPE_GPS_NAV");
-    obsfilename = base_rinex_path + fs::path::preferred_separator + Rinex_Printer::createFilename("RINEX_FILE_TYPE_OBS");
-    sbsfilename = base_rinex_path + fs::path::preferred_separator + Rinex_Printer::createFilename("RINEX_FILE_TYPE_SBAS");
-    navGalfilename = base_rinex_path + fs::path::preferred_separator + Rinex_Printer::createFilename("RINEX_FILE_TYPE_GAL_NAV");
-    navMixfilename = base_rinex_path + fs::path::preferred_separator + Rinex_Printer::createFilename("RINEX_FILE_TYPE_MIXED_NAV");
-    navGlofilename = base_rinex_path + fs::path::preferred_separator + Rinex_Printer::createFilename("RINEX_FILE_TYPE_GLO_NAV");
-    navBdsfilename = base_rinex_path + fs::path::preferred_separator + Rinex_Printer::createFilename("RINEX_FILE_TYPE_BDS_NAV");
+    navfilename = base_rinex_path + fs::path::preferred_separator + Rinex_Printer::createFilename("RINEX_FILE_TYPE_GPS_NAV", base_name);
+    obsfilename = base_rinex_path + fs::path::preferred_separator + Rinex_Printer::createFilename("RINEX_FILE_TYPE_OBS", base_name);
+    sbsfilename = base_rinex_path + fs::path::preferred_separator + Rinex_Printer::createFilename("RINEX_FILE_TYPE_SBAS", base_name);
+    navGalfilename = base_rinex_path + fs::path::preferred_separator + Rinex_Printer::createFilename("RINEX_FILE_TYPE_GAL_NAV", base_name);
+    navMixfilename = base_rinex_path + fs::path::preferred_separator + Rinex_Printer::createFilename("RINEX_FILE_TYPE_MIXED_NAV", base_name);
+    navGlofilename = base_rinex_path + fs::path::preferred_separator + Rinex_Printer::createFilename("RINEX_FILE_TYPE_GLO_NAV", base_name);
+    navBdsfilename = base_rinex_path + fs::path::preferred_separator + Rinex_Printer::createFilename("RINEX_FILE_TYPE_BDS_NAV", base_name);
 
     Rinex_Printer::navFile.open(navfilename, std::ios::out | std::ios::in | std::ios::app);
     Rinex_Printer::obsFile.open(obsfilename, std::ios::out | std::ios::in | std::ios::app);
@@ -335,7 +335,7 @@ void Rinex_Printer::lengthCheck(const std::string& line)
 }
 
 
-std::string Rinex_Printer::createFilename(const std::string& type)
+std::string Rinex_Printer::createFilename(const std::string& type, const std::string& base_name)
 {
     const std::string stationName = "GSDR";  // 4-character station name designator
     boost::gregorian::date today = boost::gregorian::day_clock::local_day();
@@ -364,7 +364,6 @@ std::string Rinex_Printer::createFilename(const std::string& type)
     fileType.insert(std::pair<std::string, std::string>("RINEX_FILE_TYPE_CLK", "C"));        // C - Clock file.
     fileType.insert(std::pair<std::string, std::string>("RINEX_FILE_TYPE_SUMMARY", "S"));    // S - Summary file (used e.g., by IGS, not a standard!).
     fileType.insert(std::pair<std::string, std::string>("RINEX_FILE_TYPE_BDS_NAV", "F"));    // G - GLONASS navigation file.
-
 
     boost::posix_time::ptime pt = boost::posix_time::second_clock::local_time();
     tm pt_tm = boost::posix_time::to_tm(pt);
@@ -416,8 +415,15 @@ std::string Rinex_Printer::createFilename(const std::string& type)
     std::string yearTag = strm3.str();
 
     std::string typeOfFile = fileType[type];
-
-    std::string filename(stationName + dayOfTheYearTag + hourTag + minTag + "." + yearTag + typeOfFile);
+    std::string filename;
+    if (base_name == "-")
+        {
+            filename = stationName + dayOfTheYearTag + hourTag + minTag + "." + yearTag + typeOfFile;
+        }
+    else
+        {
+            filename = base_name + "." + yearTag + typeOfFile;
+        }
     return filename;
 }
 
@@ -3763,7 +3769,7 @@ void Rinex_Printer::log_rinex_nav(std::fstream& out, const std::map<int32_t, Gps
                     std::string decimal = std::string("0");
                     if (timestring.size() > 16)
                         {
-                            std::string decimal(timestring, 16, 1);
+                            decimal = std::string(timestring, 16, 1);
                         }
                     line += decimal;
                     line += std::string(1, ' ');
@@ -4178,8 +4184,8 @@ void Rinex_Printer::log_rinex_nav(std::fstream& out, const std::map<int32_t, Gps
             line += Rinex_Printer::doub2for(gps_ephemeris_iter->second.d_OMEGA, 18, 2);
             line += std::string(1, ' ');
             const double OMEGA_DOT_REF = -2.6e-9;  // semicircles / s, see IS-GPS-200K pp. 164
-            double OMEGA_DOT = OMEGA_DOT_REF + gps_ephemeris_iter->second.d_DELTA_OMEGA_DOT;
-            line += Rinex_Printer::doub2for(OMEGA_DOT, 18, 2);
+            double OMEGA_DOT_aux = OMEGA_DOT_REF + gps_ephemeris_iter->second.d_DELTA_OMEGA_DOT;
+            line += Rinex_Printer::doub2for(OMEGA_DOT_aux, 18, 2);
             Rinex_Printer::lengthCheck(line);
             out << line << std::endl;
 
@@ -4522,7 +4528,7 @@ void Rinex_Printer::log_rinex_nav(std::fstream& out, const std::map<int32_t, Glo
                     std::string decimal = std::string("0");
                     if (timestring.size() > 16)
                         {
-                            std::string decimal(timestring, 16, 1);
+                            decimal = std::string(timestring, 16, 1);
                         }
                     line += decimal;
                     line += std::string(1, ' ');
