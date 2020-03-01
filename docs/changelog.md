@@ -8,7 +8,7 @@ SPDX-FileCopyrightText: 2011-2020 Carles Fernandez-Prades <carles.fernandez@cttc
 )
 <!-- prettier-ignore-end -->
 
-## [Unreleased](https://github.com/gnss-sdr/gnss-sdr/tree/next)
+## [GNSS-SDR (unreleased)](https://github.com/gnss-sdr/gnss-sdr/tree/next)
 
 ### Improvements in Accuracy:
 
@@ -100,17 +100,20 @@ SPDX-FileCopyrightText: 2011-2020 Carles Fernandez-Prades <carles.fernandez@cttc
   (e.g, the volk_gnsssdr library and googletest). Build types available: `None`,
   `Release` (by default), `Debug`, `RelWithDebInfo`, `MinSizeRel`, `Coverage`,
   `NoOptWithASM`, `O2WithASM`, `O3WithASM`, `ASAN`.
+- Fix runtime errors when compiling in `Debug` mode on macOS.
 - Updated links in comments along the source code and in CMake scripts.
 - Update GSL implementation to 0.36.0. See
   https://github.com/gsl-lite/gsl-lite/releases/tag/v0.36.0
-- Create a CI job in GitHub to ensure that `clang-tidy` has been applied in most
+- Create a CI job on GitHub to ensure that `clang-tidy` has been applied in most
   of the source code (some optional blocks and tests are left apart).
-- Create a CI job in GitHub to ensure that `clang-format` has been applied.
-- Create a CI job in GitHub to ensure that `cpplint` filters have been applied.
-- Create a CI job in GitHub to ensure compliance with REUSE Specification (see
+- Create a CI job on GitHub to ensure that `clang-format` has been applied.
+- Create a CI job on GitHub to ensure that `cpplint` filters have been applied.
+- Create a CI job on GitHub to ensure compliance with REUSE Specification (see
   https://reuse.software)
-- Create a CI job in GitHub using `prettier` (https://prettier.io/) to check
+- Create a CI job on GitHub using `prettier` (https://prettier.io/) to check
   markdown files formatting.
+- Create a CI job on GitHub to check the formatting of CMake scripts using
+  `cmakelint` (see https://github.com/richq/cmake-lint).
 
 ### Improvements in Openness:
 
@@ -135,6 +138,7 @@ SPDX-FileCopyrightText: 2011-2020 Carles Fernandez-Prades <carles.fernandez@cttc
 - Improved CMake script for cross-compilation and for the detection of AVX, AVX2
   and NEON (v7 and v8) instructions.
 - Fixed warnings raised by CMake 3.17.
+- Fixed warnings raised by cmake --warn-uninitialized ..
 
 ### Improvements in Reliability:
 
@@ -161,7 +165,7 @@ SPDX-FileCopyrightText: 2011-2020 Carles Fernandez-Prades <carles.fernandez@cttc
 
 ### Improvements in Testability:
 
-- Add receiver runtime to position_test report.
+- Add receiver runtime to `position_test` report.
 - Improvements in FPGA unit tests.
 - Add new utility tool `obsdiff` to perform single and double differences
   computations from observation RINEX files. Requires GPSTk and Armadillo >=
@@ -190,7 +194,9 @@ SPDX-FileCopyrightText: 2011-2020 Carles Fernandez-Prades <carles.fernandez@cttc
 See the definitions of concepts and metrics at
 https://gnss-sdr.org/design-forces/
 
-## [0.0.11](https://github.com/gnss-sdr/gnss-sdr/releases/tag/v0.0.11)
+&nbsp;
+
+## [GNSS-SDR v0.0.11](https://github.com/gnss-sdr/gnss-sdr/releases/tag/v0.0.11)
 
 This release has several improvements in different dimensions, addition of new
 features and bug fixes:
@@ -337,7 +343,9 @@ features and bug fixes:
 See the definitions of concepts and metrics at
 https://gnss-sdr.org/design-forces/
 
-## [0.0.10](https://github.com/gnss-sdr/gnss-sdr/releases/tag/v0.0.10)
+&nbsp;
+
+## [GNSS-SDR v0.0.10](https://github.com/gnss-sdr/gnss-sdr/releases/tag/v0.0.10)
 
 This release has several improvements in different dimensions, addition of new
 features and bug fixes:
@@ -567,7 +575,9 @@ features and bug fixes:
 See the definitions of concepts and metrics at
 https://gnss-sdr.org/design-forces/
 
-## [0.0.9](https://github.com/gnss-sdr/gnss-sdr/releases/tag/v0.0.9)
+&nbsp;
+
+## [GNSS-SDR v0.0.9](https://github.com/gnss-sdr/gnss-sdr/releases/tag/v0.0.9)
 
 DOI: https://doi.org/10.5281/zenodo.291371
 
@@ -686,7 +696,9 @@ many dimensions:
 See the definitions of concepts and metrics at
 https://gnss-sdr.org/design-forces/
 
-## [0.0.8](https://github.com/gnss-sdr/gnss-sdr/releases/tag/v0.0.8)
+&nbsp;
+
+## [GNSS-SDR v0.0.8](https://github.com/gnss-sdr/gnss-sdr/releases/tag/v0.0.8)
 
 DOI: https://doi.org/10.5281/zenodo.57022
 
@@ -710,7 +722,9 @@ respect to v0.0.7. The main changes are:
 - VOLK_GNSSSDR: Added an option to trigger profiling at building time.
 - VOLK_GNSSSDR: Fix the CMake-based check for posix_memalign.
 
-## [0.0.7](https://github.com/gnss-sdr/gnss-sdr/releases/tag/v0.0.7)
+&nbsp;
+
+## [GNSS-SDR v0.0.7](https://github.com/gnss-sdr/gnss-sdr/releases/tag/v0.0.7)
 
 DOI: https://doi.org/10.5281/zenodo.51521
 
@@ -800,7 +814,9 @@ This release has several improvements, addition of new features and bug fixes:
 - Added a CGRAN (https://www.cgran.org/) manifest
 - Lots of code cleaning and fixes of typos and small bugs.
 
-## [0.0.6](https://github.com/gnss-sdr/gnss-sdr/releases/tag/v0.0.6)
+&nbsp;
+
+## [GNSS-SDR v0.0.6](https://github.com/gnss-sdr/gnss-sdr/releases/tag/v0.0.6)
 
 This release has several improvements and bug fixes:
 
@@ -847,7 +863,9 @@ This release has several improvements and bug fixes:
 - Enabled cross-compilation for ARM devices.
 - Lots of code cleaning.
 
-## [0.0.5](https://github.com/gnss-sdr/gnss-sdr/releases/tag/v0.0.5)
+&nbsp;
+
+## [GNSS-SDR v0.0.5](https://github.com/gnss-sdr/gnss-sdr/releases/tag/v0.0.5)
 
 This release has several improvements and bug fixes:
 
@@ -872,7 +890,9 @@ This release has several improvements and bug fixes:
 - Added support for interleaved I/Q byte-size sample files.
 - Minor bug fixes, updated documentation and code cleaning.
 
-## [0.0.4](https://github.com/gnss-sdr/gnss-sdr/releases/tag/v0.0.4)
+&nbsp;
+
+## [GNSS-SDR v0.0.4](https://github.com/gnss-sdr/gnss-sdr/releases/tag/v0.0.4)
 
 This release has several improvements and bug fixes:
 
@@ -907,7 +927,9 @@ This release has several improvements and bug fixes:
 - Some raw pointers have been changed to smart pointers.
 - Minor bug fixes and code cleaning.
 
-## [0.0.3](https://github.com/gnss-sdr/gnss-sdr/releases/tag/v0.0.3)
+&nbsp;
+
+## [GNSS-SDR v0.0.3](https://github.com/gnss-sdr/gnss-sdr/releases/tag/v0.0.3)
 
 This release has several improvements and bug fixes, completing the transition
 from Subversion to Git. The main changes are:

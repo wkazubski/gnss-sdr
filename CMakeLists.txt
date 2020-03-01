@@ -14,7 +14,7 @@ if(${CMAKE_SOURCE_DIR} STREQUAL ${CMAKE_BINARY_DIR})
     message(FATAL_ERROR "Prevented in-tree build, it is bad practice.\nTry 'cd build && cmake ..' instead.")
 endif()
 
-cmake_minimum_required(VERSION 2.8.12...3.16)
+cmake_minimum_required(VERSION 2.8.12...3.17)
 project(gnss-sdr CXX C)
 list(APPEND CMAKE_MODULE_PATH ${CMAKE_SOURCE_DIR}/cmake/Modules)
 
@@ -233,6 +233,18 @@ if((${CMAKE_SYSTEM_NAME} MATCHES "Linux|kFreeBSD|GNU") AND (CMAKE_CXX_COMPILER_I
         set(CMAKE_CXX_FLAGS_RELWITHDEBINFO "-O3 -g -DNDEBUG")
         set(CMAKE_C_FLAGS_RELEASE "-O3 -DNDEBUG")
         set(CMAKE_C_FLAGS_RELWITHDEBINFO "-O3 -g -DNDEBUG")
+    endif()
+endif()
+if(${CMAKE_SYSTEM_NAME} MATCHES "Darwin")
+    if(CMAKE_CXX_COMPILER_ID MATCHES "Clang")
+        # Fix for Debug mode in macOS
+        include(CheckCXXCompilerFlag)
+        check_cxx_compiler_flag(-fstandalone-debug HAVE_STANDALONE_DEBUG)
+        check_cxx_compiler_flag(-Og HAVE_OG_FLAG)
+        if(HAVE_STANDALONE_DEBUG AND HAVE_OG_FLAG)
+            set(CMAKE_CXX_FLAGS_DEBUG "-Og -g -fstandalone-debug")
+            set(CMAKE_C_FLAGS_DEBUG "-Og -g -fstandalone-debug")
+        endif()
     endif()
 endif()
 
@@ -836,6 +848,7 @@ if(NOT VOLKGNSSSDR_FOUND)
         )
     endif()
 
+    set(STRIP_VOLK_GNSSSDR_PROFILE "")
     if(ENABLE_PACKAGING)
         if((CMAKE_CXX_COMPILER_ID STREQUAL "GNU") AND NOT WIN32)
             set(STRIP_VOLK_GNSSSDR_PROFILE "-DENABLE_STRIP=ON -DCMAKE_VERBOSE_MAKEFILE=ON")
@@ -914,7 +927,7 @@ if(NOT VOLKGNSSSDR_FOUND)
             SOURCE_DIR ${CMAKE_CURRENT_SOURCE_DIR}/src/algorithms/libs/volk_gnsssdr_module/volk_gnsssdr
             BINARY_DIR ${CMAKE_CURRENT_BINARY_DIR}/volk_gnsssdr_module/build
             CMAKE_ARGS ${VOLK_GNSSSDR_CMAKE_ARGS}
-                 -DCMAKE_BUILD_TYPE=$<$<CONFIG:None>:None>$<$<CONFIG:Debug>:Debug>$<$<CONFIG:Release>:Release>$<$<CONFIG:RelWithDebInfo>:RelWithDebInfo>$<$<CONFIG:MinSizeRel>:MinSizeRel>$<$<CONFIG:NoOptWithASM>:NoOptWithASM>$<$<CONFIG:Coverage>:Coverage>$<$<CONFIG:O2WithASM>:O2WithASM>$<$<CONFIG:O3WithASM>:O3WithASM>$<$<CONFIG:ASAN>:ASAN>
+                -DCMAKE_BUILD_TYPE=$<$<CONFIG:None>:None>$<$<CONFIG:Debug>:Debug>$<$<CONFIG:Release>:Release>$<$<CONFIG:RelWithDebInfo>:RelWithDebInfo>$<$<CONFIG:MinSizeRel>:MinSizeRel>$<$<CONFIG:NoOptWithASM>:NoOptWithASM>$<$<CONFIG:Coverage>:Coverage>$<$<CONFIG:O2WithASM>:O2WithASM>$<$<CONFIG:O3WithASM>:O3WithASM>$<$<CONFIG:ASAN>:ASAN>
             DOWNLOAD_COMMAND ""
             UPDATE_COMMAND ""
             PATCH_COMMAND ""
@@ -1505,9 +1518,13 @@ if(NOT ARMADILLO_FOUND OR ENABLE_OWN_ARMADILLO)
     )
     if(CMAKE_TOOLCHAIN_FILE)
         set(ARMADILLO_TOOLCHAIN_FILE -DCMAKE_TOOLCHAIN_FILE=${CMAKE_TOOLCHAIN_FILE})
+    else()
+        set(ARMADILLO_TOOLCHAIN_FILE "")
     endif()
     if(${CMAKE_SYSTEM_NAME} MATCHES "Darwin" AND ENABLE_OWN_ARMADILLO)
         set(DARWIN_DISABLE_HDF5 -DDETECT_HDF5=false)
+    else()
+        set(DARWIN_DISABLE_HDF5 "")
     endif()
 
     if(CMAKE_VERSION VERSION_LESS 3.2)
@@ -2277,7 +2294,11 @@ if(DOXYGEN_FOUND)
             )
         endif()
     else()
-        set(HAVE_DOT ${DOXYGEN_HAVE_DOT})
+        if(TARGET Doxygen::dot)
+            set(HAVE_DOT "YES")
+        else()
+            set(HAVE_DOT "NO")
+        endif()
     endif()
     file(TO_NATIVE_PATH ${CMAKE_SOURCE_DIR} top_srcdir)
     file(TO_NATIVE_PATH ${CMAKE_BINARY_DIR} top_builddir)
@@ -2324,12 +2345,21 @@ if(DOXYGEN_FOUND)
         )
     endif()
     message(STATUS " '${CMAKE_MAKE_PROGRAM_PRETTY_NAME} doc-clean' will clean the documentation.")
-    add_custom_target(doc-clean
-        COMMAND ${CMAKE_COMMAND} -E remove_directory ${CMAKE_BINARY_DIR}/docs/html
-        COMMAND ${CMAKE_COMMAND} -E remove_directory ${CMAKE_BINARY_DIR}/docs/latex
-        COMMAND ${CMAKE_COMMAND} -E remove ${CMAKE_BINARY_DIR}/docs/GNSS-SDR_manual.pdf
-        COMMENT "Cleaning documentation." VERBATIM
-    )
+    if(CMAKE_VERSION VERSION_LESS 3.17)
+        add_custom_target(doc-clean
+            COMMAND ${CMAKE_COMMAND} -E remove_directory ${CMAKE_BINARY_DIR}/docs/html
+            COMMAND ${CMAKE_COMMAND} -E remove_directory ${CMAKE_BINARY_DIR}/docs/latex
+            COMMAND ${CMAKE_COMMAND} -E remove ${CMAKE_BINARY_DIR}/docs/GNSS-SDR_manual.pdf
+            COMMENT "Cleaning documentation." VERBATIM
+        )
+    else()
+        add_custom_target(doc-clean
+            COMMAND ${CMAKE_COMMAND} -E rm -rf ${CMAKE_BINARY_DIR}/docs/html
+            COMMAND ${CMAKE_COMMAND} -E rm -rf ${CMAKE_BINARY_DIR}/docs/latex
+            COMMAND ${CMAKE_COMMAND} -E rm -f ${CMAKE_BINARY_DIR}/docs/GNSS-SDR_manual.pdf
+            COMMENT "Cleaning documentation." VERBATIM
+        )
+    endif()
 else()
     message(STATUS " Doxygen has not been found in your system.")
     message(STATUS " You can get nice code documentation by using it!")

@@ -79,6 +79,9 @@ endif()
 ########################################################################
 # determine passing architectures based on compile flag tests
 ########################################################################
+if(NOT PYTHON_DASH_B)
+    set(PYTHON_DASH_B "")
+endif()
 execute_process(
     COMMAND ${PYTHON_EXECUTABLE} ${PYTHON_DASH_B}
     ${PROJECT_SOURCE_DIR}/gen/volk_gnsssdr_compile_utils.py
@@ -306,7 +309,7 @@ if(NOT CROSSCOMPILE_MULTILIB AND CPU_IS_x86)
     if(${SIZEOF_CPU} EQUAL 64 AND MSVC)
         overrule_arch(mmx "No MMX for Win64")
         if(MSVC_VERSION GREATER 1700)
-            OVERRULE_ARCH(sse "No SSE for Win64 Visual Studio 2013")
+            overrule_arch(sse "No SSE for Win64 Visual Studio 2013")
         endif()
     endif()
 
@@ -404,6 +407,9 @@ else()
     execute_process(COMMAND ${CMAKE_C_COMPILER} --version
         OUTPUT_VARIABLE cmake_c_compiler_version
     )
+endif()
+if(NOT GRCBTU)
+    set(GRCBTU "")
 endif()
 set(COMPILER_INFO "${CMAKE_C_COMPILER}:::${CMAKE_C_FLAGS_${GRCBTU}} ${CMAKE_C_FLAGS}\n${CMAKE_CXX_COMPILER}:::${CMAKE_CXX_FLAGS_${GRCBTU}} ${CMAKE_CXX_FLAGS}\n")
 
