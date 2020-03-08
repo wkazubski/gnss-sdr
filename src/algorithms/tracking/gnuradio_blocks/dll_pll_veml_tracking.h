@@ -72,6 +72,7 @@ private:
     bool acquire_secondary();
     void do_correlation_step(const gr_complex *input_samples);
     void run_dll_pll();
+    void check_carrier_phase_coherent_initialization();
     void update_tracking_vars();
     void clear_tracking_vars();
     void save_correlation_results();
@@ -107,6 +108,7 @@ private:
     boost::circular_buffer<float> d_dll_filt_history;
     // tracking state machine
     int32_t d_state;
+    bool d_acc_carrier_phase_initialized;
 
     // Integration period in samples
     int32_t d_correlation_length_ms;
