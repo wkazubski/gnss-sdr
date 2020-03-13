@@ -20,18 +20,7 @@
  *
  * This file is part of GNSS-SDR.
  *
- * GNSS-SDR is free software: you can redistribute it and/or modify
- * it under the terms of the GNU General Public License as published by
- * the Free Software Foundation, either version 3 of the License, or
- * (at your option) any later version.
- *
- * GNSS-SDR is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with GNSS-SDR. If not, see <https://www.gnu.org/licenses/>.
+ * SPDX-License-Identifier: GPL-3.0-or-later
  *
  * -------------------------------------------------------------------------
  */
@@ -39,8 +28,9 @@
 #ifndef GNSS_SDR_DIRECT_RESAMPLER_CONDITIONER_CC_H
 #define GNSS_SDR_DIRECT_RESAMPLER_CONDITIONER_CC_H
 
+#include <boost/shared_ptr.hpp>
 #include <gnuradio/block.h>
-#include <volk/volk.h>
+#include <cstdint>
 
 class direct_resampler_conditioner_cc;
 
@@ -91,4 +81,4 @@ private:
     uint32_t d_phase_step;
 };
 
-#endif /* GNSS_SDR_DIRECT_RESAMPLER_CONDITIONER_CC_H */
+#endif  // GNSS_SDR_DIRECT_RESAMPLER_CONDITIONER_CC_H

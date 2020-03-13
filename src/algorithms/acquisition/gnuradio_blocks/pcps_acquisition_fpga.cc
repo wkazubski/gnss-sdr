@@ -15,18 +15,7 @@
  *
  * This file is part of GNSS-SDR.
  *
- * GNSS-SDR is free software: you can redistribute it and/or modify
- * it under the terms of the GNU General Public License as published by
- * the Free Software Foundation, either version 3 of the License, or
- * (at your option) any later version.
- *
- * GNSS-SDR is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with GNSS-SDR. If not, see <https://www.gnu.org/licenses/>.
+ * SPDX-License-Identifier: GPL-3.0-or-later
  *
  * -------------------------------------------------------------------------
  */
@@ -79,7 +68,7 @@ pcps_acquisition_fpga::pcps_acquisition_fpga(pcpsconf_fpga_t conf_)
     d_max_num_acqs = acq_parameters.max_num_acqs;
 
     acquisition_fpga = std::make_shared<Fpga_Acquisition>(acq_parameters.device_name, acq_parameters.code_length, acq_parameters.doppler_max, d_fft_size,
-        acq_parameters.fs_in, acq_parameters.sampled_ms, acq_parameters.select_queue_Fpga, acq_parameters.all_fft_codes, acq_parameters.excludelimit);
+        acq_parameters.fs_in, acq_parameters.select_queue_Fpga, acq_parameters.all_fft_codes, acq_parameters.excludelimit);
 }
 
 
@@ -134,7 +123,7 @@ void pcps_acquisition_fpga::send_positive_acquisition()
     // 0=STOP_CHANNEL 1=ACQ_SUCCEES 2=ACQ_FAIL
     DLOG(INFO) << "positive acquisition"
                << ", satellite " << d_gnss_synchro->System << " " << d_gnss_synchro->PRN
-               << ", sample_stamp " << d_sample_counter
+               << ", sample_stamp " << d_gnss_synchro->Acq_samplestamp_samples
                << ", test statistics value " << d_test_statistics
                << ", test statistics threshold " << d_threshold
                << ", code phase " << d_gnss_synchro->Acq_delay_samples
@@ -143,8 +132,7 @@ void pcps_acquisition_fpga::send_positive_acquisition()
                << ", input signal power " << d_input_power
                << ", Assist doppler_center " << d_doppler_center;
 
-
-    //the channel FSM is set, so, notify it directly the positive acquisition to minimize delays
+    // the channel FSM is set, so, notify it directly the positive acquisition to minimize delays
     d_channel_fsm.lock()->Event_valid_acquisition();
 }
 
@@ -154,7 +142,7 @@ void pcps_acquisition_fpga::send_negative_acquisition()
     // Declare negative acquisition using a message port
     DLOG(INFO) << "negative acquisition"
                << ", satellite " << d_gnss_synchro->System << " " << d_gnss_synchro->PRN
-               << ", sample_stamp " << d_sample_counter
+               << ", sample_stamp " << d_gnss_synchro->Acq_samplestamp_samples
                << ", test statistics value " << d_test_statistics
                << ", test statistics threshold " << d_threshold
                << ", code phase " << d_gnss_synchro->Acq_delay_samples
@@ -196,7 +184,6 @@ void pcps_acquisition_fpga::acquisition_core(uint32_t num_doppler_bins, uint32_t
     if (total_block_exp > d_total_block_exp)
         {
             // if the attenuation factor of the FPGA FFT-IFFT is smaller than the reference attenuation factor then we need to update the reference attenuation factor
-            std::cout << "changing blk exp..... d_total_block_exp = " << d_total_block_exp << " total_block_exp = " << total_block_exp << " chan = " << d_channel << std::endl;
             d_total_block_exp = total_block_exp;
             d_test_statistics = 0;
         }
@@ -220,7 +207,7 @@ void pcps_acquisition_fpga::acquisition_core(uint32_t num_doppler_bins, uint32_t
             if (d_downsampling_factor > 1)
                 {
                     d_gnss_synchro->Acq_delay_samples = static_cast<double>(d_downsampling_factor * (indext));
-                    d_gnss_synchro->Acq_samplestamp_samples = d_downsampling_factor * static_cast<uint64_t>(d_sample_counter) - static_cast<uint64_t>(44);  //33; //41; //+ 81*0.5; // delay due to the downsampling filter in the acquisition
+                    d_gnss_synchro->Acq_samplestamp_samples = d_downsampling_factor * static_cast<uint64_t>(d_sample_counter) - static_cast<uint64_t>(44);  // 33;  // 41;  // + 81*0.5;  // delay due to the downsampling filter in the acquisition
                 }
             else
                 {
@@ -239,18 +226,14 @@ void pcps_acquisition_fpga::acquisition_core(uint32_t num_doppler_bins, uint32_t
 void pcps_acquisition_fpga::set_active(bool active)
 {
     d_active = active;
-
     d_input_power = 0.0;
-
     d_mag = 0.0;
 
     DLOG(INFO) << "Channel: " << d_channel
                << " , doing acquisition of satellite: " << d_gnss_synchro->System << " " << d_gnss_synchro->PRN
                << " ,sample stamp: " << d_sample_counter << ", threshold: "
                << d_threshold << ", doppler_max: " << d_doppler_max
-               << ", doppler_step: " << d_doppler_step
-               // no CFAR algorithm in the FPGA
-               << ", use_CFAR_algorithm_flag: false";
+               << ", doppler_step: " << d_doppler_step;
 
     acquisition_fpga->open_device();
     acquisition_fpga->configure_acquisition();
@@ -313,7 +296,7 @@ void pcps_acquisition_fpga::set_active(bool active)
 }
 
 
-void pcps_acquisition_fpga::reset_acquisition(void)
+void pcps_acquisition_fpga::reset_acquisition()
 {
     // this function triggers a HW reset of the FPGA PL.
     acquisition_fpga->open_device();

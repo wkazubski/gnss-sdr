@@ -15,24 +15,13 @@
  *
  * This file is part of GNSS-SDR.
  *
- * GNSS-SDR is free software: you can redistribute it and/or modify
- * it under the terms of the GNU General Public License as published by
- * the Free Software Foundation, either version 3 of the License, or
- * (at your option) any later version.
- *
- * GNSS-SDR is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with GNSS-SDR. If not, see <https://www.gnu.org/licenses/>.
+ * SPDX-License-Identifier: GPL-3.0-or-later
  *
  * -------------------------------------------------------------------------
  */
 
-#ifndef GNSS_SDR_TRACKING_LOOP_FILTER_H_
-#define GNSS_SDR_TRACKING_LOOP_FILTER_H_
+#ifndef GNSS_SDR_TRACKING_LOOP_FILTER_H
+#define GNSS_SDR_TRACKING_LOOP_FILTER_H
 
 #include <vector>
 
@@ -54,10 +43,10 @@ public:
     Tracking_loop_filter(Tracking_loop_filter&&) = default;                       //!< Move operator
     Tracking_loop_filter& operator=(Tracking_loop_filter&& /*other*/) = default;  //!< Move assignment operator
 
-    float get_noise_bandwidth(void) const;
-    float get_update_interval(void) const;
-    bool get_include_last_integrator(void) const;
-    int get_order(void) const;
+    float get_noise_bandwidth() const;
+    float get_update_interval() const;
+    bool get_include_last_integrator() const;
+    int get_order() const;
 
     void set_noise_bandwidth(float noise_bandwidth);
     void set_update_interval(float update_interval);
@@ -94,7 +83,7 @@ private:
     float d_update_interval;
 
     // Compute the filter coefficients:
-    void update_coefficients(void);
+    void update_coefficients();
 };
 
 #endif

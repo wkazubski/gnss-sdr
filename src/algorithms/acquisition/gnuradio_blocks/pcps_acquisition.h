@@ -33,24 +33,13 @@
  *
  * This file is part of GNSS-SDR.
  *
- * GNSS-SDR is free software: you can redistribute it and/or modify
- * it under the terms of the GNU General Public License as published by
- * the Free Software Foundation, either version 3 of the License, or
- * (at your option) any later version.
- *
- * GNSS-SDR is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with GNSS-SDR. If not, see <https://www.gnu.org/licenses/>.
+ * SPDX-License-Identifier: GPL-3.0-or-later
  *
  * -------------------------------------------------------------------------
  */
 
-#ifndef GNSS_SDR_PCPS_ACQUISITION_H_
-#define GNSS_SDR_PCPS_ACQUISITION_H_
+#ifndef GNSS_SDR_PCPS_ACQUISITION_H
+#define GNSS_SDR_PCPS_ACQUISITION_H
 
 #if ARMA_NO_BOUND_CHECKING
 #define ARMA_NO_DEBUG 1
@@ -62,17 +51,17 @@
 #include <glog/logging.h>
 #include <gnuradio/block.h>
 #include <gnuradio/fft/fft.h>
-#include <gnuradio/gr_complex.h>     // for gr_complex
-#include <gnuradio/thread/thread.h>  // for scoped_lock
-#include <gnuradio/types.h>          // for gr_vector_const_void_star
-#include <gsl/gsl>                   // for Guidelines Support Library
-#include <volk/volk_complex.h>       // for lv_16sc_t
+#include <gnuradio/gr_complex.h>              // for gr_complex
+#include <gnuradio/thread/thread.h>           // for scoped_lock
+#include <gnuradio/types.h>                   // for gr_vector_const_void_star
+#include <gsl/gsl>                            // for Guidelines Support Library
+#include <volk/volk_complex.h>                // for lv_16sc_t
+#include <volk_gnsssdr/volk_gnsssdr_alloc.h>  // for volk_gnsssdr::vector
 #include <complex>
 #include <cstdint>
 #include <memory>
 #include <string>
 #include <utility>
-#include <vector>
 
 class Gnss_Synchro;
 class pcps_acquisition;
@@ -214,7 +203,7 @@ public:
 
 private:
     friend pcps_acquisition_sptr pcps_make_acquisition(const Acq_Conf& conf_);
-    pcps_acquisition(const Acq_Conf& conf_);
+    explicit pcps_acquisition(const Acq_Conf& conf_);
     bool d_active;
     bool d_worker_active;
     bool d_cshort;
@@ -243,14 +232,14 @@ private:
     float d_test_statistics;
     float d_doppler_center_step_two;
     std::string d_dump_filename;
-    std::vector<std::vector<float>> d_magnitude_grid;
-    std::vector<float> d_tmp_buffer;
-    std::vector<std::complex<float>> d_input_signal;
-    std::vector<std::vector<std::complex<float>>> d_grid_doppler_wipeoffs;
-    std::vector<std::vector<std::complex<float>>> d_grid_doppler_wipeoffs_step_two;
-    std::vector<std::complex<float>> d_fft_codes;
-    std::vector<std::complex<float>> d_data_buffer;
-    std::vector<lv_16sc_t> d_data_buffer_sc;
+    volk_gnsssdr::vector<volk_gnsssdr::vector<float>> d_magnitude_grid;
+    volk_gnsssdr::vector<float> d_tmp_buffer;
+    volk_gnsssdr::vector<std::complex<float>> d_input_signal;
+    volk_gnsssdr::vector<volk_gnsssdr::vector<std::complex<float>>> d_grid_doppler_wipeoffs;
+    volk_gnsssdr::vector<volk_gnsssdr::vector<std::complex<float>>> d_grid_doppler_wipeoffs_step_two;
+    volk_gnsssdr::vector<std::complex<float>> d_fft_codes;
+    volk_gnsssdr::vector<std::complex<float>> d_data_buffer;
+    volk_gnsssdr::vector<lv_16sc_t> d_data_buffer_sc;
     std::shared_ptr<gr::fft::fft_complex> d_fft_if;
     std::shared_ptr<gr::fft::fft_complex> d_ifft;
     std::weak_ptr<ChannelFsm> d_channel_fsm;
@@ -267,8 +256,9 @@ private:
     void dump_results(int32_t effective_fft_size);
     bool is_fdma();
     bool start();
+    void calculate_threshold(void);
     float first_vs_second_peak_statistic(uint32_t& indext, int32_t& doppler, uint32_t num_doppler_bins, int32_t doppler_max, int32_t doppler_step);
-    float max_to_input_power_statistic(uint32_t& indext, int32_t& doppler, float input_power, uint32_t num_doppler_bins, int32_t doppler_max, int32_t doppler_step);
+    float max_to_input_power_statistic(uint32_t& indext, int32_t& doppler, uint32_t num_doppler_bins, int32_t doppler_max, int32_t doppler_step);
 };
 
-#endif /* GNSS_SDR_PCPS_ACQUISITION_H_*/
+#endif  // GNSS_SDR_PCPS_ACQUISITION_H

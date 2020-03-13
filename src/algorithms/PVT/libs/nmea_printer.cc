@@ -3,7 +3,7 @@
  * \brief Implementation of a NMEA 2.1 printer for GNSS-SDR
  * This class provides a implementation of a subset of the NMEA-0183 standard for interfacing
  * marine electronic devices as defined by the National Marine Electronics Association (NMEA).
- * See http://www.nmea.org/ for the NMEA 183 standard
+ * See https://www.nmea.org/ for the NMEA 183 standard
  *
  * \author Javier Arribas, 2012. jarribas(at)cttc.es
  *
@@ -17,18 +17,7 @@
  *
  * This file is part of GNSS-SDR.
  *
- * GNSS-SDR is free software: you can redistribute it and/or modify
- * it under the terms of the GNU General Public License as published by
- * the Free Software Foundation, either version 3 of the License, or
- * (at your option) any later version.
- *
- * GNSS-SDR is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with GNSS-SDR. If not, see <https://www.gnu.org/licenses/>.
+ * SPDX-License-Identifier: GPL-3.0-or-later
  *
  * -------------------------------------------------------------------------
  */
@@ -43,6 +32,7 @@
 #include <fcntl.h>
 #include <iostream>  // for cout, cerr
 #include <termios.h>
+#include <utility>
 
 #if HAS_STD_FILESYSTEM
 #include <system_error>
@@ -299,7 +289,7 @@ char Nmea_Printer::checkSum(const std::string& sentence)
     // iterate over the string, XOR each byte with the total sum:
     for (char c : sentence)
         {
-            check = char(check ^ c);
+            check = static_cast<char>(check ^ c);
         }
     // return the result
     return check;

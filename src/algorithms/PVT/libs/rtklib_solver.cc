@@ -26,28 +26,7 @@
  * Copyright (C) 2017-2019, Carles Fernandez
  * All rights reserved.
  *
- * Redistribution and use in source and binary forms, with or without
- * modification, are permitted provided that the following conditions are
- * met:
- *
- * 1. Redistributions of source code must retain the above copyright
- *    notice, this list of conditions and the following disclaimer.
- *
- * 2. Redistributions in binary form must reproduce the above copyright
- *    notice, this list of conditions and the following disclaimer in the
- *    documentation and/or other materials provided with the distribution.
- *
- * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
- * "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT
- * LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR
- * A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT
- * HOLDER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL,
- * SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT
- * LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE,
- * DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY
- * THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
- * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
- * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+ * SPDX-License-Identifier: BSD-2-Clause
  *
  * -----------------------------------------------------------------------*/
 
@@ -87,11 +66,11 @@ namespace errorlib = boost::system;
 #endif
 
 
-Rtklib_Solver::Rtklib_Solver(int nchannels, std::string dump_filename, bool flag_dump_to_file, bool flag_dump_to_mat, const rtk_t &rtk)
+Rtklib_Solver::Rtklib_Solver(int nchannels, const std::string &dump_filename, bool flag_dump_to_file, bool flag_dump_to_mat, const rtk_t &rtk)
 {
     // init empty ephemeris for all the available GNSS channels
     d_nchannels = nchannels;
-    d_dump_filename = std::move(dump_filename);
+    d_dump_filename = dump_filename;
     d_flag_dump_enabled = flag_dump_to_file;
     d_flag_dump_mat_enabled = flag_dump_to_mat;
     this->set_averaging_flag(false);
@@ -566,13 +545,14 @@ bool Rtklib_Solver::get_PVT(const std::map<int, Gnss_Synchro> &gnss_observables_
                                 if (gps_ephemeris_iter != gps_ephemeris_map.cend())
                                     {
                                         // convert ephemeris from GNSS-SDR class to RTKLIB structure
-                                        eph_data[valid_obs] = eph_to_rtklib(gps_ephemeris_iter->second);
+                                        eph_data[valid_obs] = eph_to_rtklib(gps_ephemeris_iter->second, d_pre_2009_file);
                                         // convert observation from GNSS-SDR class to RTKLIB structure
                                         obsd_t newobs = {{0, 0}, '0', '0', {}, {}, {}, {}, {}, {}};
                                         obs_data[valid_obs + glo_valid_obs] = insert_obs_to_rtklib(newobs,
                                             gnss_observables_iter->second,
                                             gps_ephemeris_iter->second.i_GPS_week,
-                                            0);
+                                            0,
+                                            d_pre_2009_file);
                                         valid_obs++;
                                     }
                                 else  // the ephemeris are not available for this SV
@@ -678,7 +658,7 @@ bool Rtklib_Solver::get_PVT(const std::map<int, Gnss_Synchro> &gnss_observables_
                             }
                         break;
                     }
-                case 'R':  //TODO This should be using rtk lib nomenclature
+                case 'R':  // TODO This should be using rtk lib nomenclature
                     {
                         std::string sig_(gnss_observables_iter->second.Signal);
                         // GLONASS GNAV L1
@@ -925,8 +905,8 @@ bool Rtklib_Solver::get_PVT(const std::map<int, Gnss_Synchro> &gnss_observables_
 
             if (result == 0)
                 {
-                    LOG(INFO) << "RTKLIB rtkpos error";
-                    DLOG(INFO) << "RTKLIB rtkpos error message: " << rtk_.errbuf;
+                    LOG(INFO) << "RTKLIB rtkpos error: " << rtk_.errbuf;
+                    rtk_.neb = 0;                  // clear error buffer to avoid repeating the error message
                     this->set_time_offset_s(0.0);  // reset rx time estimation
                     this->set_num_valid_observations(0);
                 }
@@ -967,7 +947,7 @@ bool Rtklib_Solver::get_PVT(const std::map<int, Gnss_Synchro> &gnss_observables_
                     rx_position_and_time(0) = pvt_sol.rr[0];  // [m]
                     rx_position_and_time(1) = pvt_sol.rr[1];  // [m]
                     rx_position_and_time(2) = pvt_sol.rr[2];  // [m]
-                    //todo: fix this ambiguity in the RTKLIB units in receiver clock offset!
+                    // todo: fix this ambiguity in the RTKLIB units in receiver clock offset!
                     if (rtk_.opt.mode == PMODE_SINGLE)
                         {
                             // if the RTKLIB solver is set to SINGLE, the dtr is already expressed in [s]
@@ -1025,7 +1005,7 @@ bool Rtklib_Solver::get_PVT(const std::map<int, Gnss_Synchro> &gnss_observables_
                     // TOW
                     monitor_pvt.TOW_at_current_symbol_ms = gnss_observables_map.begin()->second.TOW_at_current_symbol_ms;
                     // WEEK
-                    monitor_pvt.week = adjgpsweek(nav_data.eph[0].week);
+                    monitor_pvt.week = adjgpsweek(nav_data.eph[0].week, d_pre_2009_file);
                     // PVT GPS time
                     monitor_pvt.RX_time = gnss_observables_map.begin()->second.RX_time;
                     // User clock offset [s]
@@ -1071,6 +1051,19 @@ bool Rtklib_Solver::get_PVT(const std::map<int, Gnss_Synchro> &gnss_observables_
                     monitor_pvt.hdop = dop_[2];
                     monitor_pvt.vdop = dop_[3];
 
+                    arma::vec rx_vel_enu(3);
+                    rx_vel_enu(0) = enuv[0];
+                    rx_vel_enu(1) = enuv[1];
+                    rx_vel_enu(2) = enuv[2];
+
+                    this->set_rx_vel(rx_vel_enu);
+
+                    double clock_drift_ppm = pvt_sol.dtr[5] / GPS_C_M_S * 1e6;
+
+                    this->set_clock_drift_ppm(clock_drift_ppm);
+                    // User clock drift [ppm]
+                    monitor_pvt.user_clk_drift_ppm = clock_drift_ppm;
+
                     // ######## LOG FILE #########
                     if (d_flag_dump_enabled == true)
                         {
@@ -1083,7 +1076,7 @@ bool Rtklib_Solver::get_PVT(const std::map<int, Gnss_Synchro> &gnss_observables_
                                     tmp_uint32 = gnss_observables_map.begin()->second.TOW_at_current_symbol_ms;
                                     d_dump_file.write(reinterpret_cast<char *>(&tmp_uint32), sizeof(uint32_t));
                                     // WEEK
-                                    tmp_uint32 = adjgpsweek(nav_data.eph[0].week);
+                                    tmp_uint32 = adjgpsweek(nav_data.eph[0].week, d_pre_2009_file);
                                     d_dump_file.write(reinterpret_cast<char *>(&tmp_uint32), sizeof(uint32_t));
                                     // PVT GPS time
                                     tmp_double = gnss_observables_map.begin()->second.RX_time;

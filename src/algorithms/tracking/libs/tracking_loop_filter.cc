@@ -15,18 +15,7 @@
  *
  * This file is part of GNSS-SDR.
  *
- * GNSS-SDR is free software: you can redistribute it and/or modify
- * it under the terms of the GNU General Public License as published by
- * the Free Software Foundation, either version 3 of the License, or
- * (at your option) any later version.
- *
- * GNSS-SDR is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with GNSS-SDR. If not, see <https://www.gnu.org/licenses/>.
+ * SPDX-License-Identifier: GPL-3.0-or-later
  *
  * -------------------------------------------------------------------------
  */
@@ -35,6 +24,7 @@
 #include "tracking_loop_filter.h"
 #include <glog/logging.h>
 #include <cmath>
+#include <cstddef>
 
 const int MAX_LOOP_ORDER = 3;
 const int MAX_LOOP_HISTORY_LENGTH = 4;
@@ -74,7 +64,7 @@ float Tracking_loop_filter::apply(float current_input)
     float result = 0.0;
 
     // Handle the old outputs first:
-    for (unsigned int ii = 0; ii < d_output_coefficients.size(); ++ii)
+    for (size_t ii = 0; ii < d_output_coefficients.size(); ++ii)
         {
             result += d_output_coefficients[ii] * d_outputs[(d_current_index + ii) % MAX_LOOP_HISTORY_LENGTH];
         }
@@ -94,7 +84,7 @@ float Tracking_loop_filter::apply(float current_input)
 
     d_inputs[d_current_index] = current_input;
 
-    for (unsigned int ii = 0; ii < d_input_coefficients.size(); ++ii)
+    for (size_t ii = 0; ii < d_input_coefficients.size(); ++ii)
         {
             result += d_input_coefficients[ii] * d_inputs[(d_current_index + ii) % MAX_LOOP_HISTORY_LENGTH];
         }
@@ -105,7 +95,7 @@ float Tracking_loop_filter::apply(float current_input)
 }
 
 
-void Tracking_loop_filter::update_coefficients(void)
+void Tracking_loop_filter::update_coefficients()
 {
     // Analog gains:
     float g1;
@@ -219,7 +209,7 @@ void Tracking_loop_filter::set_noise_bandwidth(float noise_bandwidth)
 }
 
 
-float Tracking_loop_filter::get_noise_bandwidth(void) const
+float Tracking_loop_filter::get_noise_bandwidth() const
 {
     return d_noise_bandwidth;
 }
@@ -232,7 +222,7 @@ void Tracking_loop_filter::set_update_interval(float update_interval)
 }
 
 
-float Tracking_loop_filter::get_update_interval(void) const
+float Tracking_loop_filter::get_update_interval() const
 {
     return d_update_interval;
 }
@@ -245,7 +235,7 @@ void Tracking_loop_filter::set_include_last_integrator(bool include_last_integra
 }
 
 
-bool Tracking_loop_filter::get_include_last_integrator(void) const
+bool Tracking_loop_filter::get_include_last_integrator() const
 {
     return d_include_last_integrator;
 }
@@ -266,7 +256,7 @@ void Tracking_loop_filter::set_order(int loop_order)
 }
 
 
-int Tracking_loop_filter::get_order(void) const
+int Tracking_loop_filter::get_order() const
 {
     return d_loop_order;
 }

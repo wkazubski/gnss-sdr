@@ -12,24 +12,13 @@
  *
  * This file is part of GNSS-SDR.
  *
- * GNSS-SDR is free software: you can redistribute it and/or modify
- * it under the terms of the GNU General Public License as published by
- * the Free Software Foundation, either version 3 of the License, or
- * (at your option) any later version.
- *
- * GNSS-SDR is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with GNSS-SDR. If not, see <https://www.gnu.org/licenses/>.
+ * SPDX-License-Identifier: GPL-3.0-or-later
  *
  * -------------------------------------------------------------------------
  */
 
-#ifndef GALILEO_E5A_PCPS_ACQUISITION_H_
-#define GALILEO_E5A_PCPS_ACQUISITION_H_
+#ifndef GNSS_SDR_GALILEO_E5A_PCPS_ACQUISITION_H
+#define GNSS_SDR_GALILEO_E5A_PCPS_ACQUISITION_H
 
 
 #include "channel_fsm.h"
@@ -154,7 +143,6 @@ public:
     void set_resampler_latency(uint32_t latency_samples) override;
 
 private:
-    float calculate_threshold(float pfa);
     ConfigurationInterface* configuration_;
     pcps_acquisition_sptr acquisition_;
     Acq_Conf acq_parameters_;
@@ -162,11 +150,7 @@ private:
     std::string item_type_;
     std::string dump_filename_;
     std::string role_;
-    bool bit_transition_flag_;
-    bool dump_;
     bool acq_pilot_;
-    bool use_CFAR_;
-    bool blocking_;
     bool acq_iq_;
     unsigned int vector_length_;
     unsigned int code_length_;
@@ -176,7 +160,6 @@ private:
     unsigned int doppler_step_;
     int doppler_center_;
     unsigned int sampled_ms_;
-    unsigned int max_dwells_;
     unsigned int in_streams_;
     unsigned int out_streams_;
     int64_t fs_in_;
@@ -185,4 +168,4 @@ private:
     Gnss_Synchro* gnss_synchro_;
 };
 
-#endif /* GALILEO_E5A_PCPS_ACQUISITION_H_ */
+#endif  // GNSS_SDR_GALILEO_E5A_PCPS_ACQUISITION_H

@@ -11,25 +11,14 @@
  *
  * This file is part of GNSS-SDR.
  *
- * GNSS-SDR is free software: you can redistribute it and/or modify
- * it under the terms of the GNU General Public License as published by
- * the Free Software Foundation, either version 3 of the License, or
- * (at your option) any later version.
- *
- * GNSS-SDR is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with GNSS-SDR. If not, see <http://www.gnu.org/licenses/>.
+ * SPDX-License-Identifier: GPL-3.0-or-later
  *
  * -------------------------------------------------------------------------
  */
 
 
-#ifndef GNSS_SDR_BEIDOU_B3I_H_
-#define GNSS_SDR_BEIDOU_B3I_H_
+#ifndef GNSS_SDR_BEIDOU_B3I_H
+#define GNSS_SDR_BEIDOU_B3I_H
 
 #include "MATH_CONSTANTS.h"
 #include <cstdint>
@@ -37,9 +26,9 @@
 
 // carrier and code frequencies
 const double BEIDOU_B3I_FREQ_HZ = 1.268520e9;         //!< BeiDou B3I [Hz]
-const double BEIDOU_B3I_CODE_RATE_HZ = 10.23e6;       //!< BeiDou B3I code rate [chips/s]
+const double BEIDOU_B3I_CODE_RATE_CPS = 10.23e6;      //!< BeiDou B3I code rate [chips/s]
 const double BEIDOU_B3I_CODE_LENGTH_CHIPS = 10230.0;  //!< BeiDou B3I code length [chips]
-const double BEIDOU_B3I_CODE_PERIOD = 0.001;          //!< BeiDou B3I code period [seconds]
+const double BEIDOU_B3I_CODE_PERIOD_S = 0.001;        //!< BeiDou B3I code period [seconds]
 const uint32_t BEIDOU_B3I_CODE_PERIOD_MS = 1;         //!< BeiDou B3I code period [ms]
 const int32_t BEIDOU_B3I_SECONDARY_CODE_LENGTH = 20;
 const std::string BEIDOU_B3I_SECONDARY_CODE_STR = "00000100110101001110";
@@ -57,4 +46,4 @@ const int32_t BEIDOU_B3I_TELEMETRY_SYMBOL_PERIOD_MS = BEIDOU_B3I_TELEMETRY_SYMBO
 const int32_t BEIDOU_B3I_TELEMETRY_RATE_SYMBOLS_SECOND = BEIDOU_B3I_TELEMETRY_RATE_BITS_SECOND * BEIDOU_B3I_TELEMETRY_SYMBOLS_PER_BIT;
 
 
-#endif /* GNSS_SDR_BEIDOU_B3I_H_ */
+#endif  // GNSS_SDR_BEIDOU_B3I_H

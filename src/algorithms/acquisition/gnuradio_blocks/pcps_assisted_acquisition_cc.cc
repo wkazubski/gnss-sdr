@@ -14,18 +14,7 @@
  *
  * This file is part of GNSS-SDR.
  *
- * GNSS-SDR is free software: you can redistribute it and/or modify
- * it under the terms of the GNU General Public License as published by
- * the Free Software Foundation, either version 3 of the License, or
- * (at your option) any later version.
- *
- * GNSS-SDR is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with GNSS-SDR. If not, see <https://www.gnu.org/licenses/>.
+ * SPDX-License-Identifier: GPL-3.0-or-later
  *
  * -------------------------------------------------------------------------
  */
@@ -50,20 +39,20 @@ extern Concurrent_Map<Gps_Acq_Assist> global_gps_acq_assist_map;
 pcps_assisted_acquisition_cc_sptr pcps_make_assisted_acquisition_cc(
     int32_t max_dwells, uint32_t sampled_ms, int32_t doppler_max, int32_t doppler_min,
     int64_t fs_in, int32_t samples_per_ms, bool dump,
-    std::string dump_filename)
+    const std::string &dump_filename)
 {
     return pcps_assisted_acquisition_cc_sptr(
         new pcps_assisted_acquisition_cc(max_dwells, sampled_ms, doppler_max, doppler_min,
-            fs_in, samples_per_ms, dump, std::move(dump_filename)));
+            fs_in, samples_per_ms, dump, dump_filename));
 }
 
 
 pcps_assisted_acquisition_cc::pcps_assisted_acquisition_cc(
     int32_t max_dwells, uint32_t sampled_ms, int32_t doppler_max, int32_t doppler_min,
     int64_t fs_in, int32_t samples_per_ms, bool dump,
-    std::string dump_filename) : gr::block("pcps_assisted_acquisition_cc",
-                                     gr::io_signature::make(1, 1, sizeof(gr_complex)),
-                                     gr::io_signature::make(0, 0, sizeof(gr_complex)))
+    const std::string &dump_filename) : gr::block("pcps_assisted_acquisition_cc",
+                                            gr::io_signature::make(1, 1, sizeof(gr_complex)),
+                                            gr::io_signature::make(0, 0, sizeof(gr_complex)))
 {
     this->message_port_register_out(pmt::mp("events"));
     d_sample_counter = 0ULL;  // SAMPLE COUNTER
@@ -90,7 +79,7 @@ pcps_assisted_acquisition_cc::pcps_assisted_acquisition_cc(
 
     // For dumping samples into a file
     d_dump = dump;
-    d_dump_filename = std::move(dump_filename);
+    d_dump_filename = dump_filename;
 
     d_doppler_resolution = 0;
     d_threshold = 0;
@@ -164,7 +153,7 @@ void pcps_assisted_acquisition_cc::forecast(int noutput_items,
 {
     if (noutput_items != 0)
         {
-            ninput_items_required[0] = d_gnuradio_forecast_samples;  //set the required available samples in each call
+            ninput_items_required[0] = d_gnuradio_forecast_samples;  // set the required available samples in each call
         }
 }
 
@@ -174,7 +163,7 @@ void pcps_assisted_acquisition_cc::get_assistance()
     Gps_Acq_Assist gps_acq_assisistance;
     if (global_gps_acq_assist_map.read(this->d_gnss_synchro->PRN, gps_acq_assisistance) == true)
         {
-            //TODO: use the LO tolerance here
+            // TODO: use the LO tolerance here
             if (gps_acq_assisistance.dopplerUncertainty >= 1000)
                 {
                     d_doppler_max = gps_acq_assisistance.d_Doppler0 + gps_acq_assisistance.dopplerUncertainty * 2;

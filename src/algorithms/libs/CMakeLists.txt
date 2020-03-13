@@ -1,19 +1,10 @@
-# Copyright (C) 2012-2019  (see AUTHORS file for a list of contributors)
+# Copyright (C) 2012-2020  (see AUTHORS file for a list of contributors)
+#
+# GNSS-SDR is a software-defined Global Navigation Satellite Systems receiver
 #
 # This file is part of GNSS-SDR.
 #
-# GNSS-SDR is free software: you can redistribute it and/or modify
-# it under the terms of the GNU General Public License as published by
-# the Free Software Foundation, either version 3 of the License, or
-# (at your option) any later version.
-#
-# GNSS-SDR is distributed in the hope that it will be useful,
-# but WITHOUT ANY WARRANTY; without even the implied warranty of
-# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-# GNU General Public License for more details.
-#
-# You should have received a copy of the GNU General Public License
-# along with GNSS-SDR. If not, see <https://www.gnu.org/licenses/>.
+# SPDX-License-Identifier: GPL-3.0-or-later
 #
 
 add_subdirectory(rtklib)
@@ -40,6 +31,7 @@ set(GNSS_SPLIBS_SOURCES
     conjugate_ic.cc
     gnss_sdr_create_directory.cc
     geofunctions.cc
+    item_type_helpers.cc
 )
 
 set(GNSS_SPLIBS_HEADERS
@@ -65,6 +57,7 @@ set(GNSS_SPLIBS_HEADERS
     gnss_sdr_create_directory.h
     gnss_circular_deque.h
     geofunctions.h
+    item_type_helpers.h
 )
 
 if(ENABLE_OPENCL)
@@ -100,14 +93,14 @@ target_include_directories(algorithms_libs
 target_link_libraries(algorithms_libs
     PUBLIC
         Armadillo::armadillo
-        Boost::boost
-        Gflags::gflags
+        Boost::headers
         Gnuradio::runtime
         Gnuradio::blocks
     PRIVATE
         core_system_parameters
         Volk::volk ${ORC_LIBRARIES}
         Volkgnsssdr::volkgnsssdr
+        Gflags::gflags
         Glog::glog
 )
 
@@ -118,7 +111,7 @@ if(ENABLE_OPENCL)
     )
 endif()
 
-if(CMAKE_BUILD_TYPE MATCHES Rel)
+if(ENABLE_ARMA_NO_DEBUG)
     target_compile_definitions(algorithms_libs
         PUBLIC -DARMA_NO_BOUND_CHECKING=1
     )
@@ -132,6 +125,30 @@ target_include_directories(algorithms_libs
 target_compile_definitions(algorithms_libs
     PUBLIC -DGNSSSDR_INSTALL_DIR="${CMAKE_INSTALL_PREFIX}"
 )
+
+if((CMAKE_CXX_COMPILER_ID STREQUAL "GNU") AND NOT WIN32)
+    if(CMAKE_CXX_COMPILER_VERSION VERSION_LESS "6.1.1")
+        target_compile_definitions(algorithms_libs
+            PRIVATE -DOLDCOMPILER=1
+        )
+    endif()
+endif()
+
+if(CMAKE_CXX_COMPILER_ID MATCHES "Clang")
+    if(CMAKE_CXX_COMPILER_ID STREQUAL "AppleClang")
+        if(CLANG_VERSION VERSION_LESS "600")
+            target_compile_definitions(algorithms_libs
+                PRIVATE -DOLDCOMPILER=1
+            )
+        endif()
+    else()
+        if(CMAKE_CXX_COMPILER_VERSION VERSION_LESS "3.5.0")
+            target_compile_definitions(algorithms_libs
+                PRIVATE -DOLDCOMPILER=1
+            )
+        endif()
+    endif()
+endif()
 
 set_property(TARGET algorithms_libs
     APPEND PROPERTY INTERFACE_INCLUDE_DIRECTORIES

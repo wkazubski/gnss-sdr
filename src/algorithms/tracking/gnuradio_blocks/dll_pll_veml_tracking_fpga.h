@@ -13,18 +13,7 @@
  *
  * This file is part of GNSS-SDR.
  *
- * GNSS-SDR is free software: you can redistribute it and/or modify
- * it under the terms of the GNU General Public License as published by
- * the Free Software Foundation, either version 3 of the License, or
- * (at your option) any later version.
- *
- * GNSS-SDR is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with GNSS-SDR. If not, see <https://www.gnu.org/licenses/>.
+ * SPDX-License-Identifier: GPL-3.0-or-later
  *
  * -------------------------------------------------------------------------
  */
@@ -37,15 +26,17 @@
 #include "tracking_FLL_PLL_filter.h"  // for PLL/FLL filter
 #include "tracking_loop_filter.h"     // for DLL filter
 #include <boost/circular_buffer.hpp>
-#include <boost/shared_ptr.hpp>   // for boost::shared_ptr
-#include <gnuradio/block.h>       // for block
-#include <gnuradio/gr_complex.h>  // for gr_complex
-#include <gnuradio/types.h>       // for gr_vector_int, gr_vector...
-#include <pmt/pmt.h>              // for pmt_t
-#include <cstdint>                // for int32_t
-#include <fstream>                // for string, ofstream
-#include <utility>                // for pair
-#include <vector>
+#include <boost/shared_ptr.hpp>               // for boost::shared_ptr
+#include <gnuradio/block.h>                   // for block
+#include <gnuradio/gr_complex.h>              // for gr_complex
+#include <gnuradio/types.h>                   // for gr_vector_int, gr_vector...
+#include <pmt/pmt.h>                          // for pmt_t
+#include <volk_gnsssdr/volk_gnsssdr_alloc.h>  // for volk_gnsssdr::vector
+#include <cstdint>                            // for int32_t
+#include <fstream>                            // for string, ofstream
+#include <memory>
+#include <string>
+#include <utility>  // for pair
 
 class Fpga_Multicorrelator_8sc;
 class Gnss_Synchro;
@@ -63,13 +54,13 @@ class dll_pll_veml_tracking_fpga : public gr::block
 {
 public:
     /*!
-	 * \brief Destructor
-	 */
+     * \brief Destructor
+     */
     ~dll_pll_veml_tracking_fpga();
 
     /*!
-	 * \brief Set the channel number and configure some multicorrelator parameters
-	 */
+     * \brief Set the channel number and configure some multicorrelator parameters
+     */
     void set_channel(uint32_t channel);
 
     /*!
@@ -83,35 +74,36 @@ public:
     void set_gnss_synchro(Gnss_Synchro *p_gnss_synchro);
 
     /*!
-	 * \brief This function starts the tracking process
-	 */
+     * \brief This function starts the tracking process
+     */
     void start_tracking();
 
     /*!
-	 * \brief This function sets a flag that makes general_work to stop in order to finish the tracking process.
-	 */
+     * \brief This function sets a flag that makes general_work to stop in order to finish the tracking process.
+     */
     void stop_tracking();
 
     /*!
-	 * \brief General Work
-	 */
+     * \brief General Work
+     */
     int general_work(int noutput_items, gr_vector_int &ninput_items,
         gr_vector_const_void_star &input_items, gr_vector_void_star &output_items);
 
     /*!
-	 * \brief This function disables the HW multicorrelator in the FPGA in order to stop the tracking process
-	 */
-    void reset(void);
+     * \brief This function disables the HW multicorrelator in the FPGA in order to stop the tracking process
+     */
+    void reset();
 
 private:
     friend dll_pll_veml_tracking_fpga_sptr dll_pll_veml_make_tracking_fpga(const Dll_Pll_Conf_Fpga &conf_);
     void msg_handler_telemetry_to_trk(const pmt::pmt_t &msg);
-    dll_pll_veml_tracking_fpga(const Dll_Pll_Conf_Fpga &conf_);
+    explicit dll_pll_veml_tracking_fpga(const Dll_Pll_Conf_Fpga &conf_);
 
     bool cn0_and_tracking_lock_status(double coh_integration_time_s);
     bool acquire_secondary();
-    void do_correlation_step(void);
+    void do_correlation_step();
     void run_dll_pll();
+    void check_carrier_phase_coherent_initialization();
     void update_tracking_vars();
     void clear_tracking_vars();
     void save_correlation_results();
@@ -141,7 +133,6 @@ private:
     std::string *d_data_secondary_code_string;
     std::string signal_pretty_name;
 
-
     // dll filter buffer
     boost::circular_buffer<float> d_dll_filt_history;
     // tracking state machine
@@ -151,10 +142,10 @@ private:
     int32_t d_correlation_length_ms;
     int32_t d_n_correlator_taps;
 
-    float *d_local_code_shift_chips;
+    volk_gnsssdr::vector<float> d_local_code_shift_chips;
     float *d_prompt_data_shift;
     std::shared_ptr<Fpga_Multicorrelator_8sc> multicorrelator_fpga;
-    gr_complex *d_correlator_outs;
+    volk_gnsssdr::vector<gr_complex> d_correlator_outs;
     gr_complex *d_Very_Early;
     gr_complex *d_Early;
     gr_complex *d_Prompt;
@@ -174,7 +165,7 @@ private:
     gr_complex d_VL_accu;
 
     gr_complex d_P_data_accu;
-    gr_complex *d_Prompt_Data;
+    volk_gnsssdr::vector<gr_complex> d_Prompt_Data;
 
     double d_code_phase_step_chips;
     double d_code_phase_rate_step_chips;
@@ -198,6 +189,8 @@ private:
     // tracking vars
     bool d_pull_in_transitory;
     bool d_corrected_doppler;
+    bool interchange_iq;
+    bool d_acc_carrier_phase_initialized;
     double d_current_correlation_time_s;
     double d_carr_phase_error_hz;
     double d_carr_freq_error_hz;
@@ -226,7 +219,7 @@ private:
     double d_CN0_SNV_dB_Hz;
     double d_carrier_lock_threshold;
     boost::circular_buffer<gr_complex> d_Prompt_circular_buffer;
-    std::vector<gr_complex> d_Prompt_buffer;
+    volk_gnsssdr::vector<gr_complex> d_Prompt_buffer;
     Exponential_Smoother d_cn0_smoother;
     Exponential_Smoother d_carrier_lock_test_smoother;
     // file dump
@@ -238,8 +231,6 @@ private:
     bool d_extended_correlation_in_fpga;
     bool d_current_extended_correlation_in_fpga;
     int32_t d_next_integration_length_samples;
-    double d_extended_integration_first_acc_carrier_phase_rad;
-    double d_extended_integration_next_acc_carrier_phase_rad_step;
     uint64_t d_sample_counter_next;
     bool d_sc_demodulate_enabled;
     int32_t d_extend_fpga_integration_periods;
@@ -252,4 +243,4 @@ private:
     bool d_stop_tracking;
 };
 
-#endif  //GNSS_SDR_DLL_PLL_VEML_TRACKING_FPGA_H
+#endif  // GNSS_SDR_DLL_PLL_VEML_TRACKING_FPGA_H

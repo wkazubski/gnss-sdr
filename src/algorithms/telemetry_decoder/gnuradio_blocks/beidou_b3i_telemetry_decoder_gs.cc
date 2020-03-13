@@ -12,18 +12,7 @@
  *
  * This file is part of GNSS-SDR.
  *
- * GNSS-SDR is free software: you can redistribute it and/or modify
- * it under the terms of the GNU General Public License as published by
- * the Free Software Foundation, either version 3 of the License, or
- * (at your option) any later version.
- *
- * GNSS-SDR is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with GNSS-SDR. If not, see <https://www.gnu.org/licenses/>.
+ * SPDX-License-Identifier: GPL-3.0-or-later
  *
  * -------------------------------------------------------------------------
  */
@@ -81,7 +70,7 @@ beidou_b3i_telemetry_decoder_gs::beidou_b3i_telemetry_decoder_gs(
     // Setting samples of preamble code
     for (int32_t i = 0; i < d_symbols_per_preamble; i++)
         {
-            if (BEIDOU_DNAV_PREAMBLE.at(i) == '1')
+            if (BEIDOU_DNAV_PREAMBLE[i] == '1')
                 {
                     d_preamble_samples[i] = 1;
                 }
@@ -131,8 +120,9 @@ beidou_b3i_telemetry_decoder_gs::~beidou_b3i_telemetry_decoder_gs()
 void beidou_b3i_telemetry_decoder_gs::decode_bch15_11_01(const int32_t *bits,
     std::array<int32_t, 15> &decbits)
 {
-    int32_t bit, err;
-    std::array<int32_t, 4> reg{1, 1, 1, 1};
+    int32_t bit;
+    int32_t err;
+    std::array<int32_t, 4> reg{-1, -1, -1, -1};
     const std::array<int32_t, 15> errind{14, 13, 10, 12, 6, 9, 4, 11, 0, 5, 7, 8, 1, 3, 2};
 
     for (uint32_t i = 0; i < 15; i++)
@@ -150,11 +140,16 @@ void beidou_b3i_telemetry_decoder_gs::decode_bch15_11_01(const int32_t *bits,
             reg[1] *= bit;
         }
 
-    err = errind[reg[0] + reg[1] * 2 + reg[2] * 4 + reg[3] * 8];
+    for (uint32_t i = 0; i < 4; ++i)
+        {
+            reg[i] = (reg[i] + 1) / 2;
+        }
+
+    err = reg[0] + reg[1] * 2 + reg[2] * 4 + reg[3] * 8;
 
     if (err > 0 and err < 16)
         {
-            decbits[err - 1] *= -1;
+            decbits[errind[err - 1]] *= -1;
         }
 }
 
@@ -317,7 +312,7 @@ void beidou_b3i_telemetry_decoder_gs::set_satellite(
             // Setting samples of preamble code
             for (int32_t i = 0; i < d_symbols_per_preamble; i++)
                 {
-                    if (BEIDOU_DNAV_PREAMBLE.at(i) == '1')
+                    if (BEIDOU_DNAV_PREAMBLE[i] == '1')
                         {
                             d_preamble_samples[i] = 1;
                         }
@@ -341,7 +336,7 @@ void beidou_b3i_telemetry_decoder_gs::set_satellite(
             // Setting samples of preamble code
             for (int32_t i = 0; i < d_symbols_per_preamble; i++)
                 {
-                    if (BEIDOU_DNAV_PREAMBLE.at(i) == '1')
+                    if (BEIDOU_DNAV_PREAMBLE[i] == '1')
                         {
                             d_preamble_samples[i] = 1;
                         }
@@ -395,7 +390,6 @@ void beidou_b3i_telemetry_decoder_gs::reset()
     d_sent_tlm_failed_msg = false;
     d_flag_valid_word = false;
     DLOG(INFO) << "Beidou B3I Telemetry decoder reset for satellite " << d_satellite;
-    return;
 }
 
 
@@ -466,14 +460,14 @@ int beidou_b3i_telemetry_decoder_gs::general_work(
                                 {
                                     for (uint32_t i = 0; i < BEIDOU_DNAV_PREAMBLE_PERIOD_SYMBOLS; i++)
                                         {
-                                            d_subframe_symbols[i] = d_symbol_history.at(i);
+                                            d_subframe_symbols[i] = d_symbol_history[i];
                                         }
                                 }
                             else  // 180 deg. inverted carrier phase PLL lock
                                 {
                                     for (uint32_t i = 0; i < BEIDOU_DNAV_PREAMBLE_PERIOD_SYMBOLS; i++)
                                         {
-                                            d_subframe_symbols[i] = -d_symbol_history.at(i);
+                                            d_subframe_symbols[i] = -d_symbol_history[i];
                                         }
                                 }
 
@@ -526,14 +520,14 @@ int beidou_b3i_telemetry_decoder_gs::general_work(
                         {
                             for (uint32_t i = 0; i < BEIDOU_DNAV_PREAMBLE_PERIOD_SYMBOLS; i++)
                                 {
-                                    d_subframe_symbols[i] = d_symbol_history.at(i);
+                                    d_subframe_symbols[i] = d_symbol_history[i];
                                 }
                         }
                     else  // 180 deg. inverted carrier phase PLL lock
                         {
                             for (uint32_t i = 0; i < BEIDOU_DNAV_PREAMBLE_PERIOD_SYMBOLS; i++)
                                 {
-                                    d_subframe_symbols[i] = -d_symbol_history.at(i);
+                                    d_subframe_symbols[i] = -d_symbol_history[i];
                                 }
                         }
 

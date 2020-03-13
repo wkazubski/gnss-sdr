@@ -32,24 +32,13 @@
  *
  * This file is part of GNSS-SDR.
  *
- * GNSS-SDR is free software: you can redistribute it and/or modify
- * it under the terms of the GNU General Public License as published by
- * the Free Software Foundation, either version 3 of the License, or
- * (at your option) any later version.
- *
- * GNSS-SDR is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with GNSS-SDR. If not, see <https://www.gnu.org/licenses/>.
+ * SPDX-License-Identifier: GPL-3.0-or-later
  *
  * -------------------------------------------------------------------------
  */
 
-#ifndef GNSS_SDR_PCPS_TONG_ACQUISITION_CC_H_
-#define GNSS_SDR_PCPS_TONG_ACQUISITION_CC_H_
+#ifndef GNSS_SDR_PCPS_TONG_ACQUISITION_CC_H
+#define GNSS_SDR_PCPS_TONG_ACQUISITION_CC_H
 
 #include "channel_fsm.h"
 #include "gnss_synchro.h"
@@ -57,6 +46,7 @@
 #include <gnuradio/fft/fft.h>
 #include <gnuradio/gr_complex.h>
 #include <fstream>
+#include <memory>  // for weak_ptr
 #include <string>
 #include <utility>
 #include <vector>
@@ -76,7 +66,7 @@ pcps_tong_acquisition_cc_sptr pcps_tong_make_acquisition_cc(
     uint32_t tong_max_val,
     uint32_t tong_max_dwells,
     bool dump,
-    std::string dump_filename);
+    const std::string& dump_filename);
 
 /*!
  * \brief This class implements a Parallel Code Phase Search Acquisition with
@@ -194,13 +184,13 @@ private:
         int64_t fs_in, int32_t samples_per_ms,
         int32_t samples_per_code, uint32_t tong_init_val,
         uint32_t tong_max_val, uint32_t tong_max_dwells,
-        bool dump, std::string dump_filename);
+        bool dump, const std::string& dump_filename);
 
     pcps_tong_acquisition_cc(uint32_t sampled_ms, uint32_t doppler_max,
         int64_t fs_in, int32_t samples_per_ms,
         int32_t samples_per_code, uint32_t tong_init_val,
         uint32_t tong_max_val, uint32_t tong_max_dwells,
-        bool dump, std::string dump_filename);
+        bool dump, const std::string& dump_filename);
 
     void calculate_magnitudes(gr_complex* fft_begin, int32_t doppler_shift,
         int32_t doppler_offset);
@@ -243,4 +233,4 @@ private:
     std::string d_dump_filename;
 };
 
-#endif /* GNSS_SDR_PCPS_TONG_ACQUISITION_CC_H_ */
+#endif  // GNSS_SDR_PCPS_TONG_ACQUISITION_CC_H

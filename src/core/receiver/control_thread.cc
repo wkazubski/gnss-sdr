@@ -16,18 +16,7 @@
  *
  * This file is part of GNSS-SDR.
  *
- * GNSS-SDR is free software: you can redistribute it and/or modify
- * it under the terms of the GNU General Public License as published by
- * the Free Software Foundation, either version 3 of the License, or
- * (at your option) any later version.
- *
- * GNSS-SDR is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with GNSS-SDR. If not, see <https://www.gnu.org/licenses/>.
+ * SPDX-License-Identifier: GPL-3.0-or-later
  *
  * -------------------------------------------------------------------------
  */
@@ -105,9 +94,9 @@ ControlThread::ControlThread()
 }
 
 
-ControlThread::ControlThread(std::shared_ptr<ConfigurationInterface> configuration)
+ControlThread::ControlThread(const std::shared_ptr<ConfigurationInterface> &configuration)
 {
-    configuration_ = std::move(configuration);
+    configuration_ = configuration;
     delete_configuration_ = false;
     restart_ = false;
     init();
@@ -116,6 +105,8 @@ ControlThread::ControlThread(std::shared_ptr<ConfigurationInterface> configurati
 
 void ControlThread::init()
 {
+    // OPTIONAL: specify a custom year to override the system time in order to postprocess old gnss records and avoid wrong week rollover
+    pre_2009_file_ = configuration_->property("GNSS-SDR.pre_2009_file", false);
     // Instantiates a control queue, a GNSS flowgraph, and a control message factory
     control_queue_ = std::make_shared<Concurrent_Queue<pmt::pmt_t>>();
     cmd_interface_.set_msg_queue(control_queue_);  // set also the queue pointer for the telecommand thread
@@ -942,13 +933,15 @@ std::vector<std::pair<int, Gnss_Satellite>> ControlThread::get_visible_sats(time
     std::map<int, Gps_Ephemeris> gps_eph_map = pvt_ptr->get_gps_ephemeris();
     for (auto &it : gps_eph_map)
         {
-            eph_t rtklib_eph = eph_to_rtklib(it.second);
+            eph_t rtklib_eph = eph_to_rtklib(it.second, pre_2009_file_);
             std::array<double, 3> r_sat{};
             double clock_bias_s;
             double sat_pos_variance_m2;
             eph2pos(gps_gtime, &rtklib_eph, r_sat.data(), &clock_bias_s,
                 &sat_pos_variance_m2);
-            double Az, El, dist_m;
+            double Az;
+            double El;
+            double dist_m;
             arma::vec r_sat_eb_e = arma::vec{r_sat[0], r_sat[1], r_sat[2]};
             arma::vec dx = r_sat_eb_e - r_eb_e;
             topocent(&Az, &El, &dist_m, r_eb_e, dx);
@@ -971,7 +964,9 @@ std::vector<std::pair<int, Gnss_Satellite>> ControlThread::get_visible_sats(time
             double sat_pos_variance_m2;
             eph2pos(gps_gtime, &rtklib_eph, r_sat.data(), &clock_bias_s,
                 &sat_pos_variance_m2);
-            double Az, El, dist_m;
+            double Az;
+            double El;
+            double dist_m;
             arma::vec r_sat_eb_e = arma::vec{r_sat[0], r_sat[1], r_sat[2]};
             arma::vec dx = r_sat_eb_e - r_eb_e;
             topocent(&Az, &El, &dist_m, r_eb_e, dx);
@@ -995,7 +990,9 @@ std::vector<std::pair<int, Gnss_Satellite>> ControlThread::get_visible_sats(time
             aux_gtime.time = fmod(utc2gpst(gps_gtime).time + 345600, 604800);
             aux_gtime.sec = 0.0;
             alm2pos(aux_gtime, &rtklib_alm, r_sat.data(), &clock_bias_s);
-            double Az, El, dist_m;
+            double Az;
+            double El;
+            double dist_m;
             arma::vec r_sat_eb_e = arma::vec{r_sat[0], r_sat[1], r_sat[2]};
             arma::vec dx = r_sat_eb_e - r_eb_e;
             topocent(&Az, &El, &dist_m, r_eb_e, dx);
@@ -1023,7 +1020,9 @@ std::vector<std::pair<int, Gnss_Satellite>> ControlThread::get_visible_sats(time
             gal_gtime.time = fmod(utc2gpst(gps_gtime).time + 345600, 604800);
             gal_gtime.sec = 0.0;
             alm2pos(gal_gtime, &rtklib_alm, r_sat.data(), &clock_bias_s);
-            double Az, El, dist_m;
+            double Az;
+            double El;
+            double dist_m;
             arma::vec r_sat_eb_e = arma::vec{r_sat[0], r_sat[1], r_sat[2]};
             arma::vec dx = r_sat_eb_e - r_eb_e;
             topocent(&Az, &El, &dist_m, r_eb_e, dx);

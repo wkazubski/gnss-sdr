@@ -13,18 +13,7 @@
  *
  * This file is part of GNSS-SDR.
  *
- * GNSS-SDR is free software: you can redistribute it and/or modify
- * it under the terms of the GNU General Public License as published by
- * the Free Software Foundation, either version 3 of the License, or
- * (at your option) any later version.
- *
- * GNSS-SDR is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with GNSS-SDR. If not, see <https://www.gnu.org/licenses/>.
+ * SPDX-License-Identifier: GPL-3.0-or-later
  *
  * -------------------------------------------------------------------------
  */
@@ -48,7 +37,7 @@ TEST(MmseResamplerTest, InstantiationAndRunTestWarning)
     double fs_out = 4000000.0;  // sampling freuqncy of the resampled signal in Hz
     std::chrono::time_point<std::chrono::system_clock> start, end;
     std::chrono::duration<double> elapsed_seconds(0);
-    int nsamples = 1000000;  //Number of samples to be computed
+    int nsamples = 1000000;  // Number of samples to be computed
     std::shared_ptr<Concurrent_Queue<pmt::pmt_t>> queue = std::make_shared<Concurrent_Queue<pmt::pmt_t>>();
     gr::top_block_sptr top_block = gr::make_top_block("mmse_resampler_conditioner_cc_test");
     boost::shared_ptr<gr::analog::sig_source_c> source = gr::analog::sig_source_c::make(fs_in, gr::analog::GR_SIN_WAVE, 1000.0, 1.0, gr_complex(0.0));
@@ -89,7 +78,7 @@ TEST(MmseResamplerTest, InstantiationAndRunTest2)
     double fs_out = 4000000.0;  // sampling freuqncy of the resampled signal in Hz
     std::chrono::time_point<std::chrono::system_clock> start, end;
     std::chrono::duration<double> elapsed_seconds(0);
-    int nsamples = 1000000;  //Number of samples to be computed
+    int nsamples = 1000000;  // Number of samples to be computed
     std::shared_ptr<Concurrent_Queue<pmt::pmt_t>> queue = std::make_shared<Concurrent_Queue<pmt::pmt_t>>();
     gr::top_block_sptr top_block = gr::make_top_block("mmse_resampler_conditioner_cc_test");
     boost::shared_ptr<gr::analog::sig_source_c> source = gr::analog::sig_source_c::make(fs_in, gr::analog::GR_SIN_WAVE, 1000.0, 1.0, gr_complex(0.0));

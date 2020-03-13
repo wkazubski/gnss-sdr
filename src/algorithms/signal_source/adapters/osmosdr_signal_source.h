@@ -2,7 +2,7 @@
  * \file osmosdr_signal_source.h
  * \brief Signal source wrapper for OsmoSDR-compatible front-ends, such as
  * HackRF or Realtek's RTL2832U-based USB dongle DVB-T receivers
- * (see http://sdr.osmocom.org/trac/wiki/rtl-sdr for more information)
+ * (see https://osmocom.org/projects/rtl-sdr/wiki for more information)
  * \author Javier Arribas, 2012. jarribas(at)cttc.es
  *
  * -------------------------------------------------------------------------
@@ -14,24 +14,13 @@
  *
  * This file is part of GNSS-SDR.
  *
- * GNSS-SDR is free software: you can redistribute it and/or modify
- * it under the terms of the GNU General Public License as published by
- * the Free Software Foundation, either version 3 of the License, or
- * (at your option) any later version.
- *
- * GNSS-SDR is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with GNSS-SDR. If not, see <https://www.gnu.org/licenses/>.
+ * SPDX-License-Identifier: GPL-3.0-or-later
  *
  * -------------------------------------------------------------------------
  */
 
-#ifndef GNSS_SDR_OSMOSDR_SIGNAL_SOURCE_H_
-#define GNSS_SDR_OSMOSDR_SIGNAL_SOURCE_H_
+#ifndef GNSS_SDR_OSMOSDR_SIGNAL_SOURCE_H
+#define GNSS_SDR_OSMOSDR_SIGNAL_SOURCE_H
 
 #include "concurrent_queue.h"
 #include "gnss_block_interface.h"
@@ -39,6 +28,7 @@
 #include <gnuradio/blocks/file_sink.h>
 #include <pmt/pmt.h>
 #include <cstdint>
+#include <memory>
 #include <osmosdr/source.h>
 #include <stdexcept>
 #include <string>
@@ -48,7 +38,7 @@ class ConfigurationInterface;
 /*!
  * \brief This class reads samples OsmoSDR-compatible front-ends, such as
  * HackRF or Realtek's RTL2832U-based USB dongle DVB-T receivers
- * (see http://sdr.osmocom.org/trac/wiki/rtl-sdr)
+ * (see https://osmocom.org/projects/rtl-sdr/wiki)
  */
 class OsmosdrSignalSource : public GNSSBlockInterface
 {
@@ -114,4 +104,4 @@ private:
     std::shared_ptr<Concurrent_Queue<pmt::pmt_t>> queue_;
 };
 
-#endif /*GNSS_SDR_OSMOSDR_SIGNAL_SOURCE_H_*/
+#endif  // GNSS_SDR_OSMOSDR_SIGNAL_SOURCE_H

@@ -1,32 +1,21 @@
 /*!
-* \file signal_generator_c.cc
-* \brief GNU Radio source block that generates synthesized GNSS signal.
-* \author Marc Molina, 2013. marc.molina.pena@gmail.com
-*
-* -------------------------------------------------------------------------
-*
-* Copyright (C) 2010-2019 (see AUTHORS file for a list of contributors)
-*
-* GNSS-SDR is a software defined Global Navigation
-* Satellite Systems receiver
-*
-* This file is part of GNSS-SDR.
-*
-* GNSS-SDR is free software: you can redistribute it and/or modify
-* it under the terms of the GNU General Public License as published by
-* the Free Software Foundation, either version 3 of the License, or
-* (at your option) any later version.
-*
-* GNSS-SDR is distributed in the hope that it will be useful,
-* but WITHOUT ANY WARRANTY; without even the implied warranty of
-* MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
-* GNU General Public License for more details.
-*
-* You should have received a copy of the GNU General Public License
-* along with GNSS-SDR. If not, see <https://www.gnu.org/licenses/>.
-*
-* -------------------------------------------------------------------------
-*/
+ * \file signal_generator_c.cc
+ * \brief GNU Radio source block that generates synthesized GNSS signal.
+ * \author Marc Molina, 2013. marc.molina.pena@gmail.com
+ *
+ * -------------------------------------------------------------------------
+ *
+ * Copyright (C) 2010-2019 (see AUTHORS file for a list of contributors)
+ *
+ * GNSS-SDR is a software defined Global Navigation
+ * Satellite Systems receiver
+ *
+ * This file is part of GNSS-SDR.
+ *
+ * SPDX-License-Identifier: GPL-3.0-or-later
+ *
+ * -------------------------------------------------------------------------
+ */
 
 #include "signal_generator_c.h"
 #include "GLONASS_L1_L2_CA.h"
@@ -49,12 +38,12 @@
 * a boost shared_ptr. This is effectively the public constructor.
 */
 signal_generator_c_sptr
-signal_make_generator_c(std::vector<std::string> signal1, std::vector<std::string> system, const std::vector<unsigned int> &PRN,
+signal_make_generator_c(const std::vector<std::string> &signal1, const std::vector<std::string> &system, const std::vector<unsigned int> &PRN,
     const std::vector<float> &CN0_dB, const std::vector<float> &doppler_Hz,
     const std::vector<unsigned int> &delay_chips, const std::vector<unsigned int> &delay_sec, bool data_flag, bool noise_flag,
     unsigned int fs_in, unsigned int vector_length, float BW_BB)
 {
-    return gnuradio::get_initial_sptr(new signal_generator_c(std::move(signal1), std::move(system), PRN, CN0_dB, doppler_Hz, delay_chips, delay_sec,
+    return gnuradio::get_initial_sptr(new signal_generator_c(signal1, system, PRN, CN0_dB, doppler_Hz, delay_chips, delay_sec,
         data_flag, noise_flag, fs_in, vector_length, BW_BB));
 }
 
@@ -113,14 +102,14 @@ void signal_generator_c::init()
 
             if (system_[sat] == "G")
                 {
-                    samples_per_code_.push_back(round(static_cast<float>(fs_in_) / (GPS_L1_CA_CODE_RATE_HZ / GPS_L1_CA_CODE_LENGTH_CHIPS)));
+                    samples_per_code_.push_back(round(static_cast<float>(fs_in_) / (GPS_L1_CA_CODE_RATE_CPS / GPS_L1_CA_CODE_LENGTH_CHIPS)));
 
                     num_of_codes_per_vector_.push_back(galileo_signal ? 4 * static_cast<int>(GALILEO_E1_C_SECONDARY_CODE_LENGTH) : 1);
                     data_bit_duration_ms_.push_back(1e3 / GPS_CA_TELEMETRY_RATE_BITS_SECOND);
                 }
             else if (system_[sat] == "R")
                 {
-                    samples_per_code_.push_back(round(static_cast<float>(fs_in_) / (GLONASS_L1_CA_CODE_RATE_HZ / GLONASS_L1_CA_CODE_LENGTH_CHIPS)));
+                    samples_per_code_.push_back(round(static_cast<float>(fs_in_) / (GLONASS_L1_CA_CODE_RATE_CPS / GLONASS_L1_CA_CODE_LENGTH_CHIPS)));
 
                     num_of_codes_per_vector_.push_back(galileo_signal ? 4 * static_cast<int>(GALILEO_E1_C_SECONDARY_CODE_LENGTH) : 1);
                     data_bit_duration_ms_.push_back(1e3 / GLONASS_GNAV_TELEMETRY_RATE_BITS_SECOND);
@@ -130,36 +119,31 @@ void signal_generator_c::init()
                     if (signal_[sat].at(0) == '5')
                         {
                             int codelen = static_cast<int>(GALILEO_E5A_CODE_LENGTH_CHIPS);
-                            samples_per_code_.push_back(round(static_cast<float>(fs_in_) / (GALILEO_E5A_CODE_CHIP_RATE_HZ / codelen)));
+                            samples_per_code_.push_back(round(static_cast<float>(fs_in_) / (GALILEO_E5A_CODE_CHIP_RATE_CPS / codelen)));
                             num_of_codes_per_vector_.push_back(1);
 
                             data_bit_duration_ms_.push_back(1e3 / GALILEO_E5A_SYMBOL_RATE_BPS);
                         }
                     else
                         {
-                            samples_per_code_.push_back(round(static_cast<float>(fs_in_) / (GALILEO_E1_CODE_CHIP_RATE_HZ / GALILEO_E1_B_CODE_LENGTH_CHIPS)));
+                            samples_per_code_.push_back(round(static_cast<float>(fs_in_) / (GALILEO_E1_CODE_CHIP_RATE_CPS / GALILEO_E1_B_CODE_LENGTH_CHIPS)));
 
                             num_of_codes_per_vector_.push_back(static_cast<int>(GALILEO_E1_C_SECONDARY_CODE_LENGTH));
                             data_bit_duration_ms_.push_back(1e3 / GALILEO_E1_B_SYMBOL_RATE_BPS);
                         }
                 }
         }
-    std::default_random_engine e1(r());
-    std::default_random_engine e2(r());
-    std::uniform_int_distribution<int> uniform_dist(0, RAND_MAX);
 }
 
 
 void signal_generator_c::generate_codes()
 {
-    //sampled_code_data_.reset(new gr_complex *[num_sats_]);
-    //sampled_code_pilot_.reset(new gr_complex *[num_sats_]);
     sampled_code_data_ = std::vector<std::vector<gr_complex>>(num_sats_, std::vector<gr_complex>(vector_length_));
     sampled_code_pilot_ = std::vector<std::vector<gr_complex>>(num_sats_, std::vector<gr_complex>(vector_length_));
 
     for (unsigned int sat = 0; sat < num_sats_; sat++)
         {
-            std::array<gr_complex, 64000> code{};  //[samples_per_code_[sat]];
+            std::array<gr_complex, 64000> code{};
 
             if (system_[sat] == "G")
                 {
@@ -213,7 +197,7 @@ void signal_generator_c::generate_codes()
 
                             galileo_e5_a_code_gen_complex_sampled(sampled_code_data_[sat], signal, PRN_[sat], fs_in_,
                                 static_cast<int>(GALILEO_E5A_CODE_LENGTH_CHIPS) - delay_chips_[sat]);
-                            //noise
+                            // noise
                             if (noise_flag_)
                                 {
                                     for (unsigned int i = 0; i < vector_length_; i++)
@@ -277,6 +261,8 @@ int signal_generator_c::general_work(int noutput_items __attribute__((unused)),
 
     work_counter_++;
 
+    std::default_random_engine e1(r());
+    std::default_random_engine e2(r());
     unsigned int out_idx = 0;
     unsigned int i = 0;
     unsigned int k = 0;
@@ -322,7 +308,7 @@ int signal_generator_c::general_work(int noutput_items __attribute__((unused)),
                                     out_idx++;
                                 }
 
-                            ms_counter_[sat] = (ms_counter_[sat] + static_cast<int>(round(1e3 * GPS_L1_CA_CODE_PERIOD))) % data_bit_duration_ms_[sat];
+                            ms_counter_[sat] = (ms_counter_[sat] + static_cast<int>(round(1e3 * GPS_L1_CA_CODE_PERIOD_S))) % data_bit_duration_ms_[sat];
                         }
                 }
 
@@ -355,7 +341,7 @@ int signal_generator_c::general_work(int noutput_items __attribute__((unused)),
                                     out_idx++;
                                 }
 
-                            ms_counter_[sat] = (ms_counter_[sat] + static_cast<int>(round(1e3 * GLONASS_L1_CA_CODE_PERIOD))) % data_bit_duration_ms_[sat];
+                            ms_counter_[sat] = (ms_counter_[sat] + static_cast<int>(round(1e3 * GLONASS_L1_CA_CODE_PERIOD_S))) % data_bit_duration_ms_[sat];
                         }
                 }
 
@@ -382,7 +368,7 @@ int signal_generator_c::general_work(int noutput_items __attribute__((unused)),
                             data_modulation_[sat] = current_data_bit_int_[sat] * (GALILEO_E5A_I_SECONDARY_CODE.at((ms_counter_[sat] + delay_sec_[sat]) % 20) == '0' ? 1 : -1);
                             pilot_modulation_[sat] = (GALILEO_E5A_Q_SECONDARY_CODE[PRN_[sat] - 1].at((ms_counter_[sat] + delay_sec_[sat]) % 100) == '0' ? 1 : -1);
 
-                            ms_counter_[sat] = ms_counter_[sat] + static_cast<int>(round(1e3 * GALILEO_E5A_CODE_PERIOD));
+                            ms_counter_[sat] = ms_counter_[sat] + static_cast<int>(round(1e3 * GALILEO_E5A_CODE_PERIOD_S));
 
                             for (k = delay_samples; k < samples_per_code_[sat]; k++)
                                 {
@@ -416,7 +402,7 @@ int signal_generator_c::general_work(int noutput_items __attribute__((unused)),
                                             out_idx++;
                                         }
 
-                                    ms_counter_[sat] = (ms_counter_[sat] + static_cast<int>(round(1e3 * GALILEO_E1_CODE_PERIOD))) % data_bit_duration_ms_[sat];
+                                    ms_counter_[sat] = (ms_counter_[sat] + static_cast<int>(round(1e3 * GALILEO_E1_CODE_PERIOD_S))) % data_bit_duration_ms_[sat];
                                 }
                         }
                 }

@@ -15,25 +15,15 @@
  *
  * This file is part of GNSS-SDR.
  *
- * GNSS-SDR is free software: you can redistribute it and/or modify
- * it under the terms of the GNU General Public License as published by
- * the Free Software Foundation, either version 3 of the License, or
- * (at your option) any later version.
- *
- * GNSS-SDR is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with GNSS-SDR. If not, see <https://www.gnu.org/licenses/>.
+ * SPDX-License-Identifier: GPL-3.0-or-later
  *
  * -------------------------------------------------------------------------
  */
 
-#ifndef GNSS_SDR_GLONASS_L1_CA_PCPS_ACQUISITION_H_
-#define GNSS_SDR_GLONASS_L1_CA_PCPS_ACQUISITION_H_
+#ifndef GNSS_SDR_GLONASS_L1_CA_PCPS_ACQUISITION_H
+#define GNSS_SDR_GLONASS_L1_CA_PCPS_ACQUISITION_H
 
+#include "acq_conf.h"
 #include "channel_fsm.h"
 #include "complex_byte_to_float_x2.h"
 #include "gnss_synchro.h"
@@ -156,6 +146,7 @@ public:
 
 private:
     ConfigurationInterface* configuration_;
+    Acq_Conf acq_parameters_;
     pcps_acquisition_sptr acquisition_;
     gr::blocks::float_to_complex::sptr float_to_complex_;
     complex_byte_to_float_x2_sptr cbyte_to_float_x2_;
@@ -163,25 +154,19 @@ private:
     std::string item_type_;
     unsigned int vector_length_;
     unsigned int code_length_;
-    bool bit_transition_flag_;
-    bool use_CFAR_algorithm_flag_;
     unsigned int channel_;
     std::weak_ptr<ChannelFsm> channel_fsm_;
     float threshold_;
     unsigned int doppler_max_;
     unsigned int doppler_step_;
     unsigned int sampled_ms_;
-    unsigned int max_dwells_;
     int64_t fs_in_;
-    bool dump_;
-    bool blocking_;
     std::string dump_filename_;
     std::vector<std::complex<float>> code_;
     Gnss_Synchro* gnss_synchro_;
     std::string role_;
     unsigned int in_streams_;
     unsigned int out_streams_;
-    float calculate_threshold(float pfa);
 };
 
-#endif /* GNSS_SDR_GLONASS_L1_CA_PCPS_ACQUISITION_H_ */
+#endif  // GNSS_SDR_GLONASS_L1_CA_PCPS_ACQUISITION_H

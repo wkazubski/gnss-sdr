@@ -13,18 +13,7 @@
  *
  * This file is part of GNSS-SDR.
  *
- * GNSS-SDR is free software: you can redistribute it and/or modify
- * it under the terms of the GNU General Public License as published by
- * the Free Software Foundation, either version 3 of the License, or
- * (at your option) any later version.
- *
- * GNSS-SDR is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with GNSS-SDR. If not, see <https://www.gnu.org/licenses/>.
+ * SPDX-License-Identifier: GPL-3.0-or-later
  *
  * -------------------------------------------------------------------------
  */
@@ -33,7 +22,7 @@
 #include <array>
 #include <cmath>  // for sin, cos, sqrt, abs, pow
 
-const double STRP_PI = 3.1415926535898;  // Pi as defined in IS-GPS-200E
+const double STRP_PI = 3.1415926535898;  // Pi as defined in IS-GPS-200K
 
 arma::mat Skew_symmetric(const arma::vec &a)
 {
@@ -516,18 +505,18 @@ void cart2utm(const arma::vec &r_eb_e, int zone, arma::vec &r_enu)
     //  Erster Band, Springer Verlag
     //
     // Explanation of variables used:
-    // f	   flattening of ellipsoid
-    // a	   semi major axis in m
-    // m0	   1 - scale at central meridian; for UTM 0.0004
-    // Q_n	   normalized meridian quadrant
-    // E0	   Easting of central meridian
-    // L0	   Longitude of central meridian
-    // bg	   constants for ellipsoidal geogr. to spherical geogr.
-    // gb	   constants for spherical geogr. to ellipsoidal geogr.
-    // gtu	   constants for ellipsoidal N, E to spherical N, E
-    // utg	   constants for spherical N, E to ellipoidal N, E
-    // tolutm	tolerance for utm, 1.2E-10*meridian quadrant
-    // tolgeo	tolerance for geographical, 0.00040 second of arc
+    // r       flattening of ellipsoid
+    // a       semi major axis in m
+    // m0      1 - scale at central meridian; for UTM 0.0004
+    // Q_n     normalized meridian quadrant
+    // E0      Easting of central meridian
+    // L0      Longitude of central meridian
+    // bg      constants for ellipsoidal geogr. to spherical geogr.
+    // gb      constants for spherical geogr. to ellipsoidal geogr.
+    // gtu     constants for ellipsoidal N, E to spherical N, E
+    // utg     constants for spherical N, E to ellipoidal N, E
+    // tolutm  tolerance for utm, 1.2E-10*meridian quadrant
+    // tolgeo  tolerance for geographical, 0.00040 second of arc
     //
     // B, L refer to latitude and longitude. Southern latitude is negative
     // International ellipsoid of 1924, valid for ED50

@@ -12,18 +12,7 @@
  *
  * This file is part of GNSS-SDR.
  *
- * GNSS-SDR is free software: you can redistribute it and/or modify
- * it under the terms of the GNU General Public License as published by
- * the Free Software Foundation, either version 3 of the License, or
- * (at your option) any later version.
- *
- * GNSS-SDR is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with GNSS-SDR. If not, see <https://www.gnu.org/licenses/>.
+ * SPDX-License-Identifier: GPL-3.0-or-later
  *
  * -------------------------------------------------------------------------
  */
@@ -46,7 +35,7 @@ class signal_generator_c;
 * us transparent reference counting, which greatly simplifies storage
 * management issues.
 *
-* See http://www.boost.org/libs/smart_ptr/smart_ptr.htm
+* See https://www.boost.org/doc/libs/release/libs/smart_ptr/doc/html/smart_ptr.html
 *
 * As a convention, the _sptr suffix indicates a boost::shared_ptr
 */
@@ -60,8 +49,8 @@ using signal_generator_c_sptr = boost::shared_ptr<signal_generator_c>;
 * interface for creating new instances.
 */
 signal_generator_c_sptr signal_make_generator_c(
-    std::vector<std::string> signal1,
-    std::vector<std::string> system,
+    const std::vector<std::string> &signal1,
+    const std::vector<std::string> &system,
     const std::vector<unsigned int> &PRN,
     const std::vector<float> &CN0_dB,
     const std::vector<float> &doppler_Hz,
@@ -92,8 +81,8 @@ public:
 
 private:
     friend signal_generator_c_sptr signal_make_generator_c(
-        std::vector<std::string> signal1,
-        std::vector<std::string> system,
+        const std::vector<std::string> &signal1,
+        const std::vector<std::string> &system,
         const std::vector<unsigned int> &PRN,
         const std::vector<float> &CN0_dB,
         const std::vector<float> &doppler_Hz,
@@ -150,10 +139,8 @@ private:
     std::vector<gr_complex> complex_phase_;
     unsigned int work_counter_{};
     std::random_device r;
-    std::default_random_engine e1;
-    std::default_random_engine e2;
     std::uniform_int_distribution<int> uniform_dist;
     std::normal_distribution<float> normal_dist;
 };
 
-#endif /* GNSS_SDR_SIGNAL_GENERATOR_C_H */
+#endif  // GNSS_SDR_SIGNAL_GENERATOR_C_H

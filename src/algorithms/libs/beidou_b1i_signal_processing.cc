@@ -14,18 +14,7 @@
  *
  * This file is part of GNSS-SDR.
  *
- * GNSS-SDR is free software: you can redistribute it and/or modify
- * it under the terms of the GNU General Public License as published by
- * the Free Software Foundation, either version 3 of the License, or
- * (at your option) any later version.
- *
- * GNSS-SDR is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with GNSS-SDR. If not, see <http://www.gnu.org/licenses/>.
+ * SPDX-License-Identifier: GPL-3.0-or-later
  *
  * -------------------------------------------------------------------------
  */
@@ -46,9 +35,11 @@ void beidou_b1i_code_gen_int(gsl::span<int32_t> _dest, int32_t _prn, uint32_t _c
     std::bitset<11> G1_register(std::string("01010101010"));
     std::bitset<11> G2_register(std::string("01010101010"));
 
-    bool feedback1, feedback2;
+    bool feedback1;
+    bool feedback2;
     bool aux;
-    uint32_t lcv, lcv2;
+    uint32_t lcv;
+    uint32_t lcv2;
     uint32_t delay;
     int32_t prn_idx;
 
@@ -145,7 +136,8 @@ void beidou_b1i_code_gen_complex_sampled(gsl::span<std::complex<float>> _dest, u
 {
     // This function is based on the GNU software GPS for MATLAB in the Kay Borre book
     std::array<std::complex<float>, 2046> _code{};
-    int32_t _samplesPerCode, _codeValueIndex;
+    int32_t _samplesPerCode;
+    int32_t _codeValueIndex;
     float _ts;
     float _tc;
     float aux;
@@ -153,7 +145,7 @@ void beidou_b1i_code_gen_complex_sampled(gsl::span<std::complex<float>> _dest, u
     const int32_t _codeLength = 2046;
 
     // --- Find number of samples per spreading code ---------------------------
-    _samplesPerCode = static_cast<int32_t>(static_cast<double>(_fs) / static_cast<double>(_codeFreqBasis / _codeLength));
+    _samplesPerCode = static_cast<int32_t>(static_cast<double>(_fs) / (static_cast<double>(_codeFreqBasis) / static_cast<double>(_codeLength)));
 
     // --- Find time constants -------------------------------------------------
     _ts = 1.0 / static_cast<float>(_fs);             // Sampling period in sec

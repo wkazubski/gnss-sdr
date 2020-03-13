@@ -16,24 +16,13 @@
  *
  * This file is part of GNSS-SDR.
  *
- * GNSS-SDR is free software: you can redistribute it and/or modify
- * it under the terms of the GNU General Public License as published by
- * the Free Software Foundation, either version 3 of the License, or
- * (at your option) any later version.
- *
- * GNSS-SDR is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with GNSS-SDR. If not, see <https://www.gnu.org/licenses/>.
+ * SPDX-License-Identifier: GPL-3.0-or-later
  *
  * -------------------------------------------------------------------------
  */
 
-#ifndef GNSS_SDR_CONTROL_THREAD_H_
-#define GNSS_SDR_CONTROL_THREAD_H_
+#ifndef GNSS_SDR_CONTROL_THREAD_H
+#define GNSS_SDR_CONTROL_THREAD_H
 
 #include "agnss_ref_location.h"    // for Agnss_Ref_Location
 #include "agnss_ref_time.h"        // for Agnss_Ref_Time
@@ -77,7 +66,7 @@ public:
      *
      * \param[in] configuration Pointer to a ConfigurationInterface
      */
-    ControlThread(std::shared_ptr<ConfigurationInterface> configuration);
+    explicit ControlThread(const std::shared_ptr<ConfigurationInterface> &configuration);
 
     /*!
      * \brief Destructor
@@ -171,6 +160,7 @@ private:
     std::shared_ptr<GNSSFlowgraph> flowgraph_;
     std::shared_ptr<ConfigurationInterface> configuration_;
     std::shared_ptr<Concurrent_Queue<pmt::pmt_t>> control_queue_;
+    bool pre_2009_file_;  // to override the system time to postprocess old gnss records and avoid wrong week rollover
     bool stop_;
     bool restart_;
     bool delete_configuration_;
@@ -209,4 +199,4 @@ private:
 #endif
 };
 
-#endif /* GNSS_SDR_CONTROL_THREAD_H_ */
+#endif  // GNSS_SDR_CONTROL_THREAD_H

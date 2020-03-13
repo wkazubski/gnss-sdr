@@ -12,18 +12,7 @@
  *
  * This file is part of GNSS-SDR.
  *
- * GNSS-SDR is free software: you can redistribute it and/or modify
- * it under the terms of the GNU General Public License as published by
- * the Free Software Foundation, either version 3 of the License, or
- * (at your option) any later version.
- *
- * GNSS-SDR is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with GNSS-SDR. If not, see <https://www.gnu.org/licenses/>.
+ * SPDX-License-Identifier: GPL-3.0-or-later
  *
  * -------------------------------------------------------------------------
  */
@@ -213,9 +202,13 @@ private:
 
     int32_t max_obs_block_rx_clock_offset_ms;
     bool d_waiting_obs_block_rx_clock_offset_correction_msg;
+    bool d_enable_rx_clock_correction;
     std::map<int, Gnss_Synchro> gnss_observables_map;
     std::map<int, Gnss_Synchro> gnss_observables_map_t0;
     std::map<int, Gnss_Synchro> gnss_observables_map_t1;
+
+    std::vector<double> initial_carrier_phase_offset_estimation_rads;
+    std::vector<bool> channel_initialized;
 
     uint32_t type_of_rx;
 
@@ -230,8 +223,8 @@ private:
     bool send_sys_v_ttff_msg(ttff_msgbuf ttff);
     std::chrono::time_point<std::chrono::system_clock> start, end;
 
+    void initialize_and_apply_carrier_phase_offset();
     bool save_gnss_synchro_map_xml(const std::string& file_name);  // debug helper function
-
     bool load_gnss_synchro_map_xml(const std::string& file_name);  // debug helper function
 
     bool d_xml_storage;
@@ -251,4 +244,4 @@ private:
     boost::posix_time::time_duration d_utc_diff_time;
 };
 
-#endif
+#endif  // GNSS_SDR_RTKLIB_PVT_GS_H

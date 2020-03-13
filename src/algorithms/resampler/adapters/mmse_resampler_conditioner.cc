@@ -13,18 +13,7 @@
  *
  * This file is part of GNSS-SDR.
  *
- * GNSS-SDR is free software: you can redistribute it and/or modify
- * it under the terms of the GNU General Public License as published by
- * the Free Software Foundation, either version 3 of the License, or
- * (at your option) any later version.
- *
- * GNSS-SDR is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with GNSS-SDR. If not, see <https://www.gnu.org/licenses/>.
+ * SPDX-License-Identifier: GPL-3.0-or-later
  *
  * -------------------------------------------------------------------------
  */
@@ -35,7 +24,7 @@
 #include <gnuradio/blocks/file_sink.h>
 #include <cmath>
 #include <limits>
-
+#include <vector>
 
 MmseResamplerConditioner::MmseResamplerConditioner(
     ConfigurationInterface* configuration, const std::string& role,
@@ -43,7 +32,8 @@ MmseResamplerConditioner::MmseResamplerConditioner(
 {
     std::string default_item_type = "gr_complex";
     std::string default_dump_file = "./data/signal_conditioner.dat";
-    double fs_in_deprecated, fs_in;
+    double fs_in_deprecated;
+    double fs_in;
     fs_in_deprecated = configuration->property("GNSS-SDR.internal_fs_hz", 2048000.0);
     fs_in = configuration->property("GNSS-SDR.internal_fs_sps", fs_in_deprecated);
     sample_freq_in_ = configuration->property(role_ + ".sample_freq_in", 4000000.0);
@@ -63,8 +53,7 @@ MmseResamplerConditioner::MmseResamplerConditioner(
         {
             item_size_ = sizeof(gr_complex);
 
-
-            //create a FIR low pass filter
+            // create a FIR low pass filter
             std::vector<float> taps = gr::filter::firdes::low_pass(1.0,
                 sample_freq_in_,
                 sample_freq_out_ / 2.1,

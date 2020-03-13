@@ -14,18 +14,7 @@
  *
  * This file is part of GNSS-SDR.
  *
- * GNSS-SDR is free software: you can redistribute it and/or modify
- * it under the terms of the GNU General Public License as published by
- * the Free Software Foundation, either version 3 of the License, or
- * (at your option) any later version.
- *
- * GNSS-SDR is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with GNSS-SDR. If not, see <https://www.gnu.org/licenses/>.
+ * SPDX-License-Identifier: GPL-3.0-or-later
  *
  * -------------------------------------------------------------------------
  */
@@ -169,7 +158,7 @@ void gnss_sdr_fpga_sample_counter::open_device()
     else
         {
             LOG(INFO) << "Acquisition test register sanity check success!";
-            //std::cout << "Acquisition test register sanity check success!" << std::endl;
+            // std::cout << "Acquisition test register sanity check success!" << std::endl;
         }
 }
 
@@ -194,7 +183,8 @@ int gnss_sdr_fpga_sample_counter::general_work(int noutput_items __attribute__((
 {
     wait_for_interrupt();
 
-    uint64_t sample_counter_tmp, sample_counter_msw_tmp;
+    uint64_t sample_counter_tmp;
+    uint64_t sample_counter_msw_tmp;
     sample_counter_tmp = map_base[0];
     sample_counter_msw_tmp = map_base[1];
     sample_counter_msw_tmp = sample_counter_msw_tmp << 32;

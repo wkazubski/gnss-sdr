@@ -29,24 +29,13 @@
  *
  * This file is part of GNSS-SDR.
  *
- * GNSS-SDR is free software: you can redistribute it and/or modify
- * it under the terms of the GNU General Public License as published by
- * the Free Software Foundation, either version 3 of the License, or
- * (at your option) any later version.
- *
- * GNSS-SDR is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with GNSS-SDR. If not, see <https://www.gnu.org/licenses/>.
+ * SPDX-License-Identifier: GPL-3.0-or-later
  *
  * -------------------------------------------------------------------------
  */
 
-#ifndef GNSS_SDR_PCPS_ASSISTED_ACQUISITION_CC_H_
-#define GNSS_SDR_PCPS_ASSISTED_ACQUISITION_CC_H_
+#ifndef GNSS_SDR_PCPS_ASSISTED_ACQUISITION_CC_H
+#define GNSS_SDR_PCPS_ASSISTED_ACQUISITION_CC_H
 
 #include "channel_fsm.h"
 #include "gnss_synchro.h"
@@ -70,7 +59,7 @@ pcps_assisted_acquisition_cc_sptr pcps_make_assisted_acquisition_cc(
     int32_t doppler_min,
     int64_t fs_in,
     int32_t samples_per_ms,
-    bool dump, std::string dump_filename);
+    bool dump, const std::string& dump_filename);
 
 /*!
  * \brief This class implements a Parallel Code Phase Search Acquisition.
@@ -181,12 +170,12 @@ private:
     pcps_make_assisted_acquisition_cc(int32_t max_dwells, uint32_t sampled_ms,
         int32_t doppler_max, int32_t doppler_min, int64_t fs_in,
         int32_t samples_per_ms, bool dump,
-        std::string dump_filename);
+        const std::string& dump_filename);
 
     pcps_assisted_acquisition_cc(int32_t max_dwells, uint32_t sampled_ms,
         int32_t doppler_max, int32_t doppler_min, int64_t fs_in,
         int32_t samples_per_ms, bool dump,
-        std::string dump_filename);
+        const std::string& dump_filename);
 
     void calculate_magnitudes(gr_complex* fft_begin, int32_t doppler_shift,
         int32_t doppler_offset);
@@ -238,4 +227,4 @@ private:
     std::string d_dump_filename;
 };
 
-#endif /* GNSS_SDR_PCPS_ASSISTED_ACQUISITION_CC_H_ */
+#endif  // GNSS_SDR_PCPS_ASSISTED_ACQUISITION_CC_H

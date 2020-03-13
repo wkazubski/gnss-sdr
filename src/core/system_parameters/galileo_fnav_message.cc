@@ -18,18 +18,7 @@
  *
  * This file is part of GNSS-SDR.
  *
- * GNSS-SDR is free software: you can redistribute it and/or modify
- * it under the terms of the GNU General Public License as published by
- * the Free Software Foundation, either version 3 of the License, or
- * (at your option) any later version.
- *
- * GNSS-SDR is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with GNSS-SDR. If not, see <https://www.gnu.org/licenses/>.
+ * SPDX-License-Identifier: GPL-3.0-or-later
  *
  * -------------------------------------------------------------------------
  */
@@ -377,12 +366,12 @@ void Galileo_Fnav_Message::decode_page(const std::string& data)
             FNAV_w_2_5 *= FNAV_W_5_LSB;
             FNAV_deltai_2_5 = static_cast<double>(read_navigation_signed(data_bits, FNAV_DELTAI_2_5_BIT));
             FNAV_deltai_2_5 *= FNAV_DELTAI_5_LSB;
-            //TODO check this
+            // TODO check this
             // Omega0_2 must be decoded when the two pieces are joined
             omega0_1 = data.substr(210, 4);
-            //omega_flag=true;
+            // omega_flag=true;
             //
-            //FNAV_Omega012_2_5=static_cast<double>(read_navigation_signed(data_bits, FNAV_Omega012_2_5_bit);
+            // FNAV_Omega012_2_5=static_cast<double>(read_navigation_signed(data_bits, FNAV_Omega012_2_5_bit);
             flag_almanac_1 = true;
             break;
         case 6:  // Almanac (SVID2(2/2) and SVID3)
@@ -624,8 +613,8 @@ Galileo_Utc_Model Galileo_Fnav_Message::get_utc_model()
     utc_model.Delta_tLSF_6 = FNAV_deltatlsf_4;
     utc_model.flag_utc_model = flag_utc_model;
     // GST
-    //utc_model.WN_5 = WN_5; //Week number
-    //utc_model.TOW_5 = WN_5; //Time of Week
+    // utc_model.WN_5 = WN_5; //Week number
+    // utc_model.TOW_5 = WN_5; //Time of Week
     return utc_model;
 }
 

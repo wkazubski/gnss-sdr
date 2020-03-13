@@ -14,18 +14,7 @@
  *
  * This file is part of GNSS-SDR.
  *
- * GNSS-SDR is free software: you can redistribute it and/or modify
- * it under the terms of the GNU General Public License as published by
- * the Free Software Foundation, either version 3 of the License, or
- * (at your option) any later version.
- *
- * GNSS-SDR is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with GNSS-SDR. If not, see <https://www.gnu.org/licenses/>.
+ * SPDX-License-Identifier: GPL-3.0-or-later
  *
  * -------------------------------------------------------------------------
  */
@@ -213,17 +202,18 @@ void gps_l5i_code_gen_complex_sampled(gsl::span<std::complex<float>> _dest, uint
             make_l5i(_code, _prn - 1);
         }
 
-    int32_t _samplesPerCode, _codeValueIndex;
+    int32_t _samplesPerCode;
+    int32_t _codeValueIndex;
     float _ts;
     float _tc;
     const int32_t _codeLength = GPS_L5I_CODE_LENGTH_CHIPS;
 
     // --- Find number of samples per spreading code ---------------------------
-    _samplesPerCode = static_cast<int32_t>(static_cast<double>(_fs) / (static_cast<double>(GPS_L5I_CODE_RATE_HZ) / static_cast<double>(_codeLength)));
+    _samplesPerCode = static_cast<int32_t>(static_cast<double>(_fs) / (static_cast<double>(GPS_L5I_CODE_RATE_CPS) / static_cast<double>(_codeLength)));
 
     // --- Find time constants -------------------------------------------------
-    _ts = 1.0 / static_cast<float>(_fs);                   // Sampling period in sec
-    _tc = 1.0 / static_cast<float>(GPS_L5I_CODE_RATE_HZ);  // L5I primary chip period in sec
+    _ts = 1.0 / static_cast<float>(_fs);                    // Sampling period in sec
+    _tc = 1.0 / static_cast<float>(GPS_L5I_CODE_RATE_CPS);  // L5I primary chip period in sec
 
     for (int32_t i = 0; i < _samplesPerCode; i++)
         {
@@ -256,7 +246,7 @@ void gps_l5q_code_gen_complex(gsl::span<std::complex<float>> _dest, uint32_t _pr
 
     for (int32_t i = 0; i < GPS_L5Q_CODE_LENGTH_CHIPS; i++)
         {
-            _dest[i] = std::complex<float>(1.0 - 2.0 * static_cast<float>(_code[i]), 0.0);
+            _dest[i] = std::complex<float>(0.0, 1.0 - 2.0 * static_cast<float>(_code[i]));
         }
 }
 
@@ -287,17 +277,18 @@ void gps_l5q_code_gen_complex_sampled(gsl::span<std::complex<float>> _dest, uint
             make_l5q(_code, _prn - 1);
         }
 
-    int32_t _samplesPerCode, _codeValueIndex;
+    int32_t _samplesPerCode;
+    int32_t _codeValueIndex;
     float _ts;
     float _tc;
     const int32_t _codeLength = GPS_L5Q_CODE_LENGTH_CHIPS;
 
     // --- Find number of samples per spreading code ---------------------------
-    _samplesPerCode = static_cast<int32_t>(static_cast<double>(_fs) / (static_cast<double>(GPS_L5Q_CODE_RATE_HZ) / static_cast<double>(_codeLength)));
+    _samplesPerCode = static_cast<int32_t>(static_cast<double>(_fs) / (static_cast<double>(GPS_L5Q_CODE_RATE_CPS) / static_cast<double>(_codeLength)));
 
     // --- Find time constants -------------------------------------------------
-    _ts = 1.0 / static_cast<float>(_fs);                   // Sampling period in sec
-    _tc = 1.0 / static_cast<float>(GPS_L5Q_CODE_RATE_HZ);  // L5Q chip period in sec
+    _ts = 1.0 / static_cast<float>(_fs);                    // Sampling period in sec
+    _tc = 1.0 / static_cast<float>(GPS_L5Q_CODE_RATE_CPS);  // L5Q chip period in sec
 
     for (int32_t i = 0; i < _samplesPerCode; i++)
         {
@@ -310,11 +301,11 @@ void gps_l5q_code_gen_complex_sampled(gsl::span<std::complex<float>> _dest, uint
             if (i == _samplesPerCode - 1)
                 {
                     // --- Correct the last index (due to number rounding issues) -----------
-                    _dest[i] = std::complex<float>(1.0 - 2.0 * _code[_codeLength - 1], 0);
+                    _dest[i] = std::complex<float>(0.0, 1.0 - 2.0 * _code[_codeLength - 1]);
                 }
             else
                 {
-                    _dest[i] = std::complex<float>(1.0 - 2.0 * _code[_codeValueIndex], 0);  // repeat the chip -> upsample
+                    _dest[i] = std::complex<float>(0.0, 1.0 - 2.0 * _code[_codeValueIndex]);  // repeat the chip -> upsample
                 }
         }
 }

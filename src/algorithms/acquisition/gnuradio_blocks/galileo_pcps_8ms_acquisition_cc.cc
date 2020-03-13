@@ -13,18 +13,7 @@
  *
  * This file is part of GNSS-SDR.
  *
- * GNSS-SDR is free software: you can redistribute it and/or modify
- * it under the terms of the GNU General Public License as published by
- * the Free Software Foundation, either version 3 of the License, or
- * (at your option) any later version.
- *
- * GNSS-SDR is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with GNSS-SDR. If not, see <https://www.gnu.org/licenses/>.
+ * SPDX-License-Identifier: GPL-3.0-or-later
  *
  * -------------------------------------------------------------------------
  */
@@ -46,11 +35,11 @@ galileo_pcps_8ms_acquisition_cc_sptr galileo_pcps_8ms_make_acquisition_cc(
     int64_t fs_in,
     int32_t samples_per_ms,
     int32_t samples_per_code,
-    bool dump, std::string dump_filename)
+    bool dump, const std::string &dump_filename)
 {
     return galileo_pcps_8ms_acquisition_cc_sptr(
         new galileo_pcps_8ms_acquisition_cc(sampled_ms, max_dwells, doppler_max, fs_in, samples_per_ms,
-            samples_per_code, dump, std::move(dump_filename)));
+            samples_per_code, dump, dump_filename));
 }
 
 
@@ -62,9 +51,9 @@ galileo_pcps_8ms_acquisition_cc::galileo_pcps_8ms_acquisition_cc(
     int32_t samples_per_ms,
     int32_t samples_per_code,
     bool dump,
-    std::string dump_filename) : gr::block("galileo_pcps_8ms_acquisition_cc",
-                                     gr::io_signature::make(1, 1, sizeof(gr_complex) * sampled_ms * samples_per_ms),
-                                     gr::io_signature::make(0, 0, sizeof(gr_complex) * sampled_ms * samples_per_ms))
+    const std::string &dump_filename) : gr::block("galileo_pcps_8ms_acquisition_cc",
+                                            gr::io_signature::make(1, 1, sizeof(gr_complex) * sampled_ms * samples_per_ms),
+                                            gr::io_signature::make(0, 0, sizeof(gr_complex) * sampled_ms * samples_per_ms))
 {
     this->message_port_register_out(pmt::mp("events"));
     d_sample_counter = 0ULL;  // SAMPLE COUNTER
@@ -94,7 +83,7 @@ galileo_pcps_8ms_acquisition_cc::galileo_pcps_8ms_acquisition_cc(
 
     // For dumping samples into a file
     d_dump = dump;
-    d_dump_filename = std::move(dump_filename);
+    d_dump_filename = dump_filename;
 
     d_doppler_resolution = 0;
     d_threshold = 0;
@@ -344,13 +333,13 @@ int galileo_pcps_8ms_acquisition_cc::general_work(int noutput_items,
                                          << "_" << d_gnss_synchro->Signal[0] << d_gnss_synchro->Signal[1] << "_sat_"
                                          << d_gnss_synchro->PRN << "_doppler_" << doppler << ".dat";
                                 d_dump_file.open(filename.str().c_str(), std::ios::out | std::ios::binary);
-                                d_dump_file.write(reinterpret_cast<char *>(d_ifft->get_outbuf()), n);  //write directly |abs(x)|^2 in this Doppler bin?
+                                d_dump_file.write(reinterpret_cast<char *>(d_ifft->get_outbuf()), n);  // write directly |abs(x)|^2 in this Doppler bin?
                                 d_dump_file.close();
                             }
                     }
 
                 // 5- Compute the test statistics and compare to the threshold
-                //d_test_statistics = 2 * d_fft_size * d_mag / d_input_power;
+                // d_test_statistics = 2 * d_fft_size * d_mag / d_input_power;
                 d_test_statistics = d_mag / d_input_power;
 
                 if (d_test_statistics > d_threshold)

@@ -12,18 +12,7 @@
  *
  * This file is part of GNSS-SDR.
  *
- * GNSS-SDR is free software: you can redistribute it and/or modify
- * it under the terms of the GNU General Public License as published by
- * the Free Software Foundation, either version 3 of the License, or
- * (at your option) any later version.
- *
- * GNSS-SDR is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with GNSS-SDR. If not, see <https://www.gnu.org/licenses/>.
+ * SPDX-License-Identifier: GPL-3.0-or-later
  *
  * -------------------------------------------------------------------------
  */
@@ -135,7 +124,7 @@ galileo_telemetry_decoder_gs::galileo_telemetry_decoder_gs(
                 {
                 case 1:  // INAV
                     {
-                        if (GALILEO_INAV_PREAMBLE.at(i) == '1')
+                        if (GALILEO_INAV_PREAMBLE[i] == '1')
                             {
                                 d_preamble_samples[i] = 1;
                             }
@@ -147,7 +136,7 @@ galileo_telemetry_decoder_gs::galileo_telemetry_decoder_gs(
                     }
                 case 2:  // FNAV for E5a-I
                     {
-                        if (GALILEO_FNAV_PREAMBLE.at(i) == '1')
+                        if (GALILEO_FNAV_PREAMBLE[i] == '1')
                             {
                                 d_preamble_samples[i] = 1;
                             }
@@ -207,14 +196,14 @@ galileo_telemetry_decoder_gs::~galileo_telemetry_decoder_gs()
 }
 
 
-void galileo_telemetry_decoder_gs::viterbi_decoder(double *page_part_symbols, int32_t *page_part_bits)
+void galileo_telemetry_decoder_gs::viterbi_decoder(float *page_part_symbols, int32_t *page_part_bits)
 {
     Viterbi(page_part_bits, out0.data(), state0.data(), out1.data(), state1.data(),
         page_part_symbols, KK, nn, DataLength);
 }
 
 
-void galileo_telemetry_decoder_gs::deinterleaver(int32_t rows, int32_t cols, const double *in, double *out)
+void galileo_telemetry_decoder_gs::deinterleaver(int32_t rows, int32_t cols, const float *in, float *out)
 {
     for (int32_t r = 0; r < rows; r++)
         {
@@ -226,10 +215,10 @@ void galileo_telemetry_decoder_gs::deinterleaver(int32_t rows, int32_t cols, con
 }
 
 
-void galileo_telemetry_decoder_gs::decode_INAV_word(double *page_part_symbols, int32_t frame_length)
+void galileo_telemetry_decoder_gs::decode_INAV_word(float *page_part_symbols, int32_t frame_length)
 {
     // 1. De-interleave
-    std::vector<double> page_part_symbols_deint(frame_length);
+    std::vector<float> page_part_symbols_deint(frame_length);
     deinterleaver(GALILEO_INAV_INTERLEAVER_ROWS, GALILEO_INAV_INTERLEAVER_COLS, page_part_symbols, page_part_symbols_deint.data());
 
     // 2. Viterbi decoder
@@ -318,15 +307,15 @@ void galileo_telemetry_decoder_gs::decode_INAV_word(double *page_part_symbols, i
 }
 
 
-void galileo_telemetry_decoder_gs::decode_FNAV_word(double *page_symbols, int32_t frame_length)
+void galileo_telemetry_decoder_gs::decode_FNAV_word(float *page_symbols, int32_t frame_length)
 {
     // 1. De-interleave
-    std::vector<double> page_symbols_deint(frame_length);
+    std::vector<float> page_symbols_deint(frame_length);
     deinterleaver(GALILEO_FNAV_INTERLEAVER_ROWS, GALILEO_FNAV_INTERLEAVER_COLS, page_symbols, page_symbols_deint.data());
 
     // 2. Viterbi decoder
     // 2.1 Take into account the NOT gate in G2 polynomial (Galileo ICD Figure 13, FEC encoder)
-    // 2.2 Take into account the possible inversion of the polarity due to PLL lock at 180�
+    // 2.2 Take into account the possible inversion of the polarity due to PLL lock at 180 degrees
     for (int32_t i = 0; i < frame_length; i++)
         {
             if ((i + 1) % 2 == 0)
@@ -571,14 +560,14 @@ int galileo_telemetry_decoder_gs::general_work(int noutput_items __attribute__((
                                     {
                                         for (uint32_t i = 0; i < d_frame_length_symbols; i++)
                                             {
-                                                d_page_part_symbols[i] = d_symbol_history.at(i + d_samples_per_preamble);  // because last symbol of the preamble is just received now!
+                                                d_page_part_symbols[i] = d_symbol_history[i + d_samples_per_preamble];  // because last symbol of the preamble is just received now!
                                             }
                                     }
                                 else  // 180 deg. inverted carrier phase PLL lock
                                     {
                                         for (uint32_t i = 0; i < d_frame_length_symbols; i++)
                                             {
-                                                d_page_part_symbols[i] = -d_symbol_history.at(i + d_samples_per_preamble);  // because last symbol of the preamble is just received now!
+                                                d_page_part_symbols[i] = -d_symbol_history[i + d_samples_per_preamble];  // because last symbol of the preamble is just received now!
                                             }
                                     }
                                 decode_INAV_word(d_page_part_symbols.data(), d_frame_length_symbols);
@@ -590,20 +579,14 @@ int galileo_telemetry_decoder_gs::general_work(int noutput_items __attribute__((
                                     {
                                         for (uint32_t i = 0; i < d_frame_length_symbols; i++)
                                             {
-                                                for (uint32_t i = 0; i < d_frame_length_symbols; i++)
-                                                    {
-                                                        d_page_part_symbols[i] = d_symbol_history.at(i + d_samples_per_preamble);  // because last symbol of the preamble is just received now!
-                                                    }
+                                                d_page_part_symbols[i] = d_symbol_history[i + d_samples_per_preamble];  // because last symbol of the preamble is just received now!
                                             }
                                     }
                                 else  // 180 deg. inverted carrier phase PLL lock
                                     {
                                         for (uint32_t i = 0; i < d_frame_length_symbols; i++)
                                             {
-                                                for (uint32_t i = 0; i < d_frame_length_symbols; i++)
-                                                    {
-                                                        d_page_part_symbols[i] = -d_symbol_history.at(i + d_samples_per_preamble);  // because last symbol of the preamble is just received now!
-                                                    }
+                                                d_page_part_symbols[i] = -d_symbol_history[i + d_samples_per_preamble];  // because last symbol of the preamble is just received now!
                                             }
                                     }
                                 decode_FNAV_word(d_page_part_symbols.data(), d_frame_length_symbols);
@@ -673,7 +656,7 @@ int galileo_telemetry_decoder_gs::general_work(int noutput_items __attribute__((
                                 else
                                     {
                                         // this page has no timing information
-                                        d_TOW_at_current_symbol_ms += static_cast<uint32_t>(GALILEO_E1_CODE_PERIOD_MS);  // + GALILEO_INAV_PAGE_PART_SYMBOLS*GALILEO_E1_CODE_PERIOD;
+                                        d_TOW_at_current_symbol_ms += static_cast<uint32_t>(GALILEO_E1_CODE_PERIOD_MS);  // + GALILEO_INAV_PAGE_PART_SYMBOLS*GALILEO_E1_CODE_PERIOD_S;
                                     }
                             }
                         break;
@@ -686,27 +669,27 @@ int galileo_telemetry_decoder_gs::general_work(int noutput_items __attribute__((
                                     {
                                         d_TOW_at_Preamble_ms = static_cast<uint32_t>(d_fnav_nav.FNAV_TOW_1 * 1000.0);
                                         d_TOW_at_current_symbol_ms = d_TOW_at_Preamble_ms + static_cast<uint32_t>((d_required_symbols + 1) * GALILEO_FNAV_CODES_PER_SYMBOL * GALILEO_E5A_CODE_PERIOD_MS);
-                                        //d_TOW_at_current_symbol_ms = d_TOW_at_Preamble_ms + static_cast<uint32_t>((GALILEO_FNAV_CODES_PER_PAGE + GALILEO_FNAV_CODES_PER_PREAMBLE) * GALILEO_E5a_CODE_PERIOD_MS);
+                                        // d_TOW_at_current_symbol_ms = d_TOW_at_Preamble_ms + static_cast<uint32_t>((GALILEO_FNAV_CODES_PER_PAGE + GALILEO_FNAV_CODES_PER_PREAMBLE) * GALILEO_E5a_CODE_PERIOD_MS);
                                         d_fnav_nav.flag_TOW_1 = false;
                                     }
                                 else if (d_fnav_nav.flag_TOW_2 == true)
                                     {
                                         d_TOW_at_Preamble_ms = static_cast<uint32_t>(d_fnav_nav.FNAV_TOW_2 * 1000.0);
-                                        //d_TOW_at_current_symbol_ms = d_TOW_at_Preamble_ms + static_cast<uint32_t>((GALILEO_FNAV_CODES_PER_PAGE + GALILEO_FNAV_CODES_PER_PREAMBLE) * GALILEO_E5a_CODE_PERIOD_MS);
+                                        // d_TOW_at_current_symbol_ms = d_TOW_at_Preamble_ms + static_cast<uint32_t>((GALILEO_FNAV_CODES_PER_PAGE + GALILEO_FNAV_CODES_PER_PREAMBLE) * GALILEO_E5a_CODE_PERIOD_MS);
                                         d_TOW_at_current_symbol_ms = d_TOW_at_Preamble_ms + static_cast<uint32_t>((d_required_symbols + 1) * GALILEO_FNAV_CODES_PER_SYMBOL * GALILEO_E5A_CODE_PERIOD_MS);
                                         d_fnav_nav.flag_TOW_2 = false;
                                     }
                                 else if (d_fnav_nav.flag_TOW_3 == true)
                                     {
                                         d_TOW_at_Preamble_ms = static_cast<uint32_t>(d_fnav_nav.FNAV_TOW_3 * 1000.0);
-                                        //d_TOW_at_current_symbol_ms = d_TOW_at_Preamble_ms + static_cast<uint32_t>((GALILEO_FNAV_CODES_PER_PAGE + GALILEO_FNAV_CODES_PER_PREAMBLE) * GALILEO_E5a_CODE_PERIOD_MS);
+                                        // d_TOW_at_current_symbol_ms = d_TOW_at_Preamble_ms + static_cast<uint32_t>((GALILEO_FNAV_CODES_PER_PAGE + GALILEO_FNAV_CODES_PER_PREAMBLE) * GALILEO_E5a_CODE_PERIOD_MS);
                                         d_TOW_at_current_symbol_ms = d_TOW_at_Preamble_ms + static_cast<uint32_t>((d_required_symbols + 1) * GALILEO_FNAV_CODES_PER_SYMBOL * GALILEO_E5A_CODE_PERIOD_MS);
                                         d_fnav_nav.flag_TOW_3 = false;
                                     }
                                 else if (d_fnav_nav.flag_TOW_4 == true)
                                     {
                                         d_TOW_at_Preamble_ms = static_cast<uint32_t>(d_fnav_nav.FNAV_TOW_4 * 1000.0);
-                                        //d_TOW_at_current_symbol_ms = d_TOW_at_Preamble_ms + static_cast<uint32_t>((GALILEO_FNAV_CODES_PER_PAGE + GALILEO_FNAV_CODES_PER_PREAMBLE) * GALILEO_E5a_CODE_PERIOD_MS);
+                                        // d_TOW_at_current_symbol_ms = d_TOW_at_Preamble_ms + static_cast<uint32_t>((GALILEO_FNAV_CODES_PER_PAGE + GALILEO_FNAV_CODES_PER_PREAMBLE) * GALILEO_E5a_CODE_PERIOD_MS);
                                         d_TOW_at_current_symbol_ms = d_TOW_at_Preamble_ms + static_cast<uint32_t>((d_required_symbols + 1) * GALILEO_FNAV_CODES_PER_SYMBOL * GALILEO_E5A_CODE_PERIOD_MS);
                                         d_fnav_nav.flag_TOW_4 = false;
                                     }
@@ -773,6 +756,12 @@ int galileo_telemetry_decoder_gs::general_work(int noutput_items __attribute__((
             current_symbol.TOW_at_current_symbol_ms = d_TOW_at_current_symbol_ms;
             // todo: Galileo to GPS time conversion should be moved to observable block.
             // current_symbol.TOW_at_current_symbol_ms -= delta_t;  // Galileo to GPS TOW
+
+            if (flag_PLL_180_deg_phase_locked == true)
+                {
+                    // correct the accumulated phase for the Costas loop phase shift, if required
+                    current_symbol.Carrier_phase_rads += GALILEO_PI;
+                }
 
             if (d_dump == true)
                 {

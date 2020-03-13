@@ -13,18 +13,7 @@
  *
  * This file is part of GNSS-SDR.
  *
- * GNSS-SDR is free software: you can redistribute it and/or modify
- * it under the terms of the GNU General Public License as published by
- * the Free Software Foundation, either version 3 of the License, or
- * (at your option) any later version.
- *
- * GNSS-SDR is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with GNSS-SDR. If not, see <https://www.gnu.org/licenses/>.
+ * SPDX-License-Identifier: GPL-3.0-or-later
  *
  * -------------------------------------------------------------------------
  */
@@ -87,7 +76,7 @@ gps_l1_ca_telemetry_decoder_gs::gps_l1_ca_telemetry_decoder_gs(
     int32_t n = 0;
     for (int32_t i = 0; i < d_bits_per_preamble; i++)
         {
-            if (GPS_CA_PREAMBLE.at(i) == '1')
+            if (GPS_CA_PREAMBLE[i] == '1')
                 {
                     d_preamble_samples[n] = 1;
                     n++;
@@ -135,10 +124,18 @@ gps_l1_ca_telemetry_decoder_gs::~gps_l1_ca_telemetry_decoder_gs()
 
 bool gps_l1_ca_telemetry_decoder_gs::gps_word_parityCheck(uint32_t gpsword)
 {
-    uint32_t d1, d2, d3, d4, d5, d6, d7, t, parity;
+    uint32_t d1;
+    uint32_t d2;
+    uint32_t d3;
+    uint32_t d4;
+    uint32_t d5;
+    uint32_t d6;
+    uint32_t d7;
+    uint32_t t;
+    uint32_t parity;
     // XOR as many bits in parallel as possible.  The magic constants pick
     //   up bits which are to be XOR'ed together to implement the GPS parity
-    //   check algorithm described in IS-GPS-200E.  This avoids lengthy shift-
+    //   check algorithm described in IS-GPS-200K.  This avoids lengthy shift-
     //   and-xor loops.
     d1 = gpsword & 0xFBFFBF00U;
     d2 = _rotl(gpsword, 1U) & 0x07FFBF01U;
@@ -293,7 +290,7 @@ bool gps_l1_ca_telemetry_decoder_gs::decode_subframe()
                             break;
                         case 5:
                             // get almanac (if available)
-                            //TODO: implement almanac reader in navigation_message
+                            // TODO: implement almanac reader in navigation_message
                             break;
                         default:
                             break;

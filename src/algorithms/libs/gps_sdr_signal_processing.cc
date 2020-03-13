@@ -14,18 +14,7 @@
  *
  * This file is part of GNSS-SDR.
  *
- * GNSS-SDR is free software: you can redistribute it and/or modify
- * it under the terms of the GNU General Public License as published by
- * the Free Software Foundation, either version 3 of the License, or
- * (at your option) any later version.
- *
- * GNSS-SDR is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with GNSS-SDR. If not, see <https://www.gnu.org/licenses/>.
+ * SPDX-License-Identifier: GPL-3.0-or-later
  *
  * -------------------------------------------------------------------------
  */
@@ -43,9 +32,11 @@ void gps_l1_ca_code_gen_int(gsl::span<int32_t> _dest, int32_t _prn, uint32_t _ch
     std::bitset<_code_length> G2{};
     std::bitset<10> G1_register{};
     std::bitset<10> G2_register{};
-    bool feedback1, feedback2;
+    bool feedback1;
+    bool feedback2;
     bool aux;
-    uint32_t lcv, lcv2;
+    uint32_t lcv;
+    uint32_t lcv2;
     uint32_t delay;
     int32_t prn_idx;
 
@@ -142,7 +133,7 @@ void gps_l1_ca_code_gen_complex(gsl::span<std::complex<float>> _dest, int32_t _p
 
     for (uint32_t ii = 0; ii < _code_length; ++ii)
         {
-            _dest[ii] = std::complex<float>(static_cast<float>(ca_code_int[ii]), 0.0F);
+            _dest[ii] = std::complex<float>(0.0F, static_cast<float>(ca_code_int[ii]));
         }
 }
 
@@ -155,7 +146,8 @@ void gps_l1_ca_code_gen_complex_sampled(gsl::span<std::complex<float>> _dest, ui
 {
     // This function is based on the GNU software GPS for MATLAB in the Kay Borre book
     std::array<std::complex<float>, 1023> _code{};
-    int32_t _samplesPerCode, _codeValueIndex;
+    int32_t _samplesPerCode;
+    int32_t _codeValueIndex;
     float _ts;
     float _tc;
     float aux;
@@ -163,7 +155,7 @@ void gps_l1_ca_code_gen_complex_sampled(gsl::span<std::complex<float>> _dest, ui
     const int32_t _codeLength = 1023;
 
     // --- Find number of samples per spreading code ---------------------------
-    _samplesPerCode = static_cast<int32_t>(static_cast<double>(_fs) / static_cast<double>(_codeFreqBasis / _codeLength));
+    _samplesPerCode = static_cast<int32_t>(static_cast<double>(_fs) / (static_cast<double>(_codeFreqBasis) / static_cast<double>(_codeLength)));
 
     // --- Find time constants -------------------------------------------------
     _ts = 1.0 / static_cast<float>(_fs);                   // Sampling period in sec

@@ -12,18 +12,7 @@
  *
  * This file is part of GNSS-SDR.
  *
- * GNSS-SDR is free software: you can redistribute it and/or modify
- * it under the terms of the GNU General Public License as published by
- * the Free Software Foundation, either version 3 of the License, or
- * (at your option) any later version.
- *
- * GNSS-SDR is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with GNSS-SDR. If not, see <https://www.gnu.org/licenses/>.
+ * SPDX-License-Identifier: GPL-3.0-or-later
  *
  * -------------------------------------------------------------------------
  */
@@ -50,7 +39,7 @@ pcps_quicksync_acquisition_cc_sptr pcps_quicksync_make_acquisition_cc(
     int32_t samples_per_code,
     bool bit_transition_flag,
     bool dump,
-    std::string dump_filename)
+    const std::string& dump_filename)
 {
     return pcps_quicksync_acquisition_cc_sptr(
         new pcps_quicksync_acquisition_cc(
@@ -59,7 +48,7 @@ pcps_quicksync_acquisition_cc_sptr pcps_quicksync_make_acquisition_cc(
             fs_in, samples_per_ms,
             samples_per_code,
             bit_transition_flag,
-            dump, std::move(dump_filename)));
+            dump, dump_filename));
 }
 
 
@@ -70,9 +59,9 @@ pcps_quicksync_acquisition_cc::pcps_quicksync_acquisition_cc(
     int32_t samples_per_ms, int32_t samples_per_code,
     bool bit_transition_flag,
     bool dump,
-    std::string dump_filename) : gr::block("pcps_quicksync_acquisition_cc",
-                                     gr::io_signature::make(1, 1, (sizeof(gr_complex) * sampled_ms * samples_per_ms)),
-                                     gr::io_signature::make(0, 0, (sizeof(gr_complex) * sampled_ms * samples_per_ms)))
+    const std::string& dump_filename) : gr::block("pcps_quicksync_acquisition_cc",
+                                            gr::io_signature::make(1, 1, (sizeof(gr_complex) * sampled_ms * samples_per_ms)),
+                                            gr::io_signature::make(0, 0, (sizeof(gr_complex) * sampled_ms * samples_per_ms)))
 {
     this->message_port_register_out(pmt::mp("events"));
     d_sample_counter = 0ULL;  // SAMPLE COUNTER
@@ -112,7 +101,7 @@ pcps_quicksync_acquisition_cc::pcps_quicksync_acquisition_cc(
 
     // For dumping samples into a file
     d_dump = dump;
-    d_dump_filename = std::move(dump_filename);
+    d_dump_filename = dump_filename;
 
     d_code_folded = std::vector<gr_complex>(d_fft_size, lv_cmake(0.0F, 0.0F));
     d_signal_folded.reserve(d_fft_size);

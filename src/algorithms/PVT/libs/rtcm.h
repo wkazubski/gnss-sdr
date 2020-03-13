@@ -12,25 +12,14 @@
  *
  * This file is part of GNSS-SDR.
  *
- * GNSS-SDR is free software: you can redistribute it and/or modify
- * it under the terms of the GNU General Public License as published by
- * the Free Software Foundation, either version 3 of the License, or
- * (at your option) any later version.
- *
- * GNSS-SDR is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with GNSS-SDR. If not, see <https://www.gnu.org/licenses/>.
+ * SPDX-License-Identifier: GPL-3.0-or-later
  *
  * -------------------------------------------------------------------------
  */
 
 
-#ifndef GNSS_SDR_RTCM_H_
-#define GNSS_SDR_RTCM_H_
+#ifndef GNSS_SDR_RTCM_H
+#define GNSS_SDR_RTCM_H
 
 
 #include "concurrent_queue.h"
@@ -44,6 +33,7 @@
 #include <boost/date_time/posix_time/posix_time.hpp>
 #include <glog/logging.h>
 #include <pmt/pmt.h>
+#include <algorithm>  // for min
 #include <bitset>
 #include <cstddef>  // for size_t
 #include <cstdint>
@@ -97,7 +87,7 @@ using b_io_context = boost::asio::io_service;
 class Rtcm
 {
 public:
-    Rtcm(uint16_t port = 2101);  //!< Default constructor that sets TCP port of the RTCM message server and RTCM Station ID. 2101 is the standard RTCM port according to the Internet Assigned Numbers Authority (IANA). See https://www.iana.org/assignments/service-names-port-numbers/service-names-port-numbers.xml
+    explicit Rtcm(uint16_t port = 2101);  //!< Default constructor that sets TCP port of the RTCM message server and RTCM Station ID. 2101 is the standard RTCM port according to the Internet Assigned Numbers Authority (IANA). See https://www.iana.org/assignments/service-names-port-numbers/service-names-port-numbers.xml
     ~Rtcm();
 
     /*!
@@ -508,7 +498,7 @@ private:
     // Classes for TCP communication
     //
     uint16_t RTCM_port;
-    //uint16_t RTCM_Station_ID;
+    // uint16_t RTCM_Station_ID;
     class Rtcm_Message
     {
     public:
@@ -593,7 +583,7 @@ private:
         inline void encode_header()
         {
             char header[header_length + 1] = "";
-            std::sprintf(header, "GS%4d", static_cast<int>(body_length_));
+            std::snprintf(header, header_length + 1, "GS%4d", std::max(std::min(static_cast<int>(body_length_), static_cast<int>(max_body_length)), 0));
             std::memcpy(data_, header, header_length);
         }
 
@@ -718,9 +708,9 @@ private:
                     if (!ec)
                         {
                             room_.deliver(read_msg_);
-                            //std::cout << "Delivered message (session): ";
-                            //std::cout.write(read_msg_.body(), read_msg_.body_length());
-                            //std::cout << std::endl;
+                            // std::cout << "Delivered message (session): ";
+                            // std::cout.write(read_msg_.body(), read_msg_.body_length());
+                            // std::cout << std::endl;
                             do_read_message_header();
                         }
                     else
@@ -868,7 +858,7 @@ private:
                 {
                     std::string message;
                     Rtcm_Message msg;
-                    queue_->wait_and_pop(message);  //message += '\n';
+                    queue_->wait_and_pop(message);  // message += '\n';
                     if (message == "Goodbye")
                         {
                             break;
@@ -1417,7 +1407,7 @@ private:
 
     // Content of message header for MSM1, MSM2, MSM3, MSM4, MSM5, MSM6 and MSM7
     std::bitset<1> DF393;
-    int32_t set_DF393(bool more_messages);  //1 indicates that more MSMs follow for given physical time and reference station ID
+    int32_t set_DF393(bool more_messages);  // 1 indicates that more MSMs follow for given physical time and reference station ID
 
     std::bitset<64> DF394;
     int32_t set_DF394(const std::map<int32_t, Gnss_Synchro>& gnss_synchro);

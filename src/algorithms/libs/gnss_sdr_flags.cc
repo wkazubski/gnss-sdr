@@ -12,25 +12,13 @@
  *
  * This file is part of GNSS-SDR.
  *
- * GNSS-SDR is free software: you can redistribute it and/or modify
- * it under the terms of the GNU General Public License as published by
- * the Free Software Foundation, either version 3 of the License, or
- * (at your option) any later version.
- *
- * GNSS-SDR is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with GNSS-SDR. If not, see <https://www.gnu.org/licenses/>.
+ * SPDX-License-Identifier: GPL-3.0-or-later
  *
  * -------------------------------------------------------------------------
  */
 
 
 #include "gnss_sdr_flags.h"
-#include <cstdint>
 #include <iostream>
 #include <string>
 
@@ -59,6 +47,8 @@ DEFINE_string(s, "-",
 DEFINE_string(signal_source, "-",
     "If defined, path to the file containing the signal samples (overrides the configuration file).");
 
+DEFINE_bool(rf_shutdown, true, "If set to false, AD9361 RF channels are not shut down when exiting the program. Useful to leave the AD9361 configured and running.");
+
 DEFINE_int32(doppler_max, 0, "If defined, sets the maximum Doppler value in the search grid, in Hz (overrides the configuration file).");
 
 DEFINE_int32(doppler_step, 0, "If defined, sets the frequency step in the search grid, in Hz (overrides the configuration file).");
@@ -71,15 +61,18 @@ DEFINE_int32(max_carrier_lock_fail, 5000, "Maximum number of carrier lock failur
 
 DEFINE_int32(max_lock_fail, 50, "Maximum number of code lock failures before dropping a satellite.");
 
-//cos(2xError_angle)=0.7 -> Error_angle=22 deg
+// cos(2xError_angle)=0.7 -> Error_angle=22 deg
 DEFINE_double(carrier_lock_th, 0.7, "Carrier lock threshold (in rad).");
-
-DEFINE_string(RINEX_version, "-", "If defined, specifies the RINEX version (2.11 or 3.02). Overrides the configuration file.");
 
 DEFINE_double(dll_bw_hz, 0.0, "If defined, bandwidth of the DLL low pass filter, in Hz (overrides the configuration file).");
 
 DEFINE_double(pll_bw_hz, 0.0, "If defined, bandwidth of the PLL low pass filter, in Hz (overrides the configuration file).");
 
+DEFINE_int32(carrier_smoothing_factor, DEFAULT_CARRIER_SMOOTHING_FACTOR, "Sets carrier smoothing factor M (overrides the configuration file)");
+
+DEFINE_string(RINEX_version, "-", "If defined, specifies the RINEX version (2.11 or 3.02). Overrides the configuration file.");
+
+DEFINE_string(RINEX_name, "-", "If defined, specifies the RINEX files base name");
 
 #if GFLAGS_GREATER_2_0
 
@@ -223,6 +216,19 @@ static bool ValidatePllBw(const char* flagname, double value)
     return false;
 }
 
+static bool ValidateCarrierSmoothingFactor(const char* flagname, int32_t value)
+{
+    const int32_t min_value = 1;
+    if (value >= min_value)
+        {  // value is ok
+            return true;
+        }
+    std::cout << "Invalid value for flag -" << flagname << ": " << value << ". Allowed range is 1 <= " << flagname << "." << std::endl;
+    std::cout << "GNSS-SDR program ended." << std::endl;
+    return false;
+}
+
+
 DEFINE_validator(c, &ValidateC);
 DEFINE_validator(config_file, &ValidateConfigFile);
 DEFINE_validator(s, &ValidateS);
@@ -235,6 +241,6 @@ DEFINE_validator(max_lock_fail, &ValidateMaxLockFail);
 DEFINE_validator(carrier_lock_th, &ValidateCarrierLockTh);
 DEFINE_validator(dll_bw_hz, &ValidateDllBw);
 DEFINE_validator(pll_bw_hz, &ValidatePllBw);
-
+DEFINE_validator(carrier_smoothing_factor, &ValidateCarrierSmoothingFactor);
 
 #endif

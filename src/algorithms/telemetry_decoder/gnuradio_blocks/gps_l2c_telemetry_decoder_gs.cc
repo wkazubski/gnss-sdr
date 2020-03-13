@@ -12,18 +12,7 @@
  *
  * This file is part of GNSS-SDR.
  *
- * GNSS-SDR is free software: you can redistribute it and/or modify
- * it under the terms of the GNU General Public License as published by
- * the Free Software Foundation, either version 3 of the License, or
- * (at your option) any later version.
- *
- * GNSS-SDR is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with GNSS-SDR. If not, see <https://www.gnu.org/licenses/>.
+ * SPDX-License-Identifier: GPL-3.0-or-later
  *
  * -------------------------------------------------------------------------
  */
@@ -85,6 +74,7 @@ gps_l2c_telemetry_decoder_gs::gps_l2c_telemetry_decoder_gs(
     cnav_msg_decoder_init(&d_cnav_decoder);
 
     d_sample_counter = 0;
+    flag_PLL_180_deg_phase_locked = false;
 }
 
 
@@ -186,6 +176,14 @@ int gps_l2c_telemetry_decoder_gs::general_work(int noutput_items __attribute__((
     // check if new CNAV frame is available
     if (flag_new_cnav_frame == true)
         {
+            if (d_cnav_decoder.part1.invert == true or d_cnav_decoder.part1.invert == true)
+                {
+                    flag_PLL_180_deg_phase_locked = true;
+                }
+            else
+                {
+                    flag_PLL_180_deg_phase_locked = false;
+                }
             std::bitset<GPS_L2_CNAV_DATA_PAGE_BITS> raw_bits;
             // Expand packet bits to bitsets. Notice the reverse order of the bits sequence, required by the CNAV message decoder
             for (uint32_t i = 0; i < GPS_L2_CNAV_DATA_PAGE_BITS; i++)
@@ -224,18 +222,26 @@ int gps_l2c_telemetry_decoder_gs::general_work(int noutput_items __attribute__((
             // delay by the formulae:
             // \code
             // symbolTime_ms = msg->tow * 6000 + *pdelay * 20 + (12 * 20); 12 symbols of the encoder's transitory
-            d_TOW_at_current_symbol = static_cast<double>(msg.tow) * 6.0 + static_cast<double>(delay) * GPS_L2_M_PERIOD + 12 * GPS_L2_M_PERIOD;
-            //d_TOW_at_current_symbol = floor(d_TOW_at_current_symbol * 1000.0) / 1000.0;
+            d_TOW_at_current_symbol = static_cast<double>(msg.tow) * 6.0 + static_cast<double>(delay) * GPS_L2_M_PERIOD_S + 12 * GPS_L2_M_PERIOD_S;
+            // d_TOW_at_current_symbol = floor(d_TOW_at_current_symbol * 1000.0) / 1000.0;
             d_flag_valid_word = true;
         }
     else
         {
-            d_TOW_at_current_symbol += GPS_L2_M_PERIOD;
+            d_TOW_at_current_symbol += GPS_L2_M_PERIOD_S;
             if (current_synchro_data.Flag_valid_symbol_output == false)
                 {
                     d_flag_valid_word = false;
                 }
         }
+
+
+    if (flag_PLL_180_deg_phase_locked == true)
+        {
+            // correct the accumulated phase for the Costas loop phase shift, if required
+            current_synchro_data.Carrier_phase_rads += GPS_L2_PI;
+        }
+
     current_synchro_data.TOW_at_current_symbol_ms = round(d_TOW_at_current_symbol * 1000.0);
     current_synchro_data.Flag_valid_word = d_flag_valid_word;
 

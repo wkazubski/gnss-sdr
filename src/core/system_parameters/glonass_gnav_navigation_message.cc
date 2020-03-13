@@ -14,18 +14,7 @@
  *
  * This file is part of GNSS-SDR.
  *
- * GNSS-SDR is free software: you can redistribute it and/or modify
- * it under the terms of the GNU General Public License as published by
- * the Free Software Foundation, either version 3 of the License, or
- * (at your option) any later version.
- *
- * GNSS-SDR is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with GNSS-SDR. If not, see <https://www.gnu.org/licenses/>.
+ * SPDX-License-Identifier: GPL-3.0-or-later
  *
  * -------------------------------------------------------------------------
  */
@@ -34,6 +23,7 @@
 #include "MATH_CONSTANTS.h"  // for TWO_N20, TWO_N30, TWO_N14, TWO_N15, TWO_N18
 #include "gnss_satellite.h"
 #include <glog/logging.h>
+#include <cstddef>  // for size_t
 #include <map>
 #include <ostream>  // for operator<<
 
@@ -91,11 +81,11 @@ void Glonass_Gnav_Navigation_Message::reset()
             i = 0.0;
         }
 
-    std::map<int, std::string> satelliteBlock;  // Map that stores to which block the PRN belongs http://www.navcen.uscg.gov/?Do=constellationStatus
+    std::map<int, std::string> satelliteBlock;  // Map that stores to which block the PRN belongs
 
     auto gnss_sat = Gnss_Satellite();
     std::string _system("GLONASS");
-    //TODO SHould number of channels be hardcoded?
+    // TODO SHould number of channels be hardcoded?
     for (uint32_t i = 1; i < 14; i++)
         {
             satelliteBlock[i] = gnss_sat.what_block(_system, i);
@@ -124,7 +114,7 @@ bool Glonass_Gnav_Navigation_Message::CRC_test(std::bitset<GLONASS_GNAV_STRING_B
     std::vector<uint32_t> string_bits(GLONASS_GNAV_STRING_BITS);
 
     // Populate data and hamming code vectors
-    for (uint32_t i = 0; i < string_bits.size(); i++)
+    for (size_t i = 0; i < string_bits.size(); i++)
         {
             string_bits[i] = static_cast<uint32_t>(bits[i]);
         }
@@ -715,7 +705,7 @@ Glonass_Gnav_Almanac Glonass_Gnav_Navigation_Message::get_almanac(uint32_t satel
 }
 
 
-bool Glonass_Gnav_Navigation_Message::have_new_ephemeris()  //Check if we have a new ephemeris stored in the galileo navigation class
+bool Glonass_Gnav_Navigation_Message::have_new_ephemeris()  // Check if we have a new ephemeris stored in the galileo navigation class
 {
     bool new_eph = false;
     // We need to make sure we have received the ephemeris info plus the time info

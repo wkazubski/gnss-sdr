@@ -21,24 +21,13 @@
  *
  * This file is part of GNSS-SDR.
  *
- * GNSS-SDR is free software: you can redistribute it and/or modify
- * it under the terms of the GNU General Public License as published by
- * the Free Software Foundation, either version 3 of the License, or
- * (at your option) any later version.
- *
- * GNSS-SDR is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with GNSS-SDR. If not, see <https://www.gnu.org/licenses/>.
+ * SPDX-License-Identifier: GPL-3.0-or-later
  *
  * -------------------------------------------------------------------------
  */
 
-#ifndef GNSS_SDR_PCPS_ACQUISITION_FPGA_H_
-#define GNSS_SDR_PCPS_ACQUISITION_FPGA_H_
+#ifndef GNSS_SDR_PCPS_ACQUISITION_FPGA_H
+#define GNSS_SDR_PCPS_ACQUISITION_FPGA_H
 
 
 #include "channel_fsm.h"
@@ -54,16 +43,13 @@ class Gnss_Synchro;
 typedef struct
 {
     /* pcps acquisition configuration */
-    uint32_t sampled_ms;
     uint32_t doppler_max;
     int64_t fs_in;
-    int32_t samples_per_ms;
     int32_t samples_per_code;
     int32_t code_length;
     uint32_t select_queue_Fpga;
     std::string device_name;
     uint32_t* all_fft_codes;  // pointer to memory that contains all the code ffts
-    //float downsampling_factor;
     uint32_t downsampling_factor;
     uint32_t total_block_exp;
     uint32_t excludelimit;
@@ -199,11 +185,11 @@ public:
     /*!
      * \brief This function triggers a HW reset of the FPGA PL.
      */
-    void reset_acquisition(void);
+    void reset_acquisition();
 
 private:
     friend pcps_acquisition_fpga_sptr pcps_make_acquisition_fpga(pcpsconf_fpga_t conf_);
-    pcps_acquisition_fpga(pcpsconf_fpga_t conf_);
+    explicit pcps_acquisition_fpga(pcpsconf_fpga_t conf_);
     bool d_active;
     bool d_make_2_steps;
     uint32_t d_doppler_index;
@@ -236,4 +222,4 @@ private:
     float first_vs_second_peak_statistic(uint32_t& indext, int32_t& doppler, uint32_t num_doppler_bins, int32_t doppler_max, int32_t doppler_step);
 };
 
-#endif /* GNSS_SDR_PCPS_ACQUISITION_FPGA_H_*/
+#endif  // GNSS_SDR_PCPS_ACQUISITION_FPGA_H

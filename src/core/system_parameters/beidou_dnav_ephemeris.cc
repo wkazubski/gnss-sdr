@@ -12,18 +12,7 @@
  *
  * This file is part of GNSS-SDR.
  *
- * GNSS-SDR is free software: you can redistribute it and/or modify
- * it under the terms of the GNU General Public License as published by
- * the Free Software Foundation, either version 3 of the License, or
- * (at your option) any later version.
- *
- * GNSS-SDR is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with GNSS-SDR. If not, see <https://www.gnu.org/licenses/>.
+ * SPDX-License-Identifier: GPL-3.0-or-later
  *
  * -------------------------------------------------------------------------
  */
@@ -63,9 +52,9 @@ Beidou_Dnav_Ephemeris::Beidou_Dnav_Ephemeris()
     d_AODC = 0;  // Issue of Data, Clock
     i_AODO = 0;  // Age of Data Offset (AODO) term for the navigation message correction table (NMCT) contained in subframe 4 (reference paragraph 20.3.3.5.1.9) [s]
     d_AODC = 0;
-    b_fit_interval_flag = false;  // indicates the curve-fit interval used by the CS (Block II/IIA/IIR/IIR-M/IIF) and SS (Block IIIA) in determining the ephemeris parameters, as follows: 0  =  4 hours, 1  =  greater than 4 hours.
-    d_spare1 = 0;
-    d_spare2 = 0;
+    b_fit_interval_flag = false;
+    d_spare1 = 0.0;
+    d_spare2 = 0.0;
 
     i_sig_type = 0;
     i_nav_type = 0;
@@ -113,7 +102,6 @@ double Beidou_Dnav_Ephemeris::check_t(double time)
 }
 
 
-// 20.3.3.3.3.1 User Algorithm for SV Clock Correction.
 double Beidou_Dnav_Ephemeris::sv_clock_drift(double transmitTime)
 {
     double dt;
@@ -168,7 +156,7 @@ double Beidou_Dnav_Ephemeris::sv_clock_relativistic_term(double transmitTime)
             dE = fmod(E - E_old, 2.0 * BEIDOU_DNAV_PI);
             if (fabs(dE) < 1e-12)
                 {
-                    //Necessary precision is reached, exit from the loop
+                    // Necessary precision is reached, exit from the loop
                     break;
                 }
         }
@@ -227,7 +215,7 @@ double Beidou_Dnav_Ephemeris::satellitePosition(double transmitTime)
             dE = fmod(E - E_old, 2.0 * BEIDOU_DNAV_PI);
             if (fabs(dE) < 1e-12)
                 {
-                    //Necessary precision is reached, exit from the loop
+                    // Necessary precision is reached, exit from the loop
                     break;
                 }
         }

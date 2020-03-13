@@ -12,18 +12,7 @@
  *
  * This file is part of GNSS-SDR.
  *
- * GNSS-SDR is free software: you can redistribute it and/or modify
- * it under the terms of the GNU General Public License as published by
- * the Free Software Foundation, either version 3 of the License, or
- * (at your option) any later version.
- *
- * GNSS-SDR is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with GNSS-SDR. If not, see <https://www.gnu.org/licenses/>.
+ * SPDX-License-Identifier: GPL-3.0-or-later
  *
  * -------------------------------------------------------------------------
  */
@@ -34,6 +23,7 @@
 #include <glog/logging.h>
 #include <gnuradio/io_signature.h>
 #include <pmt/pmt_sugar.h>  // for mp
+#include <algorithm>        // for copy
 #include <array>
 #include <cmath>      // for abs
 #include <exception>  // for exception
@@ -60,7 +50,7 @@ sbas_l1_telemetry_decoder_gs::sbas_l1_telemetry_decoder_gs(
                      gr::io_signature::make(1, 1, sizeof(Gnss_Synchro)),
                      gr::io_signature::make(1, 1, sizeof(Gnss_Synchro)))
 {
-    //prevent telemetry symbols accumulation in output buffers
+    // prevent telemetry symbols accumulation in output buffers
     this->set_max_noutput_items(1);
     // Ephemeris data port out
     this->message_port_register_out(pmt::mp("telemetry"));
@@ -137,7 +127,7 @@ bool sbas_l1_telemetry_decoder_gs::Sample_Aligner::get_symbols(const std::vector
     VLOG(FLOW) << "get_symbols(): "
                << "d_past_sample=" << d_past_sample << "\tsamples size=" << samples.size();
 
-    for (uint32_t i_sym = 0; i_sym < samples.size() / sbas_l1_telemetry_decoder_gs::D_SAMPLES_PER_SYMBOL; i_sym++)
+    for (size_t i_sym = 0; i_sym < samples.size() / sbas_l1_telemetry_decoder_gs::D_SAMPLES_PER_SYMBOL; i_sym++)
         {
             // get the next samples
             for (int32_t i = 0; i < d_n_smpls_in_history; i++)
@@ -167,7 +157,7 @@ bool sbas_l1_telemetry_decoder_gs::Sample_Aligner::get_symbols(const std::vector
                             << "smpl0: " << std::setw(6)
                             << smpls[1] << "   "
                             << "smpl1: " << std::setw(6) << smpls[2] << "\t"
-                            //<< "Flag_valid_tracking: " << std::setw(1) << in[0][0].Flag_valid_tracking << " " << std::setw(1) << in[0][0].Flag_valid_tracking << "\t"
+                            // << "Flag_valid_tracking: " << std::setw(1) << in[0][0].Flag_valid_tracking << " " << std::setw(1) << in[0][0].Flag_valid_tracking << "\t"
                             << "d_corr_paired: " << std::setw(10) << d_corr_paired << "\t"
                             << "d_corr_shifted: " << std::setw(10) << d_corr_shifted << "\t"
                             << "corr_diff: " << std::setw(10) << corr_diff << "\t"
@@ -424,7 +414,7 @@ int sbas_l1_telemetry_decoder_gs::general_work(int noutput_items __attribute__((
     // 1. Copy the current tracking output
     current_symbol = in[0];
     // copy correlation samples into samples vector
-    d_sample_buf.push_back(current_symbol.Prompt_I);  //add new symbol to the symbol queue
+    d_sample_buf.push_back(current_symbol.Prompt_I);  // add new symbol to the symbol queue
 
     // store the time stamp of the first sample in the processed sample block
     double sample_stamp = static_cast<double>(in[0].Tracking_sample_counter) / static_cast<double>(in[0].fs);
@@ -454,7 +444,7 @@ int sbas_l1_telemetry_decoder_gs::general_work(int noutput_items __attribute__((
 
             // compute message sample stamp
             // and fill messages in SBAS raw message objects
-            //std::vector<Sbas_Raw_Msg> sbas_raw_msgs;
+            // std::vector<Sbas_Raw_Msg> sbas_raw_msgs;
             for (const auto &valid_msg : valid_msgs)
                 {
                     int32_t message_sample_offset =
@@ -467,16 +457,16 @@ int sbas_l1_telemetry_decoder_gs::general_work(int noutput_items __attribute__((
                                 << " relative_preamble_start=" << valid_msg.first
                                 << " message_sample_offset=" << message_sample_offset
                                 << ")";
-                    //Sbas_Raw_Msg sbas_raw_msg(message_sample_stamp, this->d_satellite.get_PRN(), it->second);
-                    //sbas_raw_msgs.push_back(sbas_raw_msg);
+                    // Sbas_Raw_Msg sbas_raw_msg(message_sample_stamp, this->d_satellite.get_PRN(), it->second);
+                    // sbas_raw_msgs.push_back(sbas_raw_msg);
                 }
 
             // parse messages
             // and send them to the SBAS raw message queue
-            //for(std::vector<Sbas_Raw_Msg>::iterator it = sbas_raw_msgs.begin(); it != sbas_raw_msgs.end(); it++)
+            // for(std::vector<Sbas_Raw_Msg>::iterator it = sbas_raw_msgs.begin(); it != sbas_raw_msgs.end(); it++)
             //    {
-            //std::cout << "SBAS message type " << it->get_msg_type() << " from PRN" << it->get_prn() << " received" << std::endl;
-            //sbas_telemetry_data.update(*it);
+            // std::cout << "SBAS message type " << it->get_msg_type() << " from PRN" << it->get_prn() << " received" << std::endl;
+            // sbas_telemetry_data.update(*it);
             //    }
 
             // clear all processed samples in the input buffer

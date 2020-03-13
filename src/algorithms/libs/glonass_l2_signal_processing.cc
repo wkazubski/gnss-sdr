@@ -14,18 +14,7 @@
  *
  * This file is part of GNSS-SDR.
  *
- * GNSS-SDR is free software: you can redistribute it and/or modify
- * it under the terms of the GNU General Public License as published by
- * the Free Software Foundation, either version 3 of the License, or
- * (at your option) any later version.
- *
- * GNSS-SDR is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with GNSS-SDR. If not, see <https://www.gnu.org/licenses/>.
+ * SPDX-License-Identifier: GPL-3.0-or-later
  *
  * -------------------------------------------------------------------------
  */
@@ -44,7 +33,8 @@ void glonass_l2_ca_code_gen_complex(gsl::span<std::complex<float>> _dest, uint32
     bool feedback1;
     bool aux;
     uint32_t delay;
-    uint32_t lcv, lcv2;
+    uint32_t lcv;
+    uint32_t lcv2;
 
     /* Generate G1 Register */
     for (lcv = 0; lcv < _code_length; lcv++)
@@ -105,7 +95,8 @@ void glonass_l2_ca_code_gen_complex_sampled(gsl::span<std::complex<float>> _dest
 {
     // This function is based on the GNU software GPS for MATLAB in the Kay Borre book
     std::array<std::complex<float>, 511> _code{};
-    int32_t _samplesPerCode, _codeValueIndex;
+    int32_t _samplesPerCode;
+    int32_t _codeValueIndex;
     float _ts;
     float _tc;
     float aux;
@@ -113,7 +104,7 @@ void glonass_l2_ca_code_gen_complex_sampled(gsl::span<std::complex<float>> _dest
     const int32_t _codeLength = 511;
 
     // --- Find number of samples per spreading code ---------------------------
-    _samplesPerCode = static_cast<int32_t>(static_cast<double>(_fs) / static_cast<double>(_codeFreqBasis / _codeLength));
+    _samplesPerCode = static_cast<int32_t>(static_cast<double>(_fs) / (static_cast<double>(_codeFreqBasis) / static_cast<double>(_codeLength)));
 
     // --- Find time constants -------------------------------------------------
     _ts = 1.0 / static_cast<float>(_fs);             // Sampling period in sec

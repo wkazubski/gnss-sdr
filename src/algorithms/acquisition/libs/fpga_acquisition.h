@@ -17,24 +17,13 @@
  *
  * This file is part of GNSS-SDR.
  *
- * GNSS-SDR is free software: you can redistribute it and/or modify
- * it under the terms of the GNU General Public License as published by
- * the Free Software Foundation, either version 3 of the License, or
- * (at your option) any later version.
- *
- * GNSS-SDR is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with GNSS-SDR. If not, see <https://www.gnu.org/licenses/>.
+ * SPDX-License-Identifier: GPL-3.0-or-later
  *
  * -------------------------------------------------------------------------
  */
 
-#ifndef GNSS_SDR_FPGA_ACQUISITION_H_
-#define GNSS_SDR_FPGA_ACQUISITION_H_
+#ifndef GNSS_SDR_FPGA_ACQUISITION_H
+#define GNSS_SDR_FPGA_ACQUISITION_H
 
 #include <cstdint>
 #include <string>
@@ -46,15 +35,14 @@ class Fpga_Acquisition
 {
 public:
     /*!
-	 * \brief Constructor
-	 */
+     * \brief Constructor
+     */
     Fpga_Acquisition(
         std::string device_name,
         uint32_t nsamples,
         uint32_t doppler_max,
         uint32_t nsamples_total,
         int64_t fs_in,
-        uint32_t sampled_ms,
         uint32_t select_queue,
         uint32_t *all_fft_codes,
         uint32_t excludelimit);
@@ -77,7 +65,7 @@ public:
     /*!
      * \brief Run the acquisition process in the FPGA
      */
-    void run_acquisition(void);
+    void run_acquisition();
 
     /*!
      * \brief Read the results of the acquisition process
@@ -112,7 +100,7 @@ public:
     /*!
      * \brief Reset the FPGA PL.
      */
-    void reset_acquisition(void);
+    void reset_acquisition();
 
     /*!
      * \brief Read the scaling factor that has been used by the FFT-IFFT
@@ -179,4 +167,4 @@ private:
     void read_result_valid(uint32_t *result_valid);
 };
 
-#endif /* GNSS_SDR_FPGA_ACQUISITION_H_ */
+#endif  // GNSS_SDR_FPGA_ACQUISITION_H

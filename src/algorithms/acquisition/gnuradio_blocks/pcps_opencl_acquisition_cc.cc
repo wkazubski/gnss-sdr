@@ -32,24 +32,13 @@
  *
  * This file is part of GNSS-SDR.
  *
- * GNSS-SDR is free software: you can redistribute it and/or modify
- * it under the terms of the GNU General Public License as published by
- * the Free Software Foundation, either version 3 of the License, or
- * (at your option) any later version.
- *
- * GNSS-SDR is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with GNSS-SDR. If not, see <https://www.gnu.org/licenses/>.
+ * SPDX-License-Identifier: GPL-3.0-or-later
  *
  * -------------------------------------------------------------------------
  */
 
 #include "pcps_opencl_acquisition_cc.h"
-#include "GPS_L1_CA.h"  //GPS_TWO_PI
+#include "GPS_L1_CA.h"  // GPS_TWO_PI
 #include "opencl/fft_base_kernels.h"
 #include "opencl/fft_internal.h"
 #include <glog/logging.h>
@@ -62,6 +51,7 @@
 #include <fstream>
 #include <iostream>
 #include <sstream>
+#include <utility>
 
 
 pcps_opencl_acquisition_cc_sptr pcps_make_opencl_acquisition_cc(
@@ -70,11 +60,11 @@ pcps_opencl_acquisition_cc_sptr pcps_make_opencl_acquisition_cc(
     int samples_per_ms, int samples_per_code,
     bool bit_transition_flag,
     bool dump,
-    std::string dump_filename)
+    const std::string &dump_filename)
 {
     return pcps_opencl_acquisition_cc_sptr(
         new pcps_opencl_acquisition_cc(sampled_ms, max_dwells, doppler_max, fs_in, samples_per_ms,
-            samples_per_code, bit_transition_flag, dump, std::move(dump_filename)));
+            samples_per_code, bit_transition_flag, dump, dump_filename));
 }
 
 
@@ -87,9 +77,9 @@ pcps_opencl_acquisition_cc::pcps_opencl_acquisition_cc(
     int samples_per_code,
     bool bit_transition_flag,
     bool dump,
-    std::string dump_filename) : gr::block("pcps_opencl_acquisition_cc",
-                                     gr::io_signature::make(1, 1, sizeof(gr_complex) * sampled_ms * samples_per_ms),
-                                     gr::io_signature::make(0, 0, sizeof(gr_complex) * sampled_ms * samples_per_ms))
+    const std::string &dump_filename) : gr::block("pcps_opencl_acquisition_cc",
+                                            gr::io_signature::make(1, 1, sizeof(gr_complex) * sampled_ms * samples_per_ms),
+                                            gr::io_signature::make(0, 0, sizeof(gr_complex) * sampled_ms * samples_per_ms))
 {
     this->message_port_register_out(pmt::mp("events"));
     d_sample_counter = 0ULL;  // SAMPLE COUNTER
@@ -130,7 +120,7 @@ pcps_opencl_acquisition_cc::pcps_opencl_acquisition_cc(
 
     // For dumping samples into a file
     d_dump = dump;
-    d_dump_filename = std::move(dump_filename);
+    d_dump_filename = dump_filename;
 }
 
 
@@ -424,7 +414,7 @@ void pcps_opencl_acquisition_cc::acquisition_core_volk()
                             d_gnss_synchro->Acq_doppler_step = d_doppler_step;
 
                             // 5- Compute the test statistics and compare to the threshold
-                            //d_test_statistics = 2 * d_fft_size * d_mag / d_input_power;
+                            // d_test_statistics = 2 * d_fft_size * d_mag / d_input_power;
                             d_test_statistics = d_mag / d_input_power;
                         }
                 }
@@ -439,7 +429,7 @@ void pcps_opencl_acquisition_cc::acquisition_core_volk()
                              << "_" << d_gnss_synchro->Signal[0] << d_gnss_synchro->Signal[1] << "_sat_"
                              << d_gnss_synchro->PRN << "_doppler_" << doppler << ".dat";
                     d_dump_file.open(filename.str().c_str(), std::ios::out | std::ios::binary);
-                    d_dump_file.write(reinterpret_cast<char *>(d_ifft->get_outbuf()), n);  //write directly |abs(x)|^2 in this Doppler bin?
+                    d_dump_file.write(reinterpret_cast<char *>(d_ifft->get_outbuf()), n);  // write directly |abs(x)|^2 in this Doppler bin?
                     d_dump_file.close();
                 }
         }
@@ -480,7 +470,7 @@ void pcps_opencl_acquisition_cc::acquisition_core_opencl()
     int doppler;
     uint32_t indext = 0;
     float magt = 0.0;
-    float fft_normalization_factor = (static_cast<float>(d_fft_size_pow2) * static_cast<float>(d_fft_size));  //This works, but I am not sure why.
+    float fft_normalization_factor = (static_cast<float>(d_fft_size_pow2) * static_cast<float>(d_fft_size));  // This works, but I am not sure why.
     uint64_t samplestamp = d_sample_counter_buffer[d_well_count];
 
     d_input_power = 0.0;
@@ -519,9 +509,9 @@ void pcps_opencl_acquisition_cc::acquisition_core_opencl()
 
             // Multiply input signal with doppler wipe-off
             kernel = cl::Kernel(d_cl_program, "mult_vectors");
-            kernel.setArg(0, *d_cl_buffer_in);                                    //input 1
-            kernel.setArg(1, *d_cl_buffer_grid_doppler_wipeoffs[doppler_index]);  //input 2
-            kernel.setArg(2, *d_cl_buffer_1);                                     //output
+            kernel.setArg(0, *d_cl_buffer_in);                                    // input 1
+            kernel.setArg(1, *d_cl_buffer_grid_doppler_wipeoffs[doppler_index]);  // input 2
+            kernel.setArg(2, *d_cl_buffer_1);                                     // output
             d_cl_queue->enqueueNDRangeKernel(kernel, cl::NullRange, cl::NDRange(d_fft_size),
                 cl::NullRange);
 
@@ -535,9 +525,9 @@ void pcps_opencl_acquisition_cc::acquisition_core_opencl()
             // Multiply carrier wiped--off, Fourier transformed incoming signal
             // with the local FFT'd code reference
             kernel = cl::Kernel(d_cl_program, "mult_vectors");
-            kernel.setArg(0, *d_cl_buffer_2);          //input 1
-            kernel.setArg(1, *d_cl_buffer_fft_codes);  //input 2
-            kernel.setArg(2, *d_cl_buffer_2);          //output
+            kernel.setArg(0, *d_cl_buffer_2);          // input 1
+            kernel.setArg(1, *d_cl_buffer_fft_codes);  // input 2
+            kernel.setArg(2, *d_cl_buffer_2);          // output
             d_cl_queue->enqueueNDRangeKernel(kernel, cl::NullRange, cl::NDRange(d_fft_size_pow2),
                 cl::NullRange);
 
@@ -548,8 +538,8 @@ void pcps_opencl_acquisition_cc::acquisition_core_opencl()
 
             // Compute magnitude
             kernel = cl::Kernel(d_cl_program, "magnitude_squared");
-            kernel.setArg(0, *d_cl_buffer_2);          //input 1
-            kernel.setArg(1, *d_cl_buffer_magnitude);  //output
+            kernel.setArg(0, *d_cl_buffer_2);          // input 1
+            kernel.setArg(1, *d_cl_buffer_magnitude);  // output
             d_cl_queue->enqueueNDRangeKernel(kernel, cl::NullRange, cl::NDRange(d_fft_size),
                 cl::NullRange);
 
@@ -585,7 +575,7 @@ void pcps_opencl_acquisition_cc::acquisition_core_opencl()
                             d_gnss_synchro->Acq_doppler_step = d_doppler_step;
 
                             // 5- Compute the test statistics and compare to the threshold
-                            //d_test_statistics = 2 * d_fft_size * d_mag / d_input_power;
+                            // d_test_statistics = 2 * d_fft_size * d_mag / d_input_power;
                             d_test_statistics = d_mag / d_input_power;
                         }
                 }
@@ -600,7 +590,7 @@ void pcps_opencl_acquisition_cc::acquisition_core_opencl()
                              << "_" << d_gnss_synchro->Signal[0] << d_gnss_synchro->Signal[1] << "_sat_"
                              << d_gnss_synchro->PRN << "_doppler_" << doppler << ".dat";
                     d_dump_file.open(filename.str().c_str(), std::ios::out | std::ios::binary);
-                    d_dump_file.write(reinterpret_cast<char *>(d_ifft->get_outbuf()), n);  //write directly |abs(x)|^2 in this Doppler bin?
+                    d_dump_file.write(reinterpret_cast<char *>(d_ifft->get_outbuf()), n);  // write directly |abs(x)|^2 in this Doppler bin?
                     d_dump_file.close();
                 }
         }

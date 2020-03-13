@@ -12,24 +12,13 @@
  *
  * This file is part of GNSS-SDR.
  *
- * GNSS-SDR is free software: you can redistribute it and/or modify
- * it under the terms of the GNU General Public License as published by
- * the Free Software Foundation, either version 3 of the License, or
- * (at your option) any later version.
- *
- * GNSS-SDR is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with GNSS-SDR. If not, see <https://www.gnu.org/licenses/>.
+ * SPDX-License-Identifier: GPL-3.0-or-later
  *
  * -------------------------------------------------------------------------
  */
 
-#ifndef GNSS_SDR_PVT_CONF_H_
-#define GNSS_SDR_PVT_CONF_H_
+#ifndef GNSS_SDR_PVT_CONF_H
+#define GNSS_SDR_PVT_CONF_H
 
 #include <cstdint>
 #include <map>
@@ -48,6 +37,7 @@ public:
 
     int32_t rinex_version;
     int32_t rinexobs_rate_ms;
+    std::string rinex_name;
     std::map<int, int> rtcm_msg_rate_ms;
 
     bool dump;
@@ -89,7 +79,9 @@ public:
     std::string udp_addresses;
     int udp_port;
 
+    bool enable_rx_clock_correction;
     bool show_local_time_zone;
+    bool pre_2009_file;
 
     Pvt_Conf();
 };

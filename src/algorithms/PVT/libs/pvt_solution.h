@@ -13,24 +13,13 @@
  *
  * This file is part of GNSS-SDR.
  *
- * GNSS-SDR is free software: you can redistribute it and/or modify
- * it under the terms of the GNU General Public License as published by
- * the Free Software Foundation, either version 3 of the License, or
- * (at your option) any later version.
- *
- * GNSS-SDR is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with GNSS-SDR. If not, see <https://www.gnu.org/licenses/>.
+ * SPDX-License-Identifier: GPL-3.0-or-later
  *
  * -------------------------------------------------------------------------
  */
 
-#ifndef GNSS_SDR_PVT_SOLUTION_H_
-#define GNSS_SDR_PVT_SOLUTION_H_
+#ifndef GNSS_SDR_PVT_SOLUTION_H
+#define GNSS_SDR_PVT_SOLUTION_H
 
 #if ARMA_NO_BOUND_CHECKING
 #define ARMA_NO_DEBUG 1
@@ -49,13 +38,15 @@ class Pvt_Solution
 {
 public:
     Pvt_Solution();
+    void set_pre_2009_file(bool pre_2009_file);  //!< Flag for the week rollover computation in post processing mode for signals older than 2009
+    double get_time_offset_s() const;            //!< Get RX time offset [s]
+    void set_time_offset_s(double offset);       //!< Set RX time offset [s]
 
-    double get_time_offset_s() const;       //!< Get RX time offset [s]
-    void set_time_offset_s(double offset);  //!< Set RX time offset [s]
-
-    double get_latitude() const;   //!< Get RX position Latitude WGS84 [deg]
-    double get_longitude() const;  //!< Get RX position Longitude WGS84 [deg]
-    double get_height() const;     //!< Get RX position height WGS84 [m]
+    double get_clock_drift_ppm() const;                //!< Get the Rx clock drift [ppm]
+    void set_clock_drift_ppm(double clock_drift_ppm);  //!< Set the Rx clock drift [ppm]
+    double get_latitude() const;                       //!< Get RX position Latitude WGS84 [deg]
+    double get_longitude() const;                      //!< Get RX position Longitude WGS84 [deg]
+    double get_height() const;                         //!< Get RX position height WGS84 [m]
 
     double get_speed_over_ground() const;          //!< Get RX speed over ground [m/s]
     void set_speed_over_ground(double speed_m_s);  //!< Set RX speed over ground [m/s]
@@ -70,6 +61,9 @@ public:
     void set_rx_pos(const arma::vec &pos);  //!< Set position: Latitude [deg], longitude [deg], height [m]
     arma::vec get_rx_pos() const;
 
+    void set_rx_vel(const arma::vec &vel);  //!< Set velocity: East [m/s], North [m/s], Up [m/s]
+    arma::vec get_rx_vel() const;
+
     bool is_valid_position() const;
     void set_valid_position(bool is_valid);
 
@@ -79,7 +73,7 @@ public:
     int get_num_valid_observations() const;    //!< Get the number of valid pseudorange observations (valid satellites)
     void set_num_valid_observations(int num);  //!< Set the number of valid pseudorange observations (valid satellites)
 
-    //averaging
+    // averaging
     void perform_pos_averaging();
     void set_averaging_depth(int depth);  //!< Set length of averaging window
     bool is_averaging() const;
@@ -129,8 +123,11 @@ public:
      */
     int tropo(double *ddr_m, double sinel, double hsta_km, double p_mb, double t_kel, double hum, double hp_km, double htkel_km, double hhum_km);
 
+protected:
+    bool d_pre_2009_file;  // Flag to correct week rollover in post processing mode for signals older than 2009
 private:
-    double d_rx_dt_s;  // RX time offset [s]
+    double d_rx_dt_s;             // RX time offset [s]
+    double d_rx_clock_drift_ppm;  // RX clock drift [ppm]
 
     double d_latitude_d;             // RX position Latitude WGS84 [deg]
     double d_longitude_d;            // RX position Longitude WGS84 [deg]
@@ -152,6 +149,7 @@ private:
     int d_averaging_depth;  // Length of averaging window
 
     arma::vec d_rx_pos;
+    arma::vec d_rx_vel;
     boost::posix_time::ptime d_position_UTC_time;
     int d_valid_observations;
 };

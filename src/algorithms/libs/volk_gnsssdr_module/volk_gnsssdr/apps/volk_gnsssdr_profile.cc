@@ -1,19 +1,10 @@
 /* Copyright (C) 2010-2019 (see AUTHORS file for a list of contributors)
  *
+ * GNSS-SDR is a software-defined Global Navigation Satellite Systems receiver
+ *
  * This file is part of GNSS-SDR.
  *
- * GNSS-SDR is free software: you can redistribute it and/or modify
- * it under the terms of the GNU General Public License as published by
- * the Free Software Foundation, either version 3 of the License, or
- * (at your option) any later version.
- *
- * GNSS-SDR is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with GNSS-SDR. If not, see <https://www.gnu.org/licenses/>.
+ * SPDX-License-Identifier: GPL-3.0-or-later
  */
 
 #include "volk_gnsssdr_profile.h"
@@ -187,13 +178,15 @@ int main(int argc, char *argv[])
         {
             std::cout << "Warning: this was a dry-run. Config not generated" << std::endl;
         }
+
+    return 0;
 }
 
 
 void read_results(std::vector<volk_gnsssdr_test_results_t> *results)
 {
     char path[1024];
-    volk_gnsssdr_get_config_path(path);
+    volk_gnsssdr_get_config_path(path, true);
 
     read_results(results, std::string(path));
 }
@@ -216,9 +209,8 @@ void read_results(std::vector<volk_gnsssdr_test_results_t> *results, std::string
                     std::vector<std::string> single_kernel_result;
                     std::string config_str(config_line);
                     std::size_t str_size = config_str.size();
-                    std::size_t found = 1;
+                    std::size_t found = config_str.find(' ');
 
-                    found = config_str.find(' ');
                     // Split line by spaces
                     while (found && found < str_size)
                         {
@@ -232,10 +224,10 @@ void read_results(std::vector<volk_gnsssdr_test_results_t> *results, std::string
                                     found = 127;
                                 }
                             str_size = config_str.size();
-                            char buffer[128] = {'\0'};
-                            config_str.copy(buffer, found + 1, 0);
-                            buffer[found] = '\0';
-                            single_kernel_result.push_back(std::string(buffer));
+                            char buffer_aux[128] = {'\0'};
+                            config_str.copy(buffer_aux, found + 1, 0);
+                            buffer_aux[found] = '\0';
+                            single_kernel_result.push_back(std::string(buffer_aux));
                             config_str.erase(0, found + 1);
                         }
 
@@ -255,7 +247,7 @@ void read_results(std::vector<volk_gnsssdr_test_results_t> *results, std::string
 void write_results(const std::vector<volk_gnsssdr_test_results_t> *results, bool update_result)
 {
     char path[1024];
-    volk_gnsssdr_get_config_path(path);
+    volk_gnsssdr_get_config_path(path, false);
 
     write_results(results, update_result, std::string(path));
 }
@@ -295,7 +287,7 @@ void write_results(const std::vector<volk_gnsssdr_test_results_t> *results, bool
             std::cout << "Updating " << path << " ..." << std::endl;
             config.open(path.c_str(), std::ofstream::app);
             if (!config.is_open())
-                {  //either we don't have write access or we don't have the dir yet
+                {  // either we don't have write access or we don't have the dir yet
                     std::cout << "Error opening file " << path << std::endl;
                 }
         }
@@ -304,7 +296,7 @@ void write_results(const std::vector<volk_gnsssdr_test_results_t> *results, bool
             std::cout << "Writing " << path << " ..." << std::endl;
             config.open(path.c_str());
             if (!config.is_open())
-                {  //either we don't have write access or we don't have the dir yet
+                {  // either we don't have write access or we don't have the dir yet
                     std::cout << "Error opening file " << path << std::endl;
                 }
 

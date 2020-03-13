@@ -1,19 +1,10 @@
-# Copyright (C) 2012-2019  (see AUTHORS file for a list of contributors)
+# Copyright (C) 2012-2020  (see AUTHORS file for a list of contributors)
+#
+# GNSS-SDR is a software-defined Global Navigation Satellite Systems receiver
 #
 # This file is part of GNSS-SDR.
 #
-# GNSS-SDR is free software: you can redistribute it and/or modify
-# it under the terms of the GNU General Public License as published by
-# the Free Software Foundation, either version 3 of the License, or
-# (at your option) any later version.
-#
-# GNSS-SDR is distributed in the hope that it will be useful,
-# but WITHOUT ANY WARRANTY; without even the implied warranty of
-# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-# GNU General Public License for more details.
-#
-# You should have received a copy of the GNU General Public License
-# along with GNSS-SDR. If not, see <https://www.gnu.org/licenses/>.
+# SPDX-License-Identifier: GPL-3.0-or-later
 #
 
 
@@ -32,7 +23,7 @@ endif()
 target_link_libraries(gnss-sdr
     PUBLIC
         core_receiver
-        Boost::boost
+        Boost::headers
         Boost::thread
         Gflags::gflags
         Glog::glog
@@ -70,7 +61,7 @@ if(ENABLE_GPERFTOOLS)
     endif()
 endif()
 
-if(OS_IS_MACOSX)
+if(${CMAKE_SYSTEM_NAME} MATCHES "Darwin")
     if(CMAKE_CXX_COMPILER_ID MATCHES "Clang")
         target_link_libraries(gnss-sdr
             PUBLIC
@@ -95,17 +86,29 @@ add_custom_command(TARGET gnss-sdr
 
 install(TARGETS gnss-sdr
     RUNTIME DESTINATION bin
-    COMPONENT "gnss-sdr")
+    COMPONENT "gnss-sdr"
+)
 
-install(DIRECTORY ${CMAKE_SOURCE_DIR}/conf DESTINATION share/gnss-sdr
-    FILES_MATCHING PATTERN "*.conf")
+install(DIRECTORY ${CMAKE_SOURCE_DIR}/conf
+    DESTINATION share/gnss-sdr
+    FILES_MATCHING PATTERN "*.conf"
+)
 
-install(FILES ${CMAKE_SOURCE_DIR}/conf/gnss-sdr.conf DESTINATION share/gnss-sdr/conf
-    RENAME default.conf)
+install(FILES ${CMAKE_SOURCE_DIR}/conf/gnss-sdr.conf
+    DESTINATION share/gnss-sdr/conf
+    RENAME default.conf
+)
 
 if(NOT VOLKGNSSSDR_FOUND)
-    install(PROGRAMS ${CMAKE_BINARY_DIR}/volk_gnsssdr_module/build/apps/volk_gnsssdr_profile DESTINATION bin COMPONENT "volk_gnsssdr")
-    install(PROGRAMS ${CMAKE_BINARY_DIR}/volk_gnsssdr_module/build/apps/volk_gnsssdr-config-info DESTINATION bin COMPONENT "volk_gnsssdr")
+    install(PROGRAMS ${CMAKE_BINARY_DIR}/volk_gnsssdr_module/build/apps/volk_gnsssdr_profile
+        DESTINATION bin
+        COMPONENT "volk_gnsssdr"
+    )
+
+    install(PROGRAMS ${CMAKE_BINARY_DIR}/volk_gnsssdr_module/build/apps/volk_gnsssdr-config-info
+        DESTINATION bin
+        COMPONENT "volk_gnsssdr"
+    )
 endif()
 
 find_program(GZIP
@@ -119,21 +122,40 @@ find_program(GZIP
 
 if(NOT GZIP_NOTFOUND)
     execute_process(COMMAND gzip -9 -c ${CMAKE_SOURCE_DIR}/docs/manpage/gnss-sdr-manpage
-        WORKING_DIRECTORY ${CMAKE_BINARY_DIR} OUTPUT_FILE "${CMAKE_BINARY_DIR}/gnss-sdr.1.gz")
+        WORKING_DIRECTORY ${CMAKE_BINARY_DIR}
+        OUTPUT_FILE "${CMAKE_BINARY_DIR}/gnss-sdr.1.gz"
+    )
 
-    install(FILES ${CMAKE_BINARY_DIR}/gnss-sdr.1.gz DESTINATION share/man/man1)
+    install(FILES ${CMAKE_BINARY_DIR}/gnss-sdr.1.gz
+        DESTINATION share/man/man1
+    )
 
-    execute_process(COMMAND gzip -9 -c ${CMAKE_SOURCE_DIR}/docs/changelog
-        WORKING_DIRECTORY ${CMAKE_BINARY_DIR} OUTPUT_FILE "${CMAKE_BINARY_DIR}/changelog.gz")
+    execute_process(COMMAND gzip -9 -c ${CMAKE_SOURCE_DIR}/docs/changelog.md
+        WORKING_DIRECTORY ${CMAKE_BINARY_DIR}
+        OUTPUT_FILE "${CMAKE_BINARY_DIR}/changelog.gz"
+    )
 
-    install(FILES ${CMAKE_BINARY_DIR}/changelog.gz DESTINATION share/doc/gnss-sdr)
+    install(FILES ${CMAKE_BINARY_DIR}/changelog.gz
+        DESTINATION share/doc/gnss-sdr
+    )
 
     if(NOT VOLKGNSSSDR_FOUND)
         execute_process(COMMAND gzip -9 -c ${CMAKE_SOURCE_DIR}/src/algorithms/libs/volk_gnsssdr_module/volk_gnsssdr/cmake/Packaging/volk_gnsssdr_profile-manpage
-            WORKING_DIRECTORY ${CMAKE_BINARY_DIR} OUTPUT_FILE "${CMAKE_BINARY_DIR}/volk_gnsssdr_profile.1.gz")
+            WORKING_DIRECTORY ${CMAKE_BINARY_DIR}
+            OUTPUT_FILE "${CMAKE_BINARY_DIR}/volk_gnsssdr_profile.1.gz"
+        )
+
         execute_process(COMMAND gzip -9 -c ${CMAKE_SOURCE_DIR}/src/algorithms/libs/volk_gnsssdr_module/volk_gnsssdr/cmake/Packaging/volk_gnsssdr-config-info-manpage
-            WORKING_DIRECTORY ${CMAKE_BINARY_DIR} OUTPUT_FILE "${CMAKE_BINARY_DIR}/volk_gnsssdr-config-info.1.gz")
-        install(FILES ${CMAKE_BINARY_DIR}/volk_gnsssdr_profile.1.gz DESTINATION share/man/man1)
-        install(FILES ${CMAKE_BINARY_DIR}/volk_gnsssdr-config-info.1.gz DESTINATION share/man/man1)
+            WORKING_DIRECTORY ${CMAKE_BINARY_DIR}
+            OUTPUT_FILE "${CMAKE_BINARY_DIR}/volk_gnsssdr-config-info.1.gz"
+        )
+
+        install(FILES ${CMAKE_BINARY_DIR}/volk_gnsssdr_profile.1.gz
+            DESTINATION share/man/man1
+        )
+
+        install(FILES ${CMAKE_BINARY_DIR}/volk_gnsssdr-config-info.1.gz
+            DESTINATION share/man/man1
+        )
     endif()
 endif()

@@ -13,18 +13,7 @@
  *
  * This file is part of GNSS-SDR.
  *
- * GNSS-SDR is free software: you can redistribute it and/or modify
- * it under the terms of the GNU General Public License as published by
- * the Free Software Foundation, either version 3 of the License, or
- * (at your option) any later version.
- *
- * GNSS-SDR is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with GNSS-SDR. If not, see <https://www.gnu.org/licenses/>.
+ * SPDX-License-Identifier: GPL-3.0-or-later
  *
  * -------------------------------------------------------------------------
  */
@@ -87,7 +76,7 @@ int FrontEndCal::Get_SUPL_Assist()
     Gnss_Sdr_Supl_Client supl_client_acquisition_;
     Gnss_Sdr_Supl_Client supl_client_ephemeris_;
     int supl_mcc;  // Current network MCC (Mobile country code), 3 digits.
-    int supl_mns;  //Current network MNC (Mobile Network code), 2 or 3 digits.
+    int supl_mns;  // Current network MNC (Mobile Network code), 2 or 3 digits.
     int supl_lac;  // Current network LAC (Location area code),16 bits, 1-65520 are valid values.
     int supl_ci;   // Cell Identity (16 bits, 0-65535 are valid values).
 
@@ -95,7 +84,7 @@ int FrontEndCal::Get_SUPL_Assist()
     int error = 0;
     bool enable_gps_supl_assistance = configuration_->property("GNSS-SDR.SUPL_gps_enabled", false);
     if (enable_gps_supl_assistance == true)
-        //SUPL SERVER TEST. Not operational yet!
+        // SUPL SERVER TEST. Not operational yet!
         {
             LOG(INFO) << "SUPL RRLP GPS assistance enabled!";
             std::string default_acq_server = "supl.nokia.com";
@@ -151,7 +140,7 @@ int FrontEndCal::Get_SUPL_Assist()
                                     LOG(INFO) << "New Ephemeris record inserted with Toe=" << gps_eph_iter->second.d_Toe << " and GPS Week=" << gps_eph_iter->second.i_GPS_week;
                                     global_gps_ephemeris_map.write(gps_eph_iter->second.i_satellite_PRN, gps_eph_iter->second);
                                 }
-                            //Save ephemeris to XML file
+                            // Save ephemeris to XML file
                             std::string eph_xml_filename = configuration_->property("GNSS-SDR.SUPL_gps_ephemeris_xml", eph_default_xml_filename);
                             if (supl_client_ephemeris_.save_ephemeris_map_xml(eph_xml_filename, supl_client_ephemeris_.gps_ephemeris_map) == true)
                                 {
@@ -304,7 +293,7 @@ arma::vec FrontEndCal::geodetic2ecef(double phi, double lambda, double h, const 
 }
 
 
-double FrontEndCal::estimate_doppler_from_eph(unsigned int PRN, double TOW, double lat, double lon, double height) noexcept(false)
+double FrontEndCal::estimate_doppler_from_eph(unsigned int PRN, double tow, double lat, double lon, double height) noexcept(false)
 {
     int num_secs = 10;
     double step_secs = 0.5;
@@ -327,9 +316,10 @@ double FrontEndCal::estimate_doppler_from_eph(unsigned int PRN, double TOW, doub
     if (eph_it != eph_map.end())
         {
             arma::vec SV_pos_ecef = "0.0 0.0 0.0 0.0";
-            double obs_time_start, obs_time_stop;
-            obs_time_start = TOW - num_secs / 2;
-            obs_time_stop = TOW + num_secs / 2;
+            double obs_time_start;
+            double obs_time_stop;
+            obs_time_start = tow - static_cast<double>(num_secs) / 2.0;
+            obs_time_stop = tow + static_cast<double>(num_secs) / 2.0;
             int n_points = round((obs_time_stop - obs_time_start) / step_secs);
             arma::vec ranges = arma::zeros(n_points, 1);
             double obs_time = obs_time_start;
@@ -353,7 +343,7 @@ double FrontEndCal::estimate_doppler_from_eph(unsigned int PRN, double TOW, doub
             // be redefined as:
             obs_to_sat_velocity = -obs_to_sat_velocity;
 
-            //Doppler estimation
+            // Doppler estimation
             arma::vec Doppler_Hz;
             Doppler_Hz = (obs_to_sat_velocity / GPS_C_M_S) * GPS_L1_FREQ_HZ;
             double mean_Doppler_Hz;
@@ -367,7 +357,7 @@ double FrontEndCal::estimate_doppler_from_eph(unsigned int PRN, double TOW, doub
 void FrontEndCal::GPS_L1_front_end_model_E4000(double f_bb_true_Hz, double f_bb_meas_Hz, double fs_nominal_hz, double *estimated_fs_Hz, double *estimated_f_if_Hz, double *f_osc_err_ppm)
 {
     const double f_osc_n = 28.8e6;
-    //PLL registers settings (according to E4000 datasheet)
+    // PLL registers settings (according to E4000 datasheet)
     const double N = 109.0;
     const double Y = 65536.0;
     const double X = 26487.0;

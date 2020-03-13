@@ -18,24 +18,13 @@
  *
  * This file is part of GNSS-SDR.
  *
- * GNSS-SDR is free software: you can redistribute it and/or modify
- * it under the terms of the GNU General Public License as published by
- * the Free Software Foundation, either version 3 of the License, or
- * (at your option) any later version.
- *
- * GNSS-SDR is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with GNSS-SDR. If not, see <https://www.gnu.org/licenses/>.
+ * SPDX-License-Identifier: GPL-3.0-or-later
  *
  * -------------------------------------------------------------------------
  */
 
-#ifndef GNSS_SDR_GNSS_FLOWGRAPH_H_
-#define GNSS_SDR_GNSS_FLOWGRAPH_H_
+#ifndef GNSS_SDR_GNSS_FLOWGRAPH_H
+#define GNSS_SDR_GNSS_FLOWGRAPH_H
 
 #include "channel_status_msg_receiver.h"
 #include "concurrent_queue.h"
@@ -128,7 +117,7 @@ public:
     /*!
      * \brief Set flow graph configuratiob
      */
-    void set_configuration(std::shared_ptr<ConfigurationInterface> configuration);
+    void set_configuration(const std::shared_ptr<ConfigurationInterface>& configuration);
 
     bool connected() const
     {
@@ -181,9 +170,11 @@ private:
     void push_back_signal(const Gnss_Signal& gs);
     void remove_signal(const Gnss_Signal& gs);
 
-    double project_doppler(std::string searched_signal, double primary_freq_doppler_hz);
+    double project_doppler(const std::string& searched_signal, double primary_freq_doppler_hz);
+    bool is_multiband() const;
     bool connected_;
     bool running_;
+    bool multiband_;
     int sources_count_;
 
     unsigned int channels_count_;
@@ -242,4 +233,4 @@ private:
     std::vector<std::string> split_string(const std::string& s, char delim);
 };
 
-#endif /* GNSS_SDR_GNSS_FLOWGRAPH_H_ */
+#endif  // GNSS_SDR_GNSS_FLOWGRAPH_H

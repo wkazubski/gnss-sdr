@@ -14,18 +14,7 @@
  *
  * This file is part of GNSS-SDR.
  *
- * GNSS-SDR is free software: you can redistribute it and/or modify
- * it under the terms of the GNU General Public License as published by
- * the Free Software Foundation, either version 3 of the License, or
- * (at your option) any later version.
- *
- * GNSS-SDR is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with GNSS-SDR. If not, see <https://www.gnu.org/licenses/>.
+ * SPDX-License-Identifier: GPL-3.0-or-later
  *
  * -------------------------------------------------------------------------
  */
@@ -73,7 +62,7 @@ class GpsL1CaPcpsAcquisitionGSoC2013Test_msg_rx : public gr::block
 private:
     friend GpsL1CaPcpsAcquisitionGSoC2013Test_msg_rx_sptr GpsL1CaPcpsAcquisitionGSoC2013Test_msg_rx_make(Concurrent_Queue<int>& queue);
     void msg_handler_events(pmt::pmt_t msg);
-    GpsL1CaPcpsAcquisitionGSoC2013Test_msg_rx(Concurrent_Queue<int>& queue);
+    explicit GpsL1CaPcpsAcquisitionGSoC2013Test_msg_rx(Concurrent_Queue<int>& queue);
     Concurrent_Queue<int>& channel_internal_queue;
 
 public:
@@ -252,7 +241,8 @@ void GpsL1CaPcpsAcquisitionGSoC2013Test::config_1()
     config->set_property("Acquisition_1C.coherent_integration_time_ms",
         std::to_string(integration_time_ms));
     config->set_property("Acquisition_1C.max_dwells", "1");
-    config->set_property("Acquisition_1C.threshold", "0.8");
+    // config->set_property("Acquisition_1C.threshold", "2.5");
+    config->set_property("Acquisition_1C.pfa", "0.001");
     config->set_property("Acquisition_1C.doppler_max", "10000");
     config->set_property("Acquisition_1C.doppler_step", "250");
     config->set_property("Acquisition_1C.bit_transition_flag", "false");
@@ -339,7 +329,7 @@ void GpsL1CaPcpsAcquisitionGSoC2013Test::config_2()
     config->set_property("Acquisition_1C.coherent_integration_time_ms",
         std::to_string(integration_time_ms));
     config->set_property("Acquisition_1C.max_dwells", "1");
-    config->set_property("Acquisition_1C.pfa", "0.1");
+    config->set_property("Acquisition_1C.pfa", "0.001");
     config->set_property("Acquisition_1C.doppler_max", "10000");
     config->set_property("Acquisition_1C.doppler_step", "250");
     config->set_property("Acquisition_1C.bit_transition_flag", "false");
@@ -491,10 +481,6 @@ TEST_F(GpsL1CaPcpsAcquisitionGSoC2013Test, ValidationOfResults)
     }) << "Failure setting doppler_step.";
 
     ASSERT_NO_THROW({
-        acquisition->set_threshold(0.5);
-    }) << "Failure setting threshold.";
-
-    ASSERT_NO_THROW({
         acquisition->connect(top_block);
         top_block->msg_connect(acquisition->get_right_block(), pmt::mp("events"), msg_rx, pmt::mp("events"));
     }) << "Failure connecting acquisition to the top_block.";
@@ -578,10 +564,6 @@ TEST_F(GpsL1CaPcpsAcquisitionGSoC2013Test, ValidationOfResultsProbabilities)
     ASSERT_NO_THROW({
         acquisition->set_doppler_step(config->property("Acquisition_1C.doppler_step", 500));
     }) << "Failure setting doppler_step.";
-
-    ASSERT_NO_THROW({
-        acquisition->set_threshold(config->property("Acquisition_1C.threshold", 0.0));
-    }) << "Failure setting threshold.";
 
     ASSERT_NO_THROW({
         acquisition->connect(top_block);

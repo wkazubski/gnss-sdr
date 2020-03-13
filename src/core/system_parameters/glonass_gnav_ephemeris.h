@@ -14,25 +14,14 @@
  *
  * This file is part of GNSS-SDR.
  *
- * GNSS-SDR is free software: you can redistribute it and/or modify
- * it under the terms of the GNU General Public License as published by
- * the Free Software Foundation, either version 3 of the License, or
- * (at your option) any later version.
- *
- * GNSS-SDR is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with GNSS-SDR. If not, see <https://www.gnu.org/licenses/>.
+ * SPDX-License-Identifier: GPL-3.0-or-later
  *
  * -------------------------------------------------------------------------
  */
 
 
-#ifndef GNSS_SDR_GLONASS_GNAV_EPHEMERIS_H_
-#define GNSS_SDR_GLONASS_GNAV_EPHEMERIS_H_
+#ifndef GNSS_SDR_GLONASS_GNAV_EPHEMERIS_H
+#define GNSS_SDR_GLONASS_GNAV_EPHEMERIS_H
 
 
 #include <boost/date_time/posix_time/ptime.hpp>  // for ptime
@@ -97,7 +86,7 @@ public:
 
     /*!
      * \brief Sets (\a d_satClkDrift)and returns the clock drift in seconds according to the User Algorithm for SV Clock Correction
-     *  (IS-GPS-200E,  20.3.3.3.3.1)
+     *  (IS-GPS-200K,  20.3.3.3.3.1)
      */
     double sv_clock_drift(double transmitTime, double timeCorrUTC);
 
@@ -176,7 +165,7 @@ private:
     /*
      * Accounts for the beginning or end of week crossover
      *
-     * See paragraph 20.3.3.3.3.1 (IS-GPS-200E)
+     * See paragraph 20.3.3.3.3.1 (IS-GPS-200K)
      * \param[in]  -  time in seconds
      * \param[out] -  corrected time, in seconds
      */

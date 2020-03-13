@@ -1,19 +1,10 @@
-# Copyright (C) 2012-2019  (see AUTHORS file for a list of contributors)
+# Copyright (C) 2012-2020  (see AUTHORS file for a list of contributors)
+#
+# GNSS-SDR is a software-defined Global Navigation Satellite Systems receiver
 #
 # This file is part of GNSS-SDR.
 #
-# GNSS-SDR is free software: you can redistribute it and/or modify
-# it under the terms of the GNU General Public License as published by
-# the Free Software Foundation, either version 3 of the License, or
-# (at your option) any later version.
-#
-# GNSS-SDR is distributed in the hope that it will be useful,
-# but WITHOUT ANY WARRANTY; without even the implied warranty of
-# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-# GNU General Public License for more details.
-#
-# You should have received a copy of the GNU General Public License
-# along with GNSS-SDR. If not, see <https://www.gnu.org/licenses/>.
+# SPDX-License-Identifier: GPL-3.0-or-later
 #
 
 
@@ -51,7 +42,8 @@ set(TRACKING_LIB_HEADERS
     exponential_smoother.h
 )
 
-
+set(OPT_TRACKING_LIBRARIES "")
+set(OPT_TRACKING_INCLUDES "")
 if(ENABLE_CUDA)
     if(CMAKE_VERSION VERSION_GREATER 3.11)
         set(TRACKING_LIB_SOURCES ${TRACKING_LIB_SOURCES} cuda_multicorrelator.cu)
@@ -88,13 +80,14 @@ add_library(tracking_libs ${TRACKING_LIB_SOURCES} ${TRACKING_LIB_HEADERS})
 target_link_libraries(tracking_libs
     PUBLIC
         Armadillo::armadillo
-        Boost::boost
+        Boost::headers
         Gnuradio::runtime
         Volkgnsssdr::volkgnsssdr
         core_system_parameters
         algorithms_libs
         ${OPT_TRACKING_LIBRARIES}
     PRIVATE
+        gnss_sdr_flags
         Gflags::gflags
         Glog::glog
 )
@@ -118,7 +111,7 @@ if(Boost_VERSION_STRING VERSION_GREATER 1.65.99)
 endif()
 
 # Fix for Boost Asio < 1.70
-if(OS_IS_MACOSX)
+if(${CMAKE_SYSTEM_NAME} MATCHES "Darwin")
     if((CMAKE_CXX_COMPILER_ID MATCHES "Clang") AND (Boost_VERSION_STRING VERSION_LESS 1.70.0))
         if(${has_string_view})
             target_compile_definitions(tracking_libs
@@ -134,11 +127,16 @@ if(OS_IS_MACOSX)
     endif()
 endif()
 
-if(CMAKE_BUILD_TYPE MATCHES Rel)
+if(ENABLE_ARMA_NO_DEBUG)
     target_compile_definitions(tracking_libs
         PUBLIC -DARMA_NO_BOUND_CHECKING=1
     )
 endif()
+
+target_include_directories(tracking_libs
+    PUBLIC
+        ${CMAKE_SOURCE_DIR}/src/core/interfaces
+)
 
 if(ENABLE_CLANG_TIDY)
     if(CLANG_TIDY_EXE)

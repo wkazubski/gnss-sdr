@@ -12,18 +12,7 @@
  *
  * This file is part of GNSS-SDR.
  *
- * GNSS-SDR is free software: you can redistribute it and/or modify
- * it under the terms of the GNU General Public License as published by
- * the Free Software Foundation, either version 3 of the License, or
- * (at your option) any later version.
- *
- * GNSS-SDR is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with GNSS-SDR. If not, see <https://www.gnu.org/licenses/>.
+ * SPDX-License-Identifier: GPL-3.0-or-later
  *
  * -------------------------------------------------------------------------
  */
@@ -38,6 +27,7 @@
 #include <iostream>
 #include <sstream>
 #include <utility>
+#include <vector>
 
 
 labsat23_source_sptr labsat23_make_source_sptr(const char *signal_file_basename, int channel_selector, std::shared_ptr<Concurrent_Queue<pmt::pmt_t>> queue)
@@ -146,7 +136,7 @@ void labsat23_source::decode_samples_one_channel(int16_t input_short, gr_complex
             //  bits per sample, 4 samples per int16
             for (int i = 0; i < 4; i++)
                 {
-                    //out[i] = gr_complex(0.0, 0.0);
+                    // out[i] = gr_complex(0.0, 0.0);
                     // In-Phase
                     if (bs[15 - 4 * i])
                         {
@@ -194,7 +184,7 @@ void labsat23_source::decode_samples_one_channel(int16_t input_short, gr_complex
                                     out[i] += gr_complex(0, 1);
                                 }
                         }
-                    //out[i] += gr_complex(0.5, 0.5);
+                    // out[i] += gr_complex(0.5, 0.5);
                 }
             break;
         default:
@@ -272,8 +262,8 @@ int labsat23_source::general_work(int noutput_items,
                     uint8_t section_id = static_cast<int>(memblock[byte_counter]) + static_cast<int>(memblock[byte_counter + 1]) * 256;
                     byte_counter += 2;
 
-                    //uint8_t section_lenght_bytes = 0;
-                    //section_lenght_bytes += memblock[byte_counter] | (memblock[byte_counter + 1] << 8) | (memblock[byte_counter + 2] << 16) | (memblock[byte_counter + 3] << 24);
+                    // uint8_t section_lenght_bytes = 0;
+                    // section_lenght_bytes += memblock[byte_counter] | (memblock[byte_counter + 1] << 8) | (memblock[byte_counter + 2] << 16) | (memblock[byte_counter + 3] << 24);
 
                     byte_counter += 4;
                     if (section_id == 2)
@@ -342,7 +332,7 @@ int labsat23_source::general_work(int noutput_items,
                                     return -1;
                                 }
 
-                            //todo: Add support for dual channel files
+                            // todo: Add support for dual channel files
                             if (d_channel_selector == 0)
                                 {
                                     std::cout << "ERROR: Labsat file contains more than one channel and it is not currently supported by Labsat signal source." << std::endl;
@@ -421,16 +411,16 @@ int labsat23_source::general_work(int noutput_items,
                 {
                 case 0:
                     // dual channel 2 bits per complex sample
-                    //todo: implement dual channel reader
+                    // todo: implement dual channel reader
                     break;
                 default:
                     // single channel 2 bits per complex sample (1 bit I + 1 bit Q, 8 samples per int16)
                     int n_int16_to_read = noutput_items / 8;
                     if (n_int16_to_read > 0)
                         {
-                            int16_t memblock[n_int16_to_read];
-                            binary_input_file->read(reinterpret_cast<char *>(memblock), n_int16_to_read * 2);
-                            n_int16_to_read = binary_input_file->gcount() / 2;  //from bytes to int16
+                            std::vector<int16_t> memblock(n_int16_to_read);
+                            binary_input_file->read(reinterpret_cast<char *>(memblock.data()), n_int16_to_read * 2);
+                            n_int16_to_read = binary_input_file->gcount() / 2;  // from bytes to int16
                             if (n_int16_to_read > 0)
                                 {
                                     int output_pointer = 0;
@@ -479,15 +469,15 @@ int labsat23_source::general_work(int noutput_items,
                 {
                 case 0:
                     // dual channel
-                    //todo: implement dual channel reader
+                    // todo: implement dual channel reader
                     break;
                 default:
                     // single channel 4 bits per complex sample (2 bit I + 2 bit Q, 4 samples per int16)
                     int n_int16_to_read = noutput_items / 4;
                     if (n_int16_to_read > 0)
                         {
-                            int16_t memblock[n_int16_to_read];
-                            binary_input_file->read(reinterpret_cast<char *>(memblock), n_int16_to_read * 2);
+                            std::vector<int16_t> memblock(n_int16_to_read);
+                            binary_input_file->read(reinterpret_cast<char *>(memblock.data()), n_int16_to_read * 2);
                             n_int16_to_read = binary_input_file->gcount() / 2;  // from bytes to int16
                             if (n_int16_to_read > 0)
                                 {

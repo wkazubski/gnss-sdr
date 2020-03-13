@@ -24,18 +24,7 @@
  *
  * This file is part of GNSS-SDR.
  *
- * GNSS-SDR is free software: you can redistribute it and/or modify
- * it under the terms of the GNU General Public License as published by
- * the Free Software Foundation, either version 3 of the License, or
- * (at your option) any later version.
- *
- * GNSS-SDR is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with GNSS-SDR. If not, see <https://www.gnu.org/licenses/>.
+ * SPDX-License-Identifier: GPL-3.0-or-later
  *
  * -------------------------------------------------------------------------
  */
@@ -108,7 +97,7 @@ void CubatureFilter::predict_sequential(const arma::vec& x_post, const arma::mat
     arma::vec Xi_post;
     arma::vec Xi_pred;
 
-    for (uint8_t i = 0; i < np; i++)
+    for (int i = 0; i < np; i++)
         {
             Xi_post = Sm_post * (std::sqrt(static_cast<float>(np) / 2.0) * gen_one.col(i)) + x_post;
             Xi_pred = (*transition_fcn)(Xi_post);
@@ -151,7 +140,7 @@ void CubatureFilter::update_sequential(const arma::vec& z_upd, const arma::vec& 
     // Propagate and evaluate cubature points
     arma::vec Xi_pred;
     arma::vec Zi_pred;
-    for (uint8_t i = 0; i < np; i++)
+    for (int i = 0; i < np; i++)
         {
             Xi_pred = Sm_pred * (std::sqrt(static_cast<float>(np) / 2.0) * gen_one.col(i)) + x_pred;
             Zi_pred = (*measurement_fcn)(Xi_pred);
@@ -270,7 +259,7 @@ void UnscentedFilter::predict_sequential(const arma::vec& x_post, const arma::ma
 
     Xi_post.col(0) = x_post;
     Xi_pred.col(0) = (*transition_fcn)(Xi_post.col(0));
-    for (uint8_t i = 1; i <= nx; i++)
+    for (int i = 1; i <= nx; i++)
         {
             Xi_fact = std::sqrt(static_cast<float>(nx) + lambda) * arma::sqrtmat_sympd(P_x_post);
             Xi_post.col(i) = x_post + Xi_fact.col(i - 1);
@@ -285,7 +274,7 @@ void UnscentedFilter::predict_sequential(const arma::vec& x_post, const arma::ma
 
     // Compute predicted error covariance
     arma::mat P_x_pred = W0_c * ((Xi_pred.col(0) - x_pred) * (Xi_pred.col(0).t() - x_pred.t()));
-    for (uint8_t i = 1; i < np; i++)
+    for (int i = 1; i < np; i++)
         {
             P_x_pred = P_x_pred + Wi_m * ((Xi_pred.col(i) - x_pred) * (Xi_pred.col(i).t() - x_pred.t()));
         }
@@ -325,7 +314,7 @@ void UnscentedFilter::update_sequential(const arma::vec& z_upd, const arma::vec&
 
     Xi_pred.col(0) = x_pred;
     Zi_pred.col(0) = (*measurement_fcn)(Xi_pred.col(0));
-    for (uint8_t i = 1; i <= nx; i++)
+    for (int i = 1; i <= nx; i++)
         {
             Xi_fact = std::sqrt(static_cast<float>(nx) + lambda) * arma::sqrtmat_sympd(P_x_pred);
             Xi_pred.col(i) = x_pred + Xi_fact.col(i - 1);
@@ -341,7 +330,7 @@ void UnscentedFilter::update_sequential(const arma::vec& z_upd, const arma::vec&
     // Compute measurement covariance and cross covariance
     arma::mat P_zz_pred = W0_c * ((Zi_pred.col(0) - z_pred) * (Zi_pred.col(0).t() - z_pred.t()));
     arma::mat P_xz_pred = W0_c * ((Xi_pred.col(0) - x_pred) * (Zi_pred.col(0).t() - z_pred.t()));
-    for (uint8_t i = 0; i < np; i++)
+    for (int i = 0; i < np; i++)
         {
             P_zz_pred = P_zz_pred + Wi_m * ((Zi_pred.col(i) - z_pred) * (Zi_pred.col(i).t() - z_pred.t()));
             P_xz_pred = P_xz_pred + Wi_m * ((Xi_pred.col(i) - x_pred) * (Zi_pred.col(i).t() - z_pred.t()));

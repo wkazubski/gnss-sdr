@@ -13,18 +13,7 @@
  *
  * This file is part of GNSS-SDR.
  *
- * GNSS-SDR is free software: you can redistribute it and/or modify
- * it under the terms of the GNU General Public License as published by
- * the Free Software Foundation, either version 3 of the License, or
- * (at your option) any later version.
- *
- * GNSS-SDR is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with GNSS-SDR. If not, see <https://www.gnu.org/licenses/>.
+ * SPDX-License-Identifier: GPL-3.0-or-later
  *
  * -------------------------------------------------------------------------
  */
@@ -343,11 +332,11 @@ int glonass_l1_ca_telemetry_decoder_gs::general_work(int noutput_items __attribu
                         {
                             if (corr_value > 0)
                                 {
-                                    string_symbols[i] = d_symbol_history.at(i + d_symbols_per_preamble).Prompt_I;  // because last symbol of the preamble is just received now!
+                                    string_symbols[i] = d_symbol_history[i + d_symbols_per_preamble].Prompt_I;  // because last symbol of the preamble is just received now!
                                 }
                             else
                                 {
-                                    string_symbols[i] = -d_symbol_history.at(i + d_symbols_per_preamble).Prompt_I;  // because last symbol of the preamble is just received now!
+                                    string_symbols[i] = -d_symbol_history[i + d_symbols_per_preamble].Prompt_I;  // because last symbol of the preamble is just received now!
                                 }
                         }
 
@@ -389,7 +378,7 @@ int glonass_l1_ca_telemetry_decoder_gs::general_work(int noutput_items __attribu
         }
     else  // if there is not a new preamble, we define the TOW of the current symbol
         {
-            d_TOW_at_current_symbol = d_TOW_at_current_symbol + GLONASS_L1_CA_CODE_PERIOD;
+            d_TOW_at_current_symbol = d_TOW_at_current_symbol + GLONASS_L1_CA_CODE_PERIOD_S;
         }
 
     // if (d_flag_frame_sync == true and d_nav.flag_TOW_set==true and d_nav.flag_CRC_test == true)

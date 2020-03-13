@@ -12,18 +12,7 @@
  *
  * This file is part of GNSS-SDR.
  *
- * GNSS-SDR is free software: you can redistribute it and/or modify
- * it under the terms of the GNU General Public License as published by
- * the Free Software Foundation, either version 3 of the License, or
- * (at your option) any later version.
- *
- * GNSS-SDR is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with GNSS-SDR. If not, see <https://www.gnu.org/licenses/>.
+ * SPDX-License-Identifier: GPL-3.0-or-later
  *
  * -------------------------------------------------------------------------
  */
@@ -81,12 +70,12 @@ private:
 
     galileo_telemetry_decoder_gs(const Gnss_Satellite &satellite, int frame_type, bool dump);
 
-    void viterbi_decoder(double *page_part_symbols, int32_t *page_part_bits);
+    void viterbi_decoder(float *page_part_symbols, int32_t *page_part_bits);
 
-    void deinterleaver(int32_t rows, int32_t cols, const double *in, double *out);
+    void deinterleaver(int32_t rows, int32_t cols, const float *in, float *out);
 
-    void decode_INAV_word(double *page_part_symbols, int32_t frame_length);
-    void decode_FNAV_word(double *page_symbols, int32_t frame_length);
+    void decode_INAV_word(float *page_part_symbols, int32_t frame_length);
+    void decode_FNAV_word(float *page_symbols, int32_t frame_length);
 
     int d_frame_type;
     int32_t d_bits_per_preamble;
@@ -96,7 +85,7 @@ private:
     uint32_t d_PRN_code_period_ms;
     uint32_t d_required_symbols;
     uint32_t d_frame_length_symbols;
-    std::vector<double> d_page_part_symbols;
+    std::vector<float> d_page_part_symbols;
 
     boost::circular_buffer<float> d_symbol_history;
 
@@ -144,4 +133,4 @@ private:
     int32_t DataLength;
 };
 
-#endif
+#endif  // GNSS_SDR_GALILEO_TELEMETRY_DECODER_GS_H

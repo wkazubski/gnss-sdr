@@ -15,18 +15,7 @@
  *
  * This file is part of GNSS-SDR.
  *
- * GNSS-SDR is free software: you can redistribute it and/or modify
- * it under the terms of the GNU General Public License as published by
- * the Free Software Foundation, either version 3 of the License, or
- * (at your option) any later version.
- *
- * GNSS-SDR is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with GNSS-SDR. If not, see <https://www.gnu.org/licenses/>.
+ * SPDX-License-Identifier: GPL-3.0-or-later
  *
  * -------------------------------------------------------------------------
  */
@@ -98,14 +87,14 @@ int Gnss_Sdr_Valve::work(int noutput_items,
                     return 0;
                 }
             // multichannel support
-            for (unsigned int ch = 0; ch < output_items.size(); ch++)
+            for (size_t ch = 0; ch < output_items.size(); ch++)
                 {
                     memcpy(output_items[ch], input_items[ch], n * input_signature()->sizeof_stream_item(ch));
                 }
             d_ncopied_items += n;
             return n;
         }
-    for (unsigned int ch = 0; ch < output_items.size(); ch++)
+    for (size_t ch = 0; ch < output_items.size(); ch++)
         {
             memcpy(output_items[ch], input_items[ch], noutput_items * input_signature()->sizeof_stream_item(ch));
         }

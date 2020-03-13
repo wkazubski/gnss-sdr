@@ -12,18 +12,7 @@
  *
  * This file is part of GNSS-SDR.
  *
- * GNSS-SDR is free software: you can redistribute it and/or modify
- * it under the terms of the GNU General Public License as published by
- * the Free Software Foundation, either version 3 of the License, or
- * (at your option) any later version.
- *
- * GNSS-SDR is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with GNSS-SDR. If not, see <https://www.gnu.org/licenses/>.
+ * SPDX-License-Identifier: GPL-3.0-or-later
  *
  * -------------------------------------------------------------------------
  */
@@ -31,6 +20,7 @@
 
 #include "beamformer.h"
 #include <gnuradio/io_signature.h>
+#include <cstddef>
 
 
 beamformer_sptr make_beamformer_sptr()
@@ -62,12 +52,12 @@ int beamformer::work(int noutput_items, gr_vector_const_void_star &input_items,
     //  gr_complex *ch8 = (gr_complex *) input_items[7];
 
     // NON-VOLK beamforming operation
-    //TODO: Implement VOLK SIMD-accelerated beamformer!
+    // TODO: Implement VOLK SIMD-accelerated beamformer!
     gr_complex sum;
     for (int n = 0; n < noutput_items; n++)
         {
             sum = gr_complex(0, 0);
-            for (unsigned int i = 0; i < weight_vector.size(); i++)
+            for (size_t i = 0; i < weight_vector.size(); i++)
                 {
                     sum = sum + (reinterpret_cast<const gr_complex *>(input_items[i]))[n] * weight_vector[i];
                 }

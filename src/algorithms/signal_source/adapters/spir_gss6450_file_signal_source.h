@@ -13,24 +13,13 @@
  *
  * This file is not part of GNSS-SDR.
  *
- * GNSS-SDR is free software: you can redistribute it and/or modify
- * it under the terms of the GNU General Public License as published by
- * the Free Software Foundation, either version 3 of the License, or
- * (at your option) any later version.
- *
- * GNSS-SDR is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with GNSS-SDR. If not, see <https://www.gnu.org/licenses/>.
+ * SPDX-License-Identifier: GPL-3.0-or-later
  *
  * -------------------------------------------------------------------------
  */
 
-#ifndef GNSS_SDR_SPIR_GSS6450_FILE_SIGNAL_SOURCE_H_
-#define GNSS_SDR_SPIR_GSS6450_FILE_SIGNAL_SOURCE_H_
+#ifndef GNSS_SDR_SPIR_GSS6450_FILE_SIGNAL_SOURCE_H
+#define GNSS_SDR_SPIR_GSS6450_FILE_SIGNAL_SOURCE_H
 
 #include "concurrent_queue.h"
 #include "gnss_block_interface.h"
@@ -45,6 +34,7 @@
 #include <gnuradio/hier_block2.h>
 #include <pmt/pmt.h>
 #include <cstdint>
+#include <memory>
 #include <string>
 #include <vector>
 
@@ -113,7 +103,7 @@ private:
     int64_t sampling_frequency_;
     std::string filename_;
     bool repeat_;
-    bool dump_;  //Enables dumping the gr_complex sample output
+    bool dump_;  // Enables dumping the gr_complex sample output
     bool enable_throttle_control_;
     bool endian_swap_;
     std::string dump_filename_;
@@ -136,4 +126,4 @@ private:
     size_t item_size_;
 };
 
-#endif /*GNSS_SDR_SPIR_GSS6450_FILE_SIGNAL_SOURCE_H_*/
+#endif  // GNSS_SDR_SPIR_GSS6450_FILE_SIGNAL_SOURCE_H

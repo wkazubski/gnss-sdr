@@ -13,18 +13,7 @@
  *
  * This file is part of GNSS-SDR.
  *
- * GNSS-SDR is free software: you can redistribute it and/or modify
- * it under the terms of the GNU General Public License as published by
- * the Free Software Foundation, either version 3 of the License, or
- * (at your option) any later version.
- *
- * GNSS-SDR is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with GNSS-SDR. If not, see <https://www.gnu.org/licenses/>.
+ * SPDX-License-Identifier: GPL-3.0-or-later
  *
  * -------------------------------------------------------------------------
  */
@@ -124,7 +113,7 @@ std::string TcpCmdInterface::standby(const std::vector<std::string> &commandLine
 std::string TcpCmdInterface::status(const std::vector<std::string> &commandLine __attribute__((unused)))
 {
     std::stringstream str_stream;
-    //todo: implement the receiver status report
+    // todo: implement the receiver status report
 
     //    str_stream << "-------------------------------------------------------\n";
     //    str_stream << "ch | sys | sig | mode | Tlm | Eph | Doppler | CN0 |\n";
@@ -137,7 +126,11 @@ std::string TcpCmdInterface::status(const std::vector<std::string> &commandLine 
     //        }
     //    str_stream << "--------------------------------------------------------\n";
 
-    double longitude_deg, latitude_deg, height_m, ground_speed_kmh, course_over_ground_deg;
+    double longitude_deg;
+    double latitude_deg;
+    double height_m;
+    double ground_speed_kmh;
+    double course_over_ground_deg;
     time_t UTC_time;
     if (PVT_sptr_->get_latest_PVT(&longitude_deg,
             &latitude_deg,
@@ -149,7 +142,7 @@ std::string TcpCmdInterface::status(const std::vector<std::string> &commandLine 
             struct tm tstruct = {0, 0, 0, 0, 0, 0, 0, 0, 0, 0, nullptr};
             std::array<char, 80> buf1{};
             tstruct = *gmtime(&UTC_time);
-            strftime(buf1.data(), sizeof(buf1), "%d/%m/%Y %H:%M:%S", &tstruct);
+            strftime(buf1.data(), buf1.size(), "%d/%m/%Y %H:%M:%S", &tstruct);
             std::string str_time = std::string(buf1.data());
             str_stream << "- Receiver UTC Time: " << str_time << std::endl;
             str_stream << std::setprecision(9);
@@ -286,7 +279,7 @@ std::string TcpCmdInterface::coldstart(const std::vector<std::string> &commandLi
 std::string TcpCmdInterface::set_ch_satellite(const std::vector<std::string> &commandLine __attribute__((unused)))
 {
     std::string response;
-    //todo: implement the set satellite command
+    // todo: implement the set satellite command
     response = "Not implemented\n";
     return response;
 }

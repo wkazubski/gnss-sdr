@@ -17,18 +17,7 @@
  *
  * This file is part of GNSS-SDR.
  *
- * GNSS-SDR is free software: you can redistribute it and/or modify
- * it under the terms of the GNU General Public License as published by
- * the Free Software Foundation, either version 3 of the License, or
- * (at your option) any later version.
- *
- * GNSS-SDR is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with GNSS-SDR. If not, see <https://www.gnu.org/licenses/>.
+ * SPDX-License-Identifier: GPL-3.0-or-later
  *
  * -------------------------------------------------------------------------
  */
@@ -63,7 +52,6 @@ Fpga_Acquisition::Fpga_Acquisition(std::string device_name,
     uint32_t doppler_max,
     uint32_t nsamples_total,
     int64_t fs_in,
-    uint32_t sampled_ms __attribute__((unused)),
     uint32_t select_queue,
     uint32_t *all_fft_codes,
     uint32_t excludelimit)
@@ -152,11 +140,11 @@ void Fpga_Acquisition::fpga_acquisition_test_register()
 }
 
 
-void Fpga_Acquisition::run_acquisition(void)
+void Fpga_Acquisition::run_acquisition()
 {
     // enable interrupts
     int32_t reenable = 1;
-    //int32_t disable_int = 0;
+    // int32_t disable_int = 0;
     ssize_t nbytes = TEMP_FAILURE_RETRY(write(d_fd, reinterpret_cast<void *>(&reenable), sizeof(int32_t)));
     if (nbytes != sizeof(int32_t))
         {
@@ -207,11 +195,11 @@ void Fpga_Acquisition::set_doppler_sweep(uint32_t num_sweeps, uint32_t doppler_s
 
 void Fpga_Acquisition::configure_acquisition()
 {
-    //Fpga_Acquisition::();
+    // Fpga_Acquisition::();
     d_map_base[0] = d_select_queue;
     d_map_base[1] = d_vector_length;
     d_map_base[2] = d_nsamples;
-    d_map_base[7] = static_cast<int32_t>(log2(static_cast<float>(d_vector_length)));  // log2 FFTlength
+    d_map_base[7] = static_cast<int32_t>(std::log2(static_cast<float>(d_vector_length)));  // log2 FFTlength
     d_map_base[12] = d_excludelimit;
 }
 
@@ -263,9 +251,9 @@ void Fpga_Acquisition::close_device()
 }
 
 
-void Fpga_Acquisition::reset_acquisition(void)
+void Fpga_Acquisition::reset_acquisition()
 {
-    //printf("============ resetting the hw now from the acquisition ===============");
+    // printf("============ resetting the hw now from the acquisition ===============");
     d_map_base[8] = RESET_ACQUISITION;  // writing a 2 to d_map_base[8] resets the acquisition. This causes a reset of all
                                         // the FPGA HW modules including the multicorrelators
 }

@@ -1,7 +1,7 @@
 /*!
  * \file rinex_printer.h
  * \brief Interface of a RINEX 2.11 / 3.01 printer
- * See http://igscb.jpl.nasa.gov/igscb/data/format/rinex301.pdf
+ * See ftp://igs.org/pub/data/format/rinex301.pdf
  *
  * Receiver Independent EXchange Format (RINEX):
  * The first proposal for the Receiver Independent Exchange Format RINEX
@@ -21,7 +21,7 @@
  * 3) The observation time being the reading of the receiver clock at the
  * instant of validity of the carrier-phase and/or the code measurements.
  * Note: A collection of the formats currently used by the IGS can be found
- * here: http://igscb.jpl.nasa.gov/components/formats.html
+ * here: https://kb.igs.org/hc/en-us/articles/201096516-IGS-Formats
  * \author Carles Fernandez Prades, 2011. cfernandez(at)cttc.es
  * -------------------------------------------------------------------------
  *
@@ -32,24 +32,13 @@
  *
  * This file is part of GNSS-SDR.
  *
- * GNSS-SDR is free software: you can redistribute it and/or modify
- * it under the terms of the GNU General Public License as published by
- * the Free Software Foundation, either version 3 of the License, or
- * (at your option) any later version.
- *
- * GNSS-SDR is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with GNSS-SDR. If not, see <https://www.gnu.org/licenses/>.
+ * SPDX-License-Identifier: GPL-3.0-or-later
  *
  * -------------------------------------------------------------------------
  */
 
-#ifndef GNSS_SDR_RINEX_PRINTER_H_
-#define GNSS_SDR_RINEX_PRINTER_H_
+#ifndef GNSS_SDR_RINEX_PRINTER_H
+#define GNSS_SDR_RINEX_PRINTER_H
 
 #include <boost/date_time/posix_time/posix_time.hpp>
 #include <cstdint>  // for int32_t
@@ -89,7 +78,7 @@ public:
     /*!
      * \brief Default constructor. Creates GNSS Navigation and Observables RINEX files and their headers
      */
-    Rinex_Printer(int version = 0, const std::string& base_path = ".");
+    explicit Rinex_Printer(int version = 0, const std::string& base_path = ".", const std::string& base_name = "-");
 
     /*!
      * \brief Default destructor. Closes GNSS Navigation and Observables RINEX files
@@ -347,7 +336,7 @@ public:
     /*!
      *  \brief Writes dual frequency GPS L1 and L2 observables into the RINEX file
      */
-    void log_rinex_obs(std::fstream& out, const Gps_Ephemeris& eph, const Gps_CNAV_Ephemeris& eph_cnav, double obs_time, const std::map<int32_t, Gnss_Synchro>& observables);
+    void log_rinex_obs(std::fstream& out, const Gps_Ephemeris& eph, const Gps_CNAV_Ephemeris& eph_cnav, double obs_time, const std::map<int32_t, Gnss_Synchro>& observables, bool triple_band = false);
 
     /*!
      *  \brief Writes Galileo observables into the RINEX file. Example: galileo_bands("1B"), galileo_bands("1B 5X"), galileo_bands("5X"), ... Default: "1B".
@@ -367,7 +356,7 @@ public:
     /*!
      *  \brief Writes Mixed GPS / Galileo observables into the RINEX file
      */
-    void log_rinex_obs(std::fstream& out, const Gps_Ephemeris& gps_eph, const Gps_CNAV_Ephemeris& gps_cnav_eph, const Galileo_Ephemeris& galileo_eph, double gps_obs_time, const std::map<int32_t, Gnss_Synchro>& observables);
+    void log_rinex_obs(std::fstream& out, const Gps_Ephemeris& gps_eph, const Gps_CNAV_Ephemeris& gps_cnav_eph, const Galileo_Ephemeris& galileo_eph, double gps_obs_time, const std::map<int32_t, Gnss_Synchro>& observables, bool triple_band = false);
 
     /*!
      *  \brief Writes GLONASS GNAV observables into the RINEX file. Example: glonass_bands("1C"), galileo_bands("1B 5X"), galileo_bands("5X"), ... Default: "1B".
@@ -403,7 +392,7 @@ public:
     /*!
      *  \brief Writes raw SBAS messages into the RINEX file
      */
-    //void log_rinex_sbs(std::fstream & out, const Sbas_Raw_Msg & sbs_message);
+    // void log_rinex_sbs(std::fstream & out, const Sbas_Raw_Msg & sbs_message);
 
     void update_nav_header(std::fstream& out, const Gps_Utc_Model& utc_model, const Gps_Iono& gps_iono, const Gps_Ephemeris& eph);
 
@@ -448,9 +437,13 @@ public:
     std::string navBdsfilename;
     std::string navMixfilename;
 
+    void set_pre_2009_file(bool pre_2009_file);
+
 private:
     int version;                  // RINEX version (2 for 2.10/2.11 and 3 for 3.01)
     int numberTypesObservations;  // Number of available types of observable in the system. Should be public?
+    bool pre_2009_file_;
+
     /*
      * Generation of RINEX signal strength indicators
      */
@@ -458,7 +451,7 @@ private:
 
     /* Creates RINEX file names according to the naming convention
      *
-     * See http://igscb.jpl.nasa.gov/igscb/data/format/rinex301.pdf
+     * See ftp://igs.org/pub/data/format/rinex301.pdf
      * Section 4, page 6
      *
      * \param[in] type of RINEX file. Can be:
@@ -472,7 +465,7 @@ private:
      * "RINEX_FILE_TYPE_SBAS" - SBAS broadcast data file.
      * "RINEX_FILE_TYPE_CLK" - Clock file.
      */
-    std::string createFilename(const std::string& type);
+    std::string createFilename(const std::string& type, const std::string& base_name);
 
     /*
      * Generates the data for the PGM / RUN BY / DATE line
@@ -663,7 +656,7 @@ private:
 };
 
 
-// Implementation of inline functions (modified versions from GPSTk http://www.gpstk.org)
+// Implementation of inline functions (modified versions from GPSTk https://github.com/SGL-UT/GPSTk)
 
 inline std::string& Rinex_Printer::leftJustify(std::string& s,
     const std::string::size_type length,
@@ -775,8 +768,8 @@ inline std::string& Rinex_Printer::sci2for(std::string& aStr,
     int expAdd = 0;
     std::string exp;
     int64_t iexp;
-    //If checkSwitch is false, always redo the exponential. Otherwise,
-    //set it to false.
+    // If checkSwitch is false, always redo the exponential. Otherwise,
+    // set it to false.
     bool redoexp = !checkSwitch;
 
     // Check for decimal place within specified boundaries
@@ -852,7 +845,7 @@ inline std::string& Rinex_Printer::sci2for(std::string& aStr,
             aStr.insert(static_cast<std::string::size_type>(0), 1, ' ');
         }
 
-    //If checkSwitch is false, add on one leading zero to the string
+    // If checkSwitch is false, add on one leading zero to the string
     if (!checkSwitch)
         {
             aStr.insert(static_cast<std::string::size_type>(1), 1, '0');

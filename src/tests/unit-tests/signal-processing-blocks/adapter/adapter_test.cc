@@ -13,18 +13,7 @@
  *
  * This file is part of GNSS-SDR.
  *
- * GNSS-SDR is free software: you can redistribute it and/or modify
- * it under the terms of the GNU General Public License as published by
- * the Free Software Foundation, either version 3 of the License, or
- * (at your option) any later version.
- *
- * GNSS-SDR is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with GNSS-SDR. If not, see <https://www.gnu.org/licenses/>.
+ * SPDX-License-Identifier: GPL-3.0-or-later
  *
  * -------------------------------------------------------------------------
  */
@@ -73,10 +62,10 @@ DataTypeAdapter::DataTypeAdapter()
     std::array<int8_t, 6> input_bytes{2, 23, -1, 127, -127, 0};
     std::array<int16_t, 8> input_shorts{2, 23, -1, 127, -127, 0, 255, 255};
 
-    const std::vector<int8_t> input_data_bytes_(input_bytes.data(), input_bytes.data() + sizeof(input_bytes) / sizeof(int8_t));
+    const std::vector<int8_t> input_data_bytes_(input_bytes.data(), input_bytes.data() + input_bytes.size() / sizeof(int8_t));
     input_data_bytes = input_data_bytes_;
 
-    const std::vector<int16_t> input_data_shorts_(input_shorts.data(), input_shorts.data() + sizeof(input_shorts) / sizeof(int16_t));
+    const std::vector<int16_t> input_data_shorts_(input_shorts.data(), input_shorts.data() + input_shorts.size() / sizeof(int16_t));
     input_data_shorts = input_data_shorts_;
 }
 

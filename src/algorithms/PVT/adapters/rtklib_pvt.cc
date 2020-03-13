@@ -12,18 +12,7 @@
  *
  * This file is part of GNSS-SDR.
  *
- * GNSS-SDR is free software: you can redistribute it and/or modify
- * it under the terms of the GNU General Public License as published by
- * the Free Software Foundation, either version 3 of the License, or
- * (at your option) any later version.
- *
- * GNSS-SDR is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with GNSS-SDR. If not, see <https://www.gnu.org/licenses/>.
+ * SPDX-License-Identifier: GPL-3.0-or-later
  *
  * -------------------------------------------------------------------------
  */
@@ -68,6 +57,9 @@ Rtklib_Pvt::Rtklib_Pvt(ConfigurationInterface* configuration,
     pvt_output_parameters.dump_filename = configuration->property(role + ".dump_filename", default_dump_filename);
     pvt_output_parameters.dump_mat = configuration->property(role + ".dump_mat", true);
 
+    // Flag to postprocess old gnss records (older than 2009) and avoid wrong week rollover
+    pvt_output_parameters.pre_2009_file = configuration->property("GNSS-SDR.pre_2009_file", false);
+
     // output rate
     pvt_output_parameters.output_rate_ms = bc::lcm(20, configuration->property(role + ".output_rate_ms", 500));
 
@@ -106,6 +98,11 @@ Rtklib_Pvt::Rtklib_Pvt(ConfigurationInterface* configuration,
             pvt_output_parameters.rinex_version = 2;
         }
     pvt_output_parameters.rinexobs_rate_ms = bc::lcm(configuration->property(role + ".rinexobs_rate_ms", 1000), pvt_output_parameters.output_rate_ms);
+    pvt_output_parameters.rinex_name = configuration->property(role + ".rinex_name", std::string("-"));
+    if (FLAGS_RINEX_name != "-")
+        {
+            pvt_output_parameters.rinex_name = FLAGS_RINEX_name;
+        }
 
     // RTCM Printer settings
     pvt_output_parameters.flag_rtcm_tty_port = configuration->property(role + ".flag_rtcm_tty_port", false);
@@ -199,6 +196,9 @@ Rtklib_Pvt::Rtklib_Pvt(ConfigurationInterface* configuration,
      *    608   |  BeiDou B3I + GPS L1 C/A + Galileo E1B + BeiDou B1I
      *    609   |  BeiDou B3I + GPS L1 C/A + Galileo E1B + GLONASS L1 C/A
      *    610   |  BeiDou B3I + GPS L1 C/A + Galileo E1B + GLONASS L1 C/A + BeiDou B1I
+     *
+     *    1000  |  GPS L1 C/A + GPS L2C + GPS L5
+     *    1001  |  GPS L1 C/A + Galileo E1B + GPS L2C + GPS L5 + Galileo E5a
      */
     int gps_1C_count = configuration->property("Channels_1C.count", 0);
     int gps_2S_count = configuration->property("Channels_2S.count", 0);
@@ -283,8 +283,8 @@ Rtklib_Pvt::Rtklib_Pvt(ConfigurationInterface* configuration,
         {
             pvt_output_parameters.type_of_receiver = 18;
         }
-    //if( (gps_1C_count == 0) && (gps_2S_count == 0) && (gps_L5_count == 0) && (gal_1B_count == 0) && (gal_E5a_count == 0) && (gal_E5b_count == 0)) pvt_output_parameters.type_of_receiver = 19;
-    //if( (gps_1C_count == 0) && (gps_2S_count == 0) && (gps_L5_count == 0) && (gal_1B_count == 0) && (gal_E5a_count == 0) && (gal_E5b_count == 0)) pvt_output_parameters.type_of_receiver = 20;
+    // if( (gps_1C_count == 0) && (gps_2S_count == 0) && (gps_L5_count == 0) && (gal_1B_count == 0) && (gal_E5a_count == 0) && (gal_E5b_count == 0)) pvt_output_parameters.type_of_receiver = 19;
+    // if( (gps_1C_count == 0) && (gps_2S_count == 0) && (gps_L5_count == 0) && (gal_1B_count == 0) && (gal_E5a_count == 0) && (gal_E5b_count == 0)) pvt_output_parameters.type_of_receiver = 20;
     if ((gps_1C_count != 0) && (gps_2S_count != 0) && (gps_L5_count == 0) && (gal_1B_count != 0) && (gal_E5a_count == 0) && (gal_E5b_count == 0) && (glo_1G_count == 0) && (glo_2G_count == 0) && (bds_B1_count == 0) && (bds_B3_count == 0))
         {
             pvt_output_parameters.type_of_receiver = 21;  // GPS L1 C/A + Galileo E1B + GPS L2C
@@ -380,12 +380,20 @@ Rtklib_Pvt::Rtklib_Pvt(ConfigurationInterface* configuration,
         {
             pvt_output_parameters.type_of_receiver = 603;  // Beidou B3I + GPS L2C + GLONASS L2 C/A
         }
+    if ((gps_1C_count != 0) && (gps_2S_count != 0) && (gps_L5_count != 0) && (gal_1B_count == 0) && (gal_E5a_count == 0) && (gal_E5b_count == 0) && (glo_1G_count == 0) && (glo_2G_count == 0) && (bds_B1_count == 0) && (bds_B3_count == 0))
+        {
+            pvt_output_parameters.type_of_receiver = 1000;  // GPS L1 + GPS L2C + GPS L5
+        }
+    if ((gps_1C_count != 0) && (gps_2S_count != 0) && (gps_L5_count != 0) && (gal_1B_count != 0) && (gal_E5a_count != 0) && (gal_E5b_count == 0) && (glo_1G_count == 0) && (glo_2G_count == 0) && (bds_B1_count == 0) && (bds_B3_count == 0))
+        {
+            pvt_output_parameters.type_of_receiver = 1001;  // GPS L1 + Galileo E1B + GPS L2C + GPS L5 + Galileo E5a
+        }
 
     // RTKLIB PVT solver options
     // Settings 1
     int positioning_mode = -1;
     std::string default_pos_mode("Single");
-    std::string positioning_mode_str = configuration->property(role + ".positioning_mode", default_pos_mode);  //  (PMODE_XXX) see src/algorithms/libs/rtklib/rtklib.h
+    std::string positioning_mode_str = configuration->property(role + ".positioning_mode", default_pos_mode);  // (PMODE_XXX) see src/algorithms/libs/rtklib/rtklib.h
     if (positioning_mode_str == "Single")
         {
             positioning_mode = PMODE_SINGLE;
@@ -768,6 +776,12 @@ Rtklib_Pvt::Rtklib_Pvt(ConfigurationInterface* configuration,
 
     // Show time in local zone
     pvt_output_parameters.show_local_time_zone = configuration->property(role + ".show_local_time_zone", false);
+
+    // Enable or disable rx clock correction in observables
+    pvt_output_parameters.enable_rx_clock_correction = configuration->property(role + ".enable_rx_clock_correction", false);
+
+    // Set maximum clock offset allowed if pvt_output_parameters.enable_rx_clock_correction = false
+    pvt_output_parameters.max_obs_block_rx_clock_offset_ms = configuration->property(role + ".max_clock_offset_ms", pvt_output_parameters.max_obs_block_rx_clock_offset_ms);
 
     // make PVT object
     pvt_ = rtklib_make_pvt_gs(in_streams_, pvt_output_parameters, rtk);

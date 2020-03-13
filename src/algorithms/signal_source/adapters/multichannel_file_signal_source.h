@@ -16,24 +16,13 @@
  *
  * This file is part of GNSS-SDR.
  *
- * GNSS-SDR is free software: you can redistribute it and/or modify
- * it under the terms of the GNU General Public License as published by
- * the Free Software Foundation, either version 3 of the License, or
- * (at your option) any later version.
- *
- * GNSS-SDR is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with GNSS-SDR. If not, see <https://www.gnu.org/licenses/>.
+ * SPDX-License-Identifier: GPL-3.0-or-later
  *
  * -------------------------------------------------------------------------
  */
 
-#ifndef GNSS_SDR_MULTICHANNEL_FILE_SIGNAL_SOURCE_H_
-#define GNSS_SDR_MULTICHANNEL_FILE_SIGNAL_SOURCE_H_
+#ifndef GNSS_SDR_MULTICHANNEL_FILE_SIGNAL_SOURCE_H
+#define GNSS_SDR_MULTICHANNEL_FILE_SIGNAL_SOURCE_H
 
 #include "concurrent_queue.h"
 #include "gnss_block_interface.h"
@@ -43,6 +32,7 @@
 #include <gnuradio/hier_block2.h>
 #include <pmt/pmt.h>
 #include <cstdint>
+#include <memory>
 #include <string>
 #include <vector>
 
@@ -57,7 +47,7 @@ class MultichannelFileSignalSource : public GNSSBlockInterface
 public:
     MultichannelFileSignalSource(ConfigurationInterface* configuration, const std::string& role,
         unsigned int in_streams, unsigned int out_streams,
-        std::shared_ptr<Concurrent_Queue<pmt::pmt_t>> queue);
+        const std::shared_ptr<Concurrent_Queue<pmt::pmt_t>>& queue);
 
     ~MultichannelFileSignalSource() = default;
 
@@ -129,4 +119,4 @@ private:
     bool enable_throttle_control_;
 };
 
-#endif /* GNSS_SDR_MULTICHANNEL_FILE_SIGNAL_SOURCE_H_ */
+#endif  // GNSS_SDR_MULTICHANNEL_FILE_SIGNAL_SOURCE_H

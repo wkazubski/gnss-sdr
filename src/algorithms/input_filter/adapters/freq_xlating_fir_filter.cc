@@ -13,18 +13,7 @@
  *
  * This file is part of GNSS-SDR.
  *
- * GNSS-SDR is free software: you can redistribute it and/or modify
- * it under the terms of the GNU General Public License as published by
- * the Free Software Foundation, either version 3 of the License, or
- * (at your option) any later version.
- *
- * GNSS-SDR is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with GNSS-SDR. If not, see <https://www.gnu.org/licenses/>.
+ * SPDX-License-Identifier: GPL-3.0-or-later
  *
  * -------------------------------------------------------------------------
  */
@@ -124,29 +113,29 @@ FreqXlatingFirFilter::FreqXlatingFirFilter(ConfigurationInterface* configuration
     LOG(INFO) << "Created freq_xlating_fir_filter with " << taps_.size() << " taps";
     if ((taps_item_type_ == "float") && (input_item_type_ == "gr_complex") && (output_item_type_ == "gr_complex"))
         {
-            item_size = sizeof(gr_complex);    //output
-            input_size_ = sizeof(gr_complex);  //input
+            item_size = sizeof(gr_complex);    // output
+            input_size_ = sizeof(gr_complex);  // input
             freq_xlating_fir_filter_ccf_ = gr::filter::freq_xlating_fir_filter_ccf::make(decimation_factor_, taps_, intermediate_freq_, sampling_freq_);
             DLOG(INFO) << "input_filter(" << freq_xlating_fir_filter_ccf_->unique_id() << ")";
         }
     else if ((taps_item_type_ == "float") && (input_item_type_ == "float") && (output_item_type_ == "gr_complex"))
         {
             item_size = sizeof(gr_complex);
-            input_size_ = sizeof(float);  //input
+            input_size_ = sizeof(float);  // input
             freq_xlating_fir_filter_fcf_ = gr::filter::freq_xlating_fir_filter_fcf::make(decimation_factor_, taps_, intermediate_freq_, sampling_freq_);
             DLOG(INFO) << "input_filter(" << freq_xlating_fir_filter_fcf_->unique_id() << ")";
         }
     else if ((taps_item_type_ == "float") && (input_item_type_ == "short") && (output_item_type_ == "gr_complex"))
         {
             item_size = sizeof(gr_complex);
-            input_size_ = sizeof(int16_t);  //input
+            input_size_ = sizeof(int16_t);  // input
             freq_xlating_fir_filter_scf_ = gr::filter::freq_xlating_fir_filter_scf::make(decimation_factor_, taps_, intermediate_freq_, sampling_freq_);
             DLOG(INFO) << "input_filter(" << freq_xlating_fir_filter_scf_->unique_id() << ")";
         }
     else if ((taps_item_type_ == "float") && (input_item_type_ == "short") && (output_item_type_ == "cshort"))
         {
             item_size = sizeof(lv_16sc_t);
-            input_size_ = sizeof(int16_t);  //input
+            input_size_ = sizeof(int16_t);  // input
             freq_xlating_fir_filter_scf_ = gr::filter::freq_xlating_fir_filter_scf::make(decimation_factor_, taps_, intermediate_freq_, sampling_freq_);
             DLOG(INFO) << "input_filter(" << freq_xlating_fir_filter_scf_->unique_id() << ")";
             complex_to_float_ = gr::blocks::complex_to_float::make();
@@ -157,7 +146,7 @@ FreqXlatingFirFilter::FreqXlatingFirFilter(ConfigurationInterface* configuration
     else if ((taps_item_type_ == "float") && (input_item_type_ == "byte") && (output_item_type_ == "gr_complex"))
         {
             item_size = sizeof(gr_complex);
-            input_size_ = sizeof(int8_t);  //input
+            input_size_ = sizeof(int8_t);  // input
             gr_char_to_short_ = gr::blocks::char_to_short::make();
             freq_xlating_fir_filter_scf_ = gr::filter::freq_xlating_fir_filter_scf::make(decimation_factor_, taps_, intermediate_freq_, sampling_freq_);
             DLOG(INFO) << "input_filter(" << freq_xlating_fir_filter_scf_->unique_id() << ")";
@@ -165,7 +154,7 @@ FreqXlatingFirFilter::FreqXlatingFirFilter(ConfigurationInterface* configuration
     else if ((taps_item_type_ == "float") && (input_item_type_ == "byte") && (output_item_type_ == "cbyte"))
         {
             item_size = sizeof(lv_8sc_t);
-            input_size_ = sizeof(int8_t);  //input
+            input_size_ = sizeof(int8_t);  // input
             gr_char_to_short_ = gr::blocks::char_to_short::make();
             freq_xlating_fir_filter_scf_ = gr::filter::freq_xlating_fir_filter_scf::make(decimation_factor_, taps_, intermediate_freq_, sampling_freq_);
             DLOG(INFO) << "input_filter(" << freq_xlating_fir_filter_scf_->unique_id() << ")";
@@ -174,8 +163,8 @@ FreqXlatingFirFilter::FreqXlatingFirFilter(ConfigurationInterface* configuration
     else
         {
             LOG(ERROR) << " Unknown input filter input/output item type conversion";
-            item_size = sizeof(gr_complex);    //avoids uninitialization
-            input_size_ = sizeof(gr_complex);  //avoids uninitialization
+            item_size = sizeof(gr_complex);    // avoids uninitialization
+            input_size_ = sizeof(gr_complex);  // avoids uninitialization
         }
 
     if (dump_)

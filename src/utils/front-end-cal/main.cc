@@ -13,18 +13,7 @@
  *
  * This file is part of GNSS-SDR.
  *
- * GNSS-SDR is free software: you can redistribute it and/or modify
- * it under the terms of the GNU General Public License as published by
- * the Free Software Foundation, either version 3 of the License, or
- * (at your option) any later version.
- *
- * GNSS-SDR is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with GNSS-SDR. If not, see <https://www.gnu.org/licenses/>.
+ * SPDX-License-Identifier: GPL-3.0-or-later
  *
  * -------------------------------------------------------------------------
  */
@@ -116,7 +105,7 @@ class FrontEndCal_msg_rx : public gr::block
 {
 private:
     friend FrontEndCal_msg_rx_sptr FrontEndCal_msg_rx_make();
-    void msg_handler_events(pmt::pmt_t msg);
+    void msg_handler_events(const pmt::pmt_t& msg);
     FrontEndCal_msg_rx();
 
 public:
@@ -130,11 +119,11 @@ FrontEndCal_msg_rx_sptr FrontEndCal_msg_rx_make()
 }
 
 
-void FrontEndCal_msg_rx::msg_handler_events(pmt::pmt_t msg)
+void FrontEndCal_msg_rx::msg_handler_events(const pmt::pmt_t& msg)
 {
     try
         {
-            int64_t message = pmt::to_long(std::move(msg));
+            int64_t message = pmt::to_long(msg);
             rx_message = message;
             channel_internal_queue.push(rx_message);
         }
@@ -160,15 +149,15 @@ void wait_message()
         {
             int message;
             channel_internal_queue.wait_and_pop(message);
-            //std::cout<<"Acq message rx="<<message<<std::endl;
+            // std::cout<<"Acq message rx="<<message<<std::endl;
             switch (message)
                 {
                 case 1:  // Positive acq
                     gnss_sync_vector.push_back(*gnss_synchro);
-                    //acquisition->reset();
+                    // acquisition->reset();
                     break;
                 case 2:  // negative acq
-                    //acquisition->reset();
+                    // acquisition->reset();
                     break;
                 case 3:
                     stop = true;
@@ -213,9 +202,9 @@ bool front_end_capture(const std::shared_ptr<ConfigurationInterface>& configurat
     gr::block_sptr sink;
     sink = gr::blocks::file_sink::make(sizeof(gr_complex), "tmp_capture.dat");
 
-    //--- Find number of samples per spreading code ---
+    // -- Find number of samples per spreading code ---
     int64_t fs_in_ = configuration->property("GNSS-SDR.internal_fs_sps", 2048000);
-    int samples_per_code = round(fs_in_ / (GPS_L1_CA_CODE_RATE_HZ / GPS_L1_CA_CODE_LENGTH_CHIPS));
+    int samples_per_code = round(fs_in_ / (GPS_L1_CA_CODE_RATE_CPS / GPS_L1_CA_CODE_LENGTH_CHIPS));
     int nsamples = samples_per_code * 50;
 
     int skip_samples = fs_in_ * 5;  // skip 5 seconds
@@ -399,14 +388,15 @@ int main(int argc, char** argv)
     // Get visible GPS satellites (positive acquisitions with Doppler measurements)
     // Compute Doppler estimations
 
-    //todo: Fix the front-end cal to support new channel internal message system (no more external queues)
+    // todo: Fix the front-end cal to support new channel internal message system (no more external queues)
     std::map<int, double> doppler_measurements_map;
     std::map<int, double> cn0_measurements_map;
 
     std::thread ch_thread;
 
     // record startup time
-    std::chrono::time_point<std::chrono::system_clock> start, end;
+    std::chrono::time_point<std::chrono::system_clock> start;
+    std::chrono::time_point<std::chrono::system_clock> end;
     std::chrono::duration<double> elapsed_seconds{};
     start = std::chrono::system_clock::now();
 
@@ -555,7 +545,9 @@ int main(int argc, char** argv)
                     std::cout << "  " << it.first << "   " << it.second << "   " << doppler_estimated_hz << std::endl;
                     // 7. Compute front-end IF and sampling frequency estimation
                     // Compare with the measurements and compute clock drift using FE model
-                    double estimated_fs_Hz, estimated_f_if_Hz, f_osc_err_ppm;
+                    double estimated_fs_Hz;
+                    double estimated_f_if_Hz;
+                    double f_osc_err_ppm;
                     front_end_cal.GPS_L1_front_end_model_E4000(doppler_estimated_hz, it.second, fs_in_, &estimated_fs_Hz, &estimated_f_if_Hz, &f_osc_err_ppm);
 
                     f_if_estimation_Hz_map.insert(std::pair<int, double>(it.first, estimated_f_if_Hz));

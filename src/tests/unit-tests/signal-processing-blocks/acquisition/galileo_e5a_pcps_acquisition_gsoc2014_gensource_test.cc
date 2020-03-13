@@ -13,18 +13,7 @@
  *
  * This file is part of GNSS-SDR.
  *
- * GNSS-SDR is free software: you can redistribute it and/or modify
- * it under the terms of the GNU General Public License as published by
- * the Free Software Foundation, either version 3 of the License, or
- * (at your option) any later version.
- *
- * GNSS-SDR is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with GNSS-SDR. If not, see <https://www.gnu.org/licenses/>.
+ * SPDX-License-Identifier: GPL-3.0-or-later
  *
  * -------------------------------------------------------------------------
  */
@@ -66,7 +55,7 @@ class GalileoE5aPcpsAcquisitionGSoC2014GensourceTest_msg_rx : public gr::block
 private:
     friend GalileoE5aPcpsAcquisitionGSoC2014GensourceTest_msg_rx_sptr GalileoE5aPcpsAcquisitionGSoC2014GensourceTest_msg_rx_make(Concurrent_Queue<int>& queue);
     void msg_handler_events(pmt::pmt_t msg);
-    GalileoE5aPcpsAcquisitionGSoC2014GensourceTest_msg_rx(Concurrent_Queue<int>& queue);
+    explicit GalileoE5aPcpsAcquisitionGSoC2014GensourceTest_msg_rx(Concurrent_Queue<int>& queue);
     Concurrent_Queue<int>& channel_internal_queue;
 
 public:
@@ -316,7 +305,7 @@ void GalileoE5aPcpsAcquisitionGSoC2014GensourceTest::config_3()
 {
     gnss_synchro.Channel_ID = 0;
     gnss_synchro.System = 'E';
-    //std::string signal = "5Q";
+    // std::string signal = "5Q";
     std::string signal = "5X";
     signal.copy(gnss_synchro.Signal, 2, 0);
 
@@ -499,9 +488,9 @@ void GalileoE5aPcpsAcquisitionGSoC2014GensourceTest::process_message()
 
     realization_counter++;
 
-    //std::cout << correct_estimation_counter << "correct estimation counter" << std::endl;
+    // std::cout << correct_estimation_counter << "correct estimation counter" << std::endl;
     std::cout << "Progress: " << round(static_cast<float>(realization_counter / num_of_realizations * 100)) << "% \r" << std::flush;
-    //std::cout << message << "message" <<std::endl;
+    // std::cout << message << "message" <<std::endl;
     if (realization_counter == num_of_realizations)
         {
             mse_delay /= num_of_realizations;
@@ -535,7 +524,7 @@ TEST_F(GalileoE5aPcpsAcquisitionGSoC2014GensourceTest, Instantiate)
 TEST_F(GalileoE5aPcpsAcquisitionGSoC2014GensourceTest, ConnectAndRun)
 {
     config_1();
-    //int nsamples = floor(5*fs_in*integration_time_ms*1e-3);
+    // int nsamples = floor(5*fs_in*integration_time_ms*1e-3);
     int nsamples = 21000 * 3;
     std::chrono::time_point<std::chrono::system_clock> start, end;
     std::chrono::duration<double> elapsed_seconds(0);

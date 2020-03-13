@@ -13,28 +13,19 @@
  *
  * This file is part of GNSS-SDR.
  *
- * GNSS-SDR is free software: you can redistribute it and/or modify
- * it under the terms of the GNU General Public License as published by
- * the Free Software Foundation, either version 3 of the License, or
- * (at your option) any later version.
- *
- * GNSS-SDR is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with GNSS-SDR. If not, see <https://www.gnu.org/licenses/>.
+ * SPDX-License-Identifier: GPL-3.0-or-later
  *
  * -------------------------------------------------------------------------
  */
 
-#ifndef GNSS_SDR_SERDES_MONITOR_PVT_H_
-#define GNSS_SDR_SERDES_MONITOR_PVT_H_
+#ifndef GNSS_SDR_SERDES_MONITOR_PVT_H
+#define GNSS_SDR_SERDES_MONITOR_PVT_H
 
 #include "monitor_pvt.h"
 #include "monitor_pvt.pb.h"  // file created by Protocol Buffers at compile time
 #include <memory>
+#include <string>
+#include <utility>
 
 /*!
  * \brief This class implements serialization and deserialization of
@@ -114,6 +105,7 @@ public:
         monitor_.set_pdop(monitor->pdop);
         monitor_.set_hdop(monitor->hdop);
         monitor_.set_vdop(monitor->vdop);
+        monitor_.set_user_clk_drift_ppm(monitor->user_clk_drift_ppm);
 
         monitor_.SerializeToString(&data);
         return data;
@@ -151,6 +143,7 @@ public:
         monitor.pdop = mon.pdop();
         monitor.hdop = mon.hdop();
         monitor.vdop = mon.vdop();
+        monitor.user_clk_drift_ppm = mon.user_clk_drift_ppm();
 
         return monitor;
     }
@@ -159,4 +152,4 @@ private:
     gnss_sdr::MonitorPvt monitor_{};
 };
 
-#endif  // GNSS_SDR_SERDES_MONITOR_PVT_H_
+#endif  // GNSS_SDR_SERDES_MONITOR_PVT_H

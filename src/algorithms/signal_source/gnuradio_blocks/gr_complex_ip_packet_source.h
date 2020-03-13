@@ -13,18 +13,7 @@
  *
  * This file is part of GNSS-SDR.
  *
- * GNSS-SDR is free software: you can redistribute it and/or modify
- * it under the terms of the GNU General Public License as published by
- * the Free Software Foundation, either version 3 of the License, or
- * (at your option) any later version.
- *
- * GNSS-SDR is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with GNSS-SDR. If not, see <https://www.gnu.org/licenses/>.
+ * SPDX-License-Identifier: GPL-3.0-or-later
  *
  * -------------------------------------------------------------------------
  */
@@ -98,7 +87,7 @@ private:
     size_t d_item_size;
     bool d_IQ_swap;
     boost::thread *d_pcap_thread;
-    void demux_samples(gr_vector_void_star output_items, int num_samples_readed);
+    void demux_samples(const gr_vector_void_star &output_items, int num_samples_readed);
     void my_pcap_loop_thread(pcap_t *pcap_handle);
     void pcap_callback(u_char *args, const struct pcap_pkthdr *pkthdr, const u_char *packet);
     static void static_pcap_callback(u_char *args, const struct pcap_pkthdr *pkthdr, const u_char *packet);
@@ -109,4 +98,4 @@ private:
     bool open();
 };
 
-#endif /* GNSS_SDR_GR_COMPLEX_IP_PACKET_SOURCE_H */
+#endif  //  GNSS_SDR_GR_COMPLEX_IP_PACKET_SOURCE_H

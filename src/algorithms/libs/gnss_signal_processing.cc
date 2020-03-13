@@ -15,18 +15,7 @@
  *
  * This file is part of GNSS-SDR.
  *
- * GNSS-SDR is free software: you can redistribute it and/or modify
- * it under the terms of the GNU General Public License as published by
- * the Free Software Foundation, either version 3 of the License, or
- * (at your option) any later version.
- *
- * GNSS-SDR is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with GNSS-SDR. If not, see <https://www.gnu.org/licenses/>.
+ * SPDX-License-Identifier: GPL-3.0-or-later
  *
  * -------------------------------------------------------------------------
  */
@@ -34,6 +23,7 @@
 #include "gnss_signal_processing.h"
 #include "GPS_L1_CA.h"
 #include <gnuradio/fxpt_nco.h>
+#include <cstddef>  // for size_t
 
 
 auto auxCeil2 = [](float x) { return static_cast<int32_t>(static_cast<int64_t>((x) + 1)); };
@@ -168,7 +158,7 @@ void resampler(const gsl::span<float> _from, gsl::span<float> _dest, float _fs_i
     // --- Find time constants -------------------------------------------------
     const float _t_in = 1 / _fs_in;    // Incoming sampling  period in sec
     const float _t_out = 1 / _fs_out;  // Out sampling period in sec
-    for (uint32_t i = 0; i < _dest.size() - 1; i++)
+    for (size_t i = 0; i < _dest.size() - 1; i++)
         {
             // === Digitizing ==================================================
             // --- compute index array to read sampled values ------------------
@@ -191,7 +181,7 @@ void resampler(gsl::span<const std::complex<float>> _from, gsl::span<std::comple
     // --- Find time constants -------------------------------------------------
     const float _t_in = 1 / _fs_in;    // Incoming sampling  period in sec
     const float _t_out = 1 / _fs_out;  // Out sampling period in sec
-    for (uint32_t i = 0; i < _dest.size() - 1; i++)
+    for (size_t i = 0; i < _dest.size() - 1; i++)
         {
             // === Digitizing ==================================================
             // --- compute index array to read sampled values ------------------
