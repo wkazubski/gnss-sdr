@@ -8,6 +8,30 @@ SPDX-FileCopyrightText: 2011-2020 Carles Fernandez-Prades <carles.fernandez@cttc
 )
 <!-- prettier-ignore-end -->
 
+## Unreleased
+
+### Improvements in Maintainability:
+
+- The software can now be built against the GNU Radio 3.9 API that uses C++11
+  smart pointers instead of Boost smart pointers.
+
+### Improvements in Portability:
+
+- The software can now be cross-compiled on Petalinux environments.   
+
+### Improvements in Reproducibility:
+
+- Improved reproducibility of the volk_gnsssdr library: Drop compile-time CPU
+  detection.
+
+### Improvements in Usability:
+
+- Updated version of the Contributor Covenant to version 2.0.
+- Added a Matlab script to quantize the input signal with a given number of bits
+  per sample.
+
+&nbsp;
+
 ## [GNSS-SDR v0.0.12](https://github.com/gnss-sdr/gnss-sdr/releases/tag/v0.0.12)
 
 ### Improvements in Accuracy:
