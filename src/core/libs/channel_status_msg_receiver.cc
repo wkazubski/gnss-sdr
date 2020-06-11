@@ -20,12 +20,16 @@
 
 #include "channel_status_msg_receiver.h"
 #include <boost/any.hpp>
-#include <boost/bind.hpp>
 #include <glog/logging.h>
 #include <gnuradio/gr_complex.h>
 #include <gnuradio/io_signature.h>
 #include <cstdint>
 #include <utility>
+
+#if HAS_GENERIC_LAMBDA
+#else
+#include <boost/bind/bind.hpp>
+#endif
 
 
 channel_status_msg_receiver_sptr channel_status_msg_receiver_make()
@@ -37,7 +41,16 @@ channel_status_msg_receiver_sptr channel_status_msg_receiver_make()
 channel_status_msg_receiver::channel_status_msg_receiver() : gr::block("channel_status_msg_receiver", gr::io_signature::make(0, 0, 0), gr::io_signature::make(0, 0, 0))
 {
     this->message_port_register_in(pmt::mp("status"));
-    this->set_msg_handler(pmt::mp("status"), boost::bind(&channel_status_msg_receiver::msg_handler_events, this, _1));
+    this->set_msg_handler(pmt::mp("status"),
+#if HAS_GENERIC_LAMBDA
+        [this](auto&& PH1) { msg_handler_events(PH1); });
+#else
+#if BOOST_173_OR_GREATER
+        boost::bind(&channel_status_msg_receiver::msg_handler_events, this, boost::placeholders::_1));
+#else
+        boost::bind(&channel_status_msg_receiver::msg_handler_events, this, _1));
+#endif
+#endif
     d_pvt_status.RX_time = -1;  // to indicate that the PVT is not available
 }
 

@@ -159,7 +159,7 @@ bool gps_l1_ca_telemetry_decoder_gs::gps_word_parityCheck(uint32_t gpsword)
 
 void gps_l1_ca_telemetry_decoder_gs::set_satellite(const Gnss_Satellite &satellite)
 {
-    d_nav.reset();
+    d_nav = Gps_Navigation_Message();
     d_satellite = Gnss_Satellite(satellite.get_system(), satellite.get_PRN());
     DLOG(INFO) << "Setting decoder Finite State Machine to satellite " << d_satellite;
     d_nav.i_satellite_PRN = d_satellite.get_PRN();
@@ -320,8 +320,9 @@ int gps_l1_ca_telemetry_decoder_gs::general_work(int noutput_items __attribute__
     auto **out = reinterpret_cast<Gnss_Synchro **>(&output_items[0]);            // Get the output buffer pointer
     const auto **in = reinterpret_cast<const Gnss_Synchro **>(&input_items[0]);  // Get the input buffer pointer
 
+    Gnss_Synchro current_symbol{};
     // 1. Copy the current tracking output
-    Gnss_Synchro current_symbol = in[0][0];
+    current_symbol = in[0][0];
     // add new symbol to the symbol queue
     d_symbol_history.push_back(current_symbol.Prompt_I);
     d_sample_counter++;  // count for the processed symbols

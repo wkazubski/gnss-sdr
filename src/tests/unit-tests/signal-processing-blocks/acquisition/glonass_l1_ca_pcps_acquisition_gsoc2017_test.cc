@@ -42,6 +42,10 @@
 #include <memory>
 #include <thread>
 #include <utility>
+#if HAS_GENERIC_LAMBDA
+#else
+#include <boost/bind/bind.hpp>
+#endif
 #ifdef GR_GREATER_38
 #include <gnuradio/analog/sig_source.h>
 #else
@@ -99,7 +103,16 @@ void GlonassL1CaPcpsAcquisitionGSoC2017Test_msg_rx::msg_handler_events(pmt::pmt_
 GlonassL1CaPcpsAcquisitionGSoC2017Test_msg_rx::GlonassL1CaPcpsAcquisitionGSoC2017Test_msg_rx(Concurrent_Queue<int>& queue) : gr::block("GlonassL1CaPcpsAcquisitionGSoC2017Test_msg_rx", gr::io_signature::make(0, 0, 0), gr::io_signature::make(0, 0, 0)), channel_internal_queue(queue)
 {
     this->message_port_register_in(pmt::mp("events"));
-    this->set_msg_handler(pmt::mp("events"), boost::bind(&GlonassL1CaPcpsAcquisitionGSoC2017Test_msg_rx::msg_handler_events, this, _1));
+    this->set_msg_handler(pmt::mp("events"),
+#if HAS_GENERIC_LAMBDA
+        [this](auto&& PH1) { msg_handler_events(PH1); });
+#else
+#if BOOST_173_OR_GREATER
+        boost::bind(&GlonassL1CaPcpsAcquisitionGSoC2017Test_msg_rx::msg_handler_events, this, boost::placeholders::_1));
+#else
+        boost::bind(&GlonassL1CaPcpsAcquisitionGSoC2017Test_msg_rx::msg_handler_events, this, _1));
+#endif
+#endif
     rx_message = 0;
 }
 

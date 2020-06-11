@@ -27,6 +27,13 @@
 #include <volk_gnsssdr/volk_gnsssdr_complex.h>
 #include <algorithm>
 
+#if HAS_STD_SPAN
+#include <span>
+namespace own = std;
+#else
+#include <gsl/gsl>
+namespace own = gsl;
+#endif
 
 GalileoE5aPcpsAcquisition::GalileoE5aPcpsAcquisition(ConfigurationInterface* configuration,
     const std::string& role,
@@ -160,13 +167,13 @@ void GalileoE5aPcpsAcquisition::set_local_code()
 
     if (acq_parameters_.use_automatic_resampler)
         {
-            galileo_e5_a_code_gen_complex_sampled(code, signal_, gnss_synchro_->PRN, acq_parameters_.resampled_fs, 0);
+            galileo_e5_a_code_gen_complex_sampled(code, gnss_synchro_->PRN, signal_, acq_parameters_.resampled_fs, 0);
         }
     else
         {
-            galileo_e5_a_code_gen_complex_sampled(code, signal_, gnss_synchro_->PRN, fs_in_, 0);
+            galileo_e5_a_code_gen_complex_sampled(code, gnss_synchro_->PRN, signal_, fs_in_, 0);
         }
-    gsl::span<gr_complex> code_span(code_.data(), vector_length_);
+    own::span<gr_complex> code_span(code_.data(), vector_length_);
     for (unsigned int i = 0; i < sampled_ms_; i++)
         {
             std::copy_n(code.data(), code_length_, code_span.subspan(i * code_length_, code_length_).data());

@@ -28,10 +28,10 @@
 #include "glonass_l1_ca_dll_pll_c_aid_tracking_cc.h"
 #include "GLONASS_L1_L2_CA.h"
 #include "glonass_l1_signal_processing.h"
+#include "gnss_satellite.h"
 #include "gnss_sdr_flags.h"
 #include "lock_detectors.h"
 #include "tracking_discriminators.h"
-#include <boost/bind.hpp>
 #include <glog/logging.h>
 #include <gnuradio/io_signature.h>
 #include <matio.h>
@@ -47,6 +47,10 @@
 #include <utility>
 #include <vector>
 
+#if HAS_GENERIC_LAMBDA
+#else
+#include <boost/bind/bind.hpp>
+#endif
 
 #define CN0_ESTIMATION_SAMPLES 10
 
@@ -108,8 +112,15 @@ glonass_l1_ca_dll_pll_c_aid_tracking_cc::glonass_l1_ca_dll_pll_c_aid_tracking_cc
     this->message_port_register_in(pmt::mp("preamble_timestamp_s"));
 
     this->set_msg_handler(pmt::mp("preamble_timestamp_s"),
+#if HAS_GENERIC_LAMBDA
+        [this](auto &&PH1) { msg_handler_preamble_index(PH1); });
+#else
+#if BOOST_173_OR_GREATER
+        boost::bind(&glonass_l1_ca_dll_pll_c_aid_tracking_cc::msg_handler_preamble_index, this, boost::placeholders::_1));
+#else
         boost::bind(&glonass_l1_ca_dll_pll_c_aid_tracking_cc::msg_handler_preamble_index, this, _1));
-
+#endif
+#endif
     this->message_port_register_out(pmt::mp("events"));
     this->message_port_register_in(pmt::mp("telemetry_to_trk"));
     // initialize internal vars
@@ -261,7 +272,7 @@ void glonass_l1_ca_dll_pll_c_aid_tracking_cc::start_tracking()
     d_code_loop_filter.initialize();                           // initialize the code filter
 
     // generate local reference ALWAYS starting at chip 1 (1 sample per chip)
-    glonass_l1_ca_code_gen_complex(gsl::span<gr_complex>(d_ca_code.data(), GLONASS_L1_CA_CODE_LENGTH_CHIPS), 0);
+    glonass_l1_ca_code_gen_complex(own::span<gr_complex>(d_ca_code.data(), GLONASS_L1_CA_CODE_LENGTH_CHIPS), 0);
 
     multicorrelator_cpu.set_local_code_and_taps(static_cast<int32_t>(GLONASS_L1_CA_CODE_LENGTH_CHIPS), d_ca_code.data(), d_local_code_shift_chips.data());
     std::fill_n(d_correlator_outs.begin(), d_n_correlator_taps, gr_complex(0.0, 0.0));

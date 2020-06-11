@@ -37,7 +37,7 @@
 class Gnss_Satellite
 {
 public:
-    Gnss_Satellite();                                                   //!< Default Constructor.
+    Gnss_Satellite() = default;                                         //!< Default Constructor.
     Gnss_Satellite(const std::string& system_, uint32_t PRN_);          //!< Concrete GNSS satellite Constructor.
     ~Gnss_Satellite() = default;                                        //!< Default Destructor.
     void update_PRN(uint32_t PRN);                                      //!< Updates the PRN Number when information is decoded, only applies to GLONASS GNAV messages
@@ -51,9 +51,9 @@ public:
     friend bool operator==(const Gnss_Satellite& /*sat1*/, const Gnss_Satellite& /*sat2*/);  //!< operator== for comparison
     friend std::ostream& operator<<(std::ostream& /*out*/, const Gnss_Satellite& /*sat*/);   //!< operator<< for pretty printing
 
-    Gnss_Satellite(Gnss_Satellite&& other) noexcept;             //!< Copy constructor
+    Gnss_Satellite(const Gnss_Satellite& other) noexcept;        //!< Copy constructor
     Gnss_Satellite& operator=(const Gnss_Satellite&);            //!< Copy assignment operator
-    Gnss_Satellite(const Gnss_Satellite& other) noexcept;        //!< Move constructor
+    Gnss_Satellite(Gnss_Satellite&& other) noexcept;             //!< Move constructor
     Gnss_Satellite& operator=(Gnss_Satellite&& other) noexcept;  //!< Move assignment operator
 
 private:

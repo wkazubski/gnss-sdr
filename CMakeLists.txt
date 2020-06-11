@@ -77,10 +77,13 @@ option(ENABLE_LOG "Enable logging" ON)
 
 option(ENABLE_ARMA_NO_DEBUG OFF)
 
+option(ENABLE_STRIP "Create stripped binaries without debugging symbols (in Release build mode only)" OFF)
+
 if(ENABLE_PACKAGING)
     set(ENABLE_GENERIC_ARCH ON)
     set(ENABLE_ARMA_NO_DEBUG ON)
     set(CMAKE_VERBOSE_MAKEFILE ON)
+    set(ENABLE_STRIP OFF)
 endif()
 
 # Testing
@@ -223,6 +226,9 @@ else()
 endif()
 gnsssdr_check_build_type(${CMAKE_BUILD_TYPE})
 set(CMAKE_BUILD_TYPE ${CMAKE_BUILD_TYPE} CACHE STRING "")
+if(NOT (${CMAKE_BUILD_TYPE} STREQUAL "Release"))
+    set(ENABLE_STRIP OFF)
+endif()
 
 # Enable optimization options in GCC for Release and RelWithDebInfo build types
 if((${CMAKE_SYSTEM_NAME} MATCHES "Linux|kFreeBSD|GNU") AND (CMAKE_CXX_COMPILER_ID STREQUAL "GNU"))
@@ -297,13 +303,13 @@ set(GNSSSDR_PROTOBUF_MIN_VERSION "3.0.0")
 ################################################################################
 set(GNSSSDR_GFLAGS_LOCAL_VERSION "2.2.2")
 set(GNSSSDR_GLOG_LOCAL_VERSION "0.4.0")
-set(GNSSSDR_ARMADILLO_LOCAL_VERSION "9.800.x")
+set(GNSSSDR_ARMADILLO_LOCAL_VERSION "9.900.x")
 set(GNSSSDR_GTEST_LOCAL_VERSION "1.10.0")
 set(GNSSSDR_GNSS_SIM_LOCAL_VERSION "master")
 set(GNSSSDR_GPSTK_LOCAL_VERSION "3.0.0")
 set(GNSSSDR_MATIO_LOCAL_VERSION "1.5.17")
 set(GNSSSDR_PUGIXML_LOCAL_VERSION "1.10")
-set(GNSSSDR_PROTOCOLBUFFERS_LOCAL_VERSION "3.11.4")
+set(GNSSSDR_PROTOCOLBUFFERS_LOCAL_VERSION "3.12.3")
 
 if(CMAKE_VERSION VERSION_LESS "3.0.2")
     set(GNSSSDR_GFLAGS_LOCAL_VERSION "2.2.1")  # Fix for CentOS 7
@@ -422,6 +428,7 @@ endif()
 # pkg-config - Helper tool used when compiling applications and libraries.
 ################################################################################
 set(PKG_CONFIG_USE_CMAKE_PREFIX_PATH TRUE)
+set(FPHSA_NAME_MISMATCHED ON)
 find_package(PkgConfig)
 
 
@@ -535,13 +542,15 @@ set(FILESYSTEM_FOUND FALSE)
 if(NOT (GNURADIO_VERSION VERSION_LESS 3.8) AND LOG4CPP_READY_FOR_CXX17)
     # Check if we have std::filesystem
     if(NOT (CMAKE_VERSION VERSION_LESS 3.8))
-        find_package(FILESYSTEM COMPONENTS Final Experimental)
-        set_package_properties(FILESYSTEM PROPERTIES
-            URL "https://en.cppreference.com/w/cpp/filesystem"
-            DESCRIPTION "Provides facilities for performing operations on file systems and their components"
-            PURPOSE "Work with paths, regular files, and directories."
-            TYPE OPTIONAL
-        )
+        if(NOT (ENABLE_UNIT_TESTING_EXTRA OR ENABLE_SYSTEM_TESTING_EXTRA OR ENABLE_FPGA))  # Fix for GPTSk
+            find_package(FILESYSTEM COMPONENTS Final Experimental)
+            set_package_properties(FILESYSTEM PROPERTIES
+                URL "https://en.cppreference.com/w/cpp/filesystem"
+                DESCRIPTION "Provides facilities for performing operations on file systems and their components"
+                PURPOSE "Work with paths, regular files, and directories."
+                TYPE OPTIONAL
+            )
+        endif()
         if(${FILESYSTEM_FOUND})
             if(CMAKE_VERSION VERSION_LESS 3.13)
                 set(CMAKE_CXX_STANDARD 17)
@@ -733,6 +742,22 @@ if(Boost_VERSION_STRING VERSION_GREATER 1.70.99)
     endif()
 endif()
 
+if(Boost_VERSION_STRING VERSION_LESS 1.73)
+    # Disable concepts to address https://github.com/boostorg/asio/issues/312
+    if(((CMAKE_CXX_COMPILER_ID STREQUAL "GNU" AND CMAKE_CXX_COMPILER_VERSION VERSION_GREATER 9.9) OR
+        CMAKE_CXX_COMPILER_ID MATCHES "Clang") AND (CMAKE_VERSION VERSION_GREATER 3.11))
+        target_compile_definitions(Boost::headers
+            INTERFACE
+                -DBOOST_ASIO_DISABLE_CONCEPTS
+        )
+    endif()
+endif()
+
+# Workaround for https://github.com/boostorg/format/issues/67
+if((Boost_VERSION_STRING VERSION_GREATER 1.71) AND (Boost_VERSION_STRING VERSION_LESS 1.73))
+    set(CMAKE_CXX_STANDARD 17)
+endif()
+
 # Fix for Boost Asio < 1.70 when using Clang in macOS
 if(Boost_VERSION_STRING VERSION_LESS 1.70.0)
     # Check if we have std::string_view
@@ -744,6 +769,19 @@ if(Boost_VERSION_STRING VERSION_LESS 1.70.0)
         has_string_view
     )
 endif()
+
+
+
+################################################################################
+# Detect availability of std::span
+################################################################################
+include(CheckCXXSourceCompiles)
+check_cxx_source_compiles("
+    #include <span>
+    int main()
+    { std::span<float> s; }"
+    has_span
+)
 
 
 
@@ -790,29 +828,36 @@ if(NOT VOLKGNSSSDR_FOUND)
     if(NOT MAKO_FOUND)
         message(STATUS "Mako template library not found. See https://www.makotemplates.org/")
         message(STATUS " You can try to install it by typing:")
-        if(${LINUX_DISTRIBUTION} MATCHES "Fedora" OR ${LINUX_DISTRIBUTION} MATCHES "Red Hat")
-            message(STATUS " sudo yum install ${PYTHON_NAME}-mako")
-        elseif(${LINUX_DISTRIBUTION} MATCHES "openSUSE")
-            message(STATUS " sudo zypper install ${PYTHON_NAME}-Mako")
-        else()
-            message(STATUS " sudo apt-get install ${PYTHON_NAME}-mako")
+        if(${CMAKE_SYSTEM_NAME} MATCHES "Linux|kFreeBSD|GNU")
+            if(${LINUX_DISTRIBUTION} MATCHES "Fedora" OR ${LINUX_DISTRIBUTION} MATCHES "Red Hat")
+                message(STATUS " sudo yum install ${PYTHON_NAME}-mako")
+            elseif(${LINUX_DISTRIBUTION} MATCHES "openSUSE")
+                message(STATUS " sudo zypper install ${PYTHON_NAME}-Mako")
+            else()
+                message(STATUS " sudo apt-get install ${PYTHON_NAME}-mako")
+            endif()
         endif()
         message(FATAL_ERROR "Mako templates required to build VOLK_GNSSSDR")
     endif()
 
-    # Six
-    if(NOT SIX_FOUND)
-        message(STATUS "python-six not found. See https://pythonhosted.org/six/")
-        message(STATUS " You can try to install it by typing:")
-        if(${LINUX_DISTRIBUTION} MATCHES "Fedora" OR ${LINUX_DISTRIBUTION} MATCHES "Red Hat")
-            message(STATUS " sudo yum install ${PYTHON_NAME}-six")
-        elseif(${LINUX_DISTRIBUTION} MATCHES "openSUSE")
-            message(STATUS " sudo zypper install ${PYTHON_NAME}-six")
-        else()
-            message(STATUS " sudo apt-get install ${PYTHON_NAME}-six")
+    if(PYTHON_NAME STREQUAL "python")
+        # Six
+        if(NOT SIX_FOUND)
+            message(STATUS "python-six not found. See https://pythonhosted.org/six/")
+            if(${CMAKE_SYSTEM_NAME} MATCHES "Linux|kFreeBSD|GNU")
+                message(STATUS " You can try to install it by typing:")
+                if(${LINUX_DISTRIBUTION} MATCHES "Fedora" OR ${LINUX_DISTRIBUTION} MATCHES "Red Hat")
+                    message(STATUS " sudo yum install ${PYTHON_NAME}-six")
+                elseif(${LINUX_DISTRIBUTION} MATCHES "openSUSE")
+                    message(STATUS " sudo zypper install ${PYTHON_NAME}-six")
+                else()
+                    message(STATUS " sudo apt-get install ${PYTHON_NAME}-six")
+                endif()
+            endif()
+            message(FATAL_ERROR "six - python 2 and 3 compatibility library required to build VOLK_GNSSSDR")
         endif()
-        message(FATAL_ERROR "six - python 2 and 3 compatibility library required to build VOLK_GNSSSDR")
     endif()
+
     if(CMAKE_VERSION VERSION_GREATER 3.12)
         set_package_properties(Python3 PROPERTIES
             URL "https://www.python.org/"
@@ -849,9 +894,10 @@ if(NOT VOLKGNSSSDR_FOUND)
     endif()
 
     set(STRIP_VOLK_GNSSSDR_PROFILE "")
-    if(ENABLE_PACKAGING)
-        if((CMAKE_CXX_COMPILER_ID STREQUAL "GNU") AND NOT WIN32)
-            set(STRIP_VOLK_GNSSSDR_PROFILE "-DENABLE_STRIP=ON -DCMAKE_VERBOSE_MAKEFILE=ON")
+    if((CMAKE_CXX_COMPILER_ID STREQUAL "GNU") AND NOT WIN32)
+        set(STRIP_VOLK_GNSSSDR_PROFILE "-DENABLE_STRIP=${ENABLE_STRIP}")
+        if(ENABLE_PACKAGING)
+            set(STRIP_VOLK_GNSSSDR_PROFILE "${STRIP_VOLK_GNSSSDR_PROFILE} -DCMAKE_VERBOSE_MAKEFILE=ON")
         endif()
     endif()
 
@@ -1527,7 +1573,10 @@ if(NOT ARMADILLO_FOUND OR ENABLE_OWN_ARMADILLO)
     else()
         set(DARWIN_DISABLE_HDF5 "")
     endif()
-
+    set(ARMADILLO_CXX_VERSION "")
+    if(CMAKE_CXX_COMPILER_ID STREQUAL "GNU" AND ${CMAKE_CXX_COMPILER_VERSION} VERSION_LESS 4.8.3)
+        set(ARMADILLO_CXX_VERSION -DCMAKE_CXX_FLAGS=-std=c++11)
+    endif()
     if(CMAKE_VERSION VERSION_LESS 3.2)
         ExternalProject_Add(armadillo-${armadillo_RELEASE}
             PREFIX ${CMAKE_CURRENT_BINARY_DIR}/armadillo-${armadillo_RELEASE}
@@ -1537,7 +1586,7 @@ if(NOT ARMADILLO_FOUND OR ENABLE_OWN_ARMADILLO)
             BINARY_DIR ${CMAKE_CURRENT_BINARY_DIR}/armadillo-${armadillo_RELEASE}
             CMAKE_ARGS -DCMAKE_CXX_COMPILER=${CMAKE_CXX_COMPILER}
                 -DBUILD_SHARED_LIBS=OFF
-                -DCMAKE_CXX_FLAGS=-std=c++11
+                ${ARMADILLO_CXX_VERSION}
                 ${DARWIN_DISABLE_HDF5}
                 ${ARMADILLO_TOOLCHAIN_FILE}
                 -DCMAKE_BUILD_TYPE=$<$<CONFIG:Debug>:Debug>$<$<CONFIG:Release>:Release>$<$<CONFIG:RelWithDebInfo>:RelWithDebInfo>$<$<CONFIG:MinSizeRel>:MinSizeRel>$<$<CONFIG:NoOptWithASM>:Debug>$<$<CONFIG:Coverage>:Debug>$<$<CONFIG:O2WithASM>:RelWithDebInfo>$<$<CONFIG:O3WithASM>:RelWithDebInfo>$<$<CONFIG:ASAN>:Debug>
@@ -1557,7 +1606,7 @@ if(NOT ARMADILLO_FOUND OR ENABLE_OWN_ARMADILLO)
             BINARY_DIR ${CMAKE_CURRENT_BINARY_DIR}/armadillo-${armadillo_RELEASE}
             CMAKE_ARGS -DCMAKE_CXX_COMPILER=${CMAKE_CXX_COMPILER}
                 -DBUILD_SHARED_LIBS=OFF
-                -DCMAKE_CXX_FLAGS=-std=c++11
+                ${ARMADILLO_CXX_VERSION}
                 ${DARWIN_DISABLE_HDF5}
                 ${ARMADILLO_TOOLCHAIN_FILE}
                 -DCMAKE_BUILD_TYPE=$<$<CONFIG:Debug>:Debug>$<$<CONFIG:Release>:Release>$<$<CONFIG:RelWithDebInfo>:RelWithDebInfo>$<$<CONFIG:MinSizeRel>:MinSizeRel>$<$<CONFIG:NoOptWithASM>:Debug>$<$<CONFIG:Coverage>:Debug>$<$<CONFIG:O2WithASM>:RelWithDebInfo>$<$<CONFIG:O3WithASM>:RelWithDebInfo>$<$<CONFIG:ASAN>:Debug>
@@ -1849,7 +1898,7 @@ if(NOT MATIO_FOUND OR MATIO_VERSION_STRING VERSION_LESS ${GNSSSDR_MATIO_MIN_VERS
                 ExternalProject_Add(matio-${GNSSSDR_MATIO_LOCAL_VERSION}
                     PREFIX ${CMAKE_CURRENT_BINARY_DIR}/matio
                     GIT_REPOSITORY https://github.com/tbeu/matio
-                    GIT_TAG v${GNSSSDR_MATIO_LOCAL_VERSION}
+                    GIT_TAG 596cb3ce71038958812bd6cf9b141f12ce155ac6 # Workaround until Matio 1.5.18 v${GNSSSDR_MATIO_LOCAL_VERSION}
                     SOURCE_DIR ${CMAKE_CURRENT_SOURCE_DIR}/thirdparty/matio/matio-${GNSSSDR_MATIO_LOCAL_VERSION}
                     UPDATE_COMMAND ${CMAKE_CURRENT_SOURCE_DIR}/thirdparty/matio/matio-${GNSSSDR_MATIO_LOCAL_VERSION}/autogen.sh
                     CONFIGURE_COMMAND ${CMAKE_CURRENT_SOURCE_DIR}/thirdparty/matio/matio-${GNSSSDR_MATIO_LOCAL_VERSION}/configure --with-hdf5=${HDF5_BASE_DIR} --with-zlib=${ZLIB_BASE_DIR} --with-default-file-ver=7.3 --enable-mat73=yes --prefix=<INSTALL_DIR>
@@ -2900,6 +2949,7 @@ add_feature_info(ENABLE_PACKAGING ENABLE_PACKAGING "Enables software packaging."
 add_feature_info(ENABLE_OWN_GLOG ENABLE_OWN_GLOG "Forces the downloading and building of Google glog.")
 add_feature_info(ENABLE_OWN_ARMADILLO ENABLE_OWN_ARMADILLO "Forces the downloading and building of Armadillo.")
 add_feature_info(ENABLE_LOG ENABLE_LOG "Enables runtime internal logging with Google glog.")
+add_feature_info(ENABLE_STRIP ENABLE_STRIP "Enables the generation of stripped binaries (without debugging symbols).")
 add_feature_info(ENABLE_UNIT_TESTING ENABLE_UNIT_TESTING "Enables building of Unit Tests.")
 add_feature_info(ENABLE_UNIT_TESTING_MINIMAL ENABLE_UNIT_TESTING_MINIMAL "Enables building a minimal set of Unit Tests.")
 add_feature_info(ENABLE_UNIT_TESTING_EXTRA ENABLE_UNIT_TESTING_EXTRA "Enables building of Extra Unit Tests and downloading of external data files.")
@@ -2925,8 +2975,8 @@ else()
     endif()
 endif()
 message(STATUS "CMake version: ${CMAKE_VERSION}")
-message(STATUS "The CXX compiler identification is ${CMAKE_CXX_COMPILER_ID} ${CMAKE_CXX_COMPILER_VERSION}")
-message(STATUS "The C compiler identification is ${CMAKE_C_COMPILER_ID} ${CMAKE_C_COMPILER_VERSION}")
+message(STATUS "The CXX compiler identification is ${CMAKE_CXX_COMPILER_ID} ${CMAKE_CXX_COMPILER_VERSION}. Standard: C++${CMAKE_CXX_STANDARD}.")
+message(STATUS "The C compiler identification is ${CMAKE_C_COMPILER_ID} ${CMAKE_C_COMPILER_VERSION}. Standard: C${CMAKE_C_STANDARD}.")
 message(STATUS "")
 file(REMOVE ${CMAKE_CURRENT_BINARY_DIR}/features.log)
 file(WRITE ${CMAKE_CURRENT_BINARY_DIR}/features.log "**********************************\n")
@@ -2944,8 +2994,8 @@ if(${CMAKE_SYSTEM_NAME} MATCHES "Darwin")
     file(APPEND ${CMAKE_CURRENT_BINARY_DIR}/features.log "Building on ${MACOS_DISTRIBUTION}\n")
 endif()
 file(APPEND ${CMAKE_CURRENT_BINARY_DIR}/features.log "CMake version: ${CMAKE_VERSION}\n")
-file(APPEND ${CMAKE_CURRENT_BINARY_DIR}/features.log "The CXX compiler identification is ${CMAKE_CXX_COMPILER_ID} ${CMAKE_CXX_COMPILER_VERSION}\n")
-file(APPEND ${CMAKE_CURRENT_BINARY_DIR}/features.log "The C compiler identification is ${CMAKE_C_COMPILER_ID} ${CMAKE_C_COMPILER_VERSION}\n\n")
+file(APPEND ${CMAKE_CURRENT_BINARY_DIR}/features.log "The CXX compiler identification is ${CMAKE_CXX_COMPILER_ID} ${CMAKE_CXX_COMPILER_VERSION}. Standard: C++${CMAKE_CXX_STANDARD}.\n")
+file(APPEND ${CMAKE_CURRENT_BINARY_DIR}/features.log "The C compiler identification is ${CMAKE_C_COMPILER_ID} ${CMAKE_C_COMPILER_VERSION}. Standard: C${CMAKE_C_STANDARD}.\n\n")
 if(CMAKE_VERSION VERSION_LESS 3.4)
     feature_summary(WHAT ALL)
     feature_summary(FILENAME ${CMAKE_CURRENT_BINARY_DIR}/features.log APPEND WHAT ALL)

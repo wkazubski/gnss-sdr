@@ -21,12 +21,21 @@ set(SIGNAL_PROCESSING_TESTING_LIB_SOURCES
 file(GLOB SIGNAL_PROCESSING_TESTING_LIB_HEADERS "*.h")
 list(SORT SIGNAL_PROCESSING_TESTING_LIB_HEADERS)
 
-add_library(signal_processing_testing_lib
-    ${SIGNAL_PROCESSING_TESTING_LIB_SOURCES}
-    ${SIGNAL_PROCESSING_TESTING_LIB_HEADERS}
-)
-
-source_group(Headers FILES ${SIGNAL_PROCESSING_TESTING_LIB_HEADERS})
+if(CMAKE_VERSION VERSION_GREATER 3.13)
+    add_library(signal_processing_testing_lib STATIC)
+    target_sources(signal_processing_testing_lib
+        PRIVATE
+            ${SIGNAL_PROCESSING_TESTING_LIB_SOURCES}
+        PUBLIC
+            ${SIGNAL_PROCESSING_TESTING_LIB_HEADERS}
+    )
+else()
+    source_group(Headers FILES ${SIGNAL_PROCESSING_TESTING_LIB_HEADERS})
+    add_library(signal_processing_testing_lib
+        ${SIGNAL_PROCESSING_TESTING_LIB_SOURCES}
+        ${SIGNAL_PROCESSING_TESTING_LIB_HEADERS}
+    )
+endif()
 
 target_link_libraries(signal_processing_testing_lib
     PUBLIC
@@ -38,6 +47,28 @@ target_link_libraries(signal_processing_testing_lib
         Matio::matio
         Glog::glog
 )
+
+if(CMAKE_VERSION VERSION_GREATER 3.1 AND NOT ((CMAKE_CXX_COMPILER_ID STREQUAL "GNU") AND (CMAKE_CXX_COMPILER_VERSION VERSION_LESS 7.0)))
+    set(has_generic_lambdas HAS_GENERIC_LAMBDA=1)
+    set(no_has_generic_lambdas HAS_GENERIC_LAMBDA=0)
+    target_compile_definitions(signal_processing_testing_lib
+        PRIVATE
+            "$<$<COMPILE_FEATURES:cxx_generic_lambdas>:${has_generic_lambdas}>"
+            "$<$<NOT:$<COMPILE_FEATURES:cxx_generic_lambdas>>:${no_has_generic_lambdas}>"
+    )
+else()
+    target_compile_definitions(signal_processing_testing_lib
+        PRIVATE
+            -DHAS_GENERIC_LAMBDA=0
+    )
+endif()
+
+if(Boost_VERSION_STRING VERSION_GREATER 1.72.99)
+    target_compile_definitions(signal_processing_testing_lib
+        PRIVATE
+            -DBOOST_173_OR_GREATER=1
+    )
+endif()
 
 if(ENABLE_CLANG_TIDY)
     if(CLANG_TIDY_EXE)

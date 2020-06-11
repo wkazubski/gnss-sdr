@@ -21,6 +21,7 @@
 
 #include "rtl_tcp_signal_source_c.h"
 #include "rtl_tcp_commands.h"
+#include <boost/bind/bind.hpp>
 #include <boost/thread/thread.hpp>
 #include <glog/logging.h>
 #include <map>
@@ -132,11 +133,21 @@ rtl_tcp_signal_source_c::rtl_tcp_signal_source_c(const std::string &address,
             LOG(INFO) << "Found " << info_.get_type_name() << " tuner.";
         }
 
-    // 6. Start reading
+// 6. Start reading
+#if BOOST_173_OR_GREATER
     boost::asio::async_read(socket_, boost::asio::buffer(data_),
-        boost::bind(&rtl_tcp_signal_source_c::handle_read,
-            this, _1, _2));
-    boost::thread(boost::bind(&b_io_context::run, &io_context_));
+        boost::bind(&rtl_tcp_signal_source_c::handle_read, this, boost::placeholders::_1, boost::placeholders::_2));  // NOLINT(modernize-avoid-bind)
+#else
+    boost::asio::async_read(socket_, boost::asio::buffer(data_),
+        boost::bind(&rtl_tcp_signal_source_c::handle_read, this, _1, _2));  // NOLINT(modernize-avoid-bind)
+#endif
+
+    boost::thread(
+#if HAS_GENERIC_LAMBDA
+        [ObjectPtr = &io_context_] { ObjectPtr->run(); });
+#else
+        boost::bind(&b_io_context::run, &io_context_));
+#endif
 }
 
 
@@ -288,8 +299,7 @@ void rtl_tcp_signal_source_c::handle_read(const boost::system::error_code &ec,
                 // Unpack read data
                 boost::mutex::scoped_lock lock(mutex_);
                 not_full_.wait(lock,
-                    boost::bind(&rtl_tcp_signal_source_c::not_full,
-                        this));
+                    boost::bind(&rtl_tcp_signal_source_c::not_full, this));  // NOLINT(modernize-avoid-bind)
 
                 for (size_t i = 0; i < bytes_transferred; i++)
                     {
@@ -299,8 +309,7 @@ void rtl_tcp_signal_source_c::handle_read(const boost::system::error_code &ec,
                                 // wait until there's space for more
                                 not_empty_.notify_one();  // needed?
                                 not_full_.wait(lock,
-                                    boost::bind(&rtl_tcp_signal_source_c::not_full,
-                                        this));
+                                    boost::bind(&rtl_tcp_signal_source_c::not_full, this));  // NOLINT(modernize-avoid-bind)
                             }
 
                         buffer_.push_front(lookup_[data_[i]]);
@@ -309,11 +318,16 @@ void rtl_tcp_signal_source_c::handle_read(const boost::system::error_code &ec,
             }
             // let woker know that more data is available
             not_empty_.notify_one();
-            // Read some more
+// Read some more
+#if BOOST_173_OR_GREATER
             boost::asio::async_read(socket_,
                 boost::asio::buffer(data_),
-                boost::bind(&rtl_tcp_signal_source_c::handle_read,
-                    this, _1, _2));
+                boost::bind(&rtl_tcp_signal_source_c::handle_read, this, boost::placeholders::_1, boost::placeholders::_2));  // NOLINT(modernize-avoid-bind)
+#else
+            boost::asio::async_read(socket_,
+                boost::asio::buffer(data_),
+                boost::bind(&rtl_tcp_signal_source_c::handle_read, this, _1, _2));  // NOLINT(modernize-avoid-bind)
+#endif
         }
 }
 
@@ -331,8 +345,8 @@ int rtl_tcp_signal_source_c::work(int noutput_items,
 
     {
         boost::mutex::scoped_lock lock(mutex_);
-        not_empty_.wait(lock, boost::bind(&rtl_tcp_signal_source_c::not_empty,
-                                  this));
+        not_empty_.wait(lock,
+            boost::bind(&rtl_tcp_signal_source_c::not_empty, this));  // NOLINT(modernize-avoid-bind)
 
         for (; i < noutput_items && unread_ > 1; i++)
             {

@@ -10,14 +10,38 @@ SPDX-FileCopyrightText: 2011-2020 Carles Fernandez-Prades <carles.fernandez@cttc
 
 ## Unreleased
 
+### Improvements in Efficiency:
+
+- Faster internal handling of `Gnss_Synchro` objects by reducing the amount of
+  copying via adding `noexcept` move constructor and move assignment operators,
+  so the move semantics are also used in STL containers.
+- Add building option `ENABLE_STRIP` to generate stripped binaries (that is,
+  without debugging symbols), smaller in size and potentially providing better
+  performance than non-stripped counterparts. Only for GCC in Release build
+  mode. Set to `OFF` by default.
+
 ### Improvements in Maintainability:
 
 - The software can now be built against the GNU Radio 3.9 API that uses C++11
   smart pointers instead of Boost smart pointers.
+- The software can now be built against Boost <= 1.73 (minimum version: 1.53).
+- Removed python six module as a dependency if using Python 3.x.
+- Fixed building with GCC 10 (gcc-10 and above flipped a default from `-fcommon`
+  to `-fno-common`, causing an error due to multiple defined lambda functions).
+- Fixed warnings risen by GCC 10 and Clang 10.
 
 ### Improvements in Portability:
 
-- The software can now be cross-compiled on Petalinux environments.   
+- The software can now be cross-compiled on Petalinux environments.
+- Make use of `std::span` if the compiler supports it, and use gsl-lite as a
+  fallback. The latter has been updated to version
+  [0.37.0](https://github.com/gsl-lite/gsl-lite/releases/tag/0.37.0).
+- Improved finding of libgfortran in openSUSE and Fedora distributions.
+
+### Improvements in Reliability:
+
+- Fixed a bug in GLONASS GNAV CRC computation.
+- Fixed a possible buffer overflow in the generation of RTCM messages.
 
 ### Improvements in Reproducibility:
 

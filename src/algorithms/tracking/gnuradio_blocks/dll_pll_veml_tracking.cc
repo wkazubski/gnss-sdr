@@ -36,6 +36,7 @@
 #include "beidou_b3i_signal_processing.h"
 #include "galileo_e1_signal_processing.h"
 #include "galileo_e5_signal_processing.h"
+#include "gnss_satellite.h"
 #include "gnss_sdr_create_directory.h"
 #include "gnss_synchro.h"
 #include "gps_l2c_signal.h"
@@ -46,9 +47,8 @@
 #include <glog/logging.h>
 #include <gnuradio/io_signature.h>   // for io_signature
 #include <gnuradio/thread/thread.h>  // for scoped_lock
-#include <gsl/gsl>
-#include <matio.h>          // for Mat_VarCreate
-#include <pmt/pmt_sugar.h>  // for mp
+#include <matio.h>                   // for Mat_VarCreate
+#include <pmt/pmt_sugar.h>           // for mp
 #include <volk_gnsssdr/volk_gnsssdr.h>
 #include <algorithm>  // for fill_n
 #include <array>
@@ -58,6 +58,11 @@
 #include <map>
 #include <numeric>
 #include <vector>
+
+#if HAS_GENERIC_LAMBDA
+#else
+#include <boost/bind/bind.hpp>
+#endif
 
 #if HAS_STD_FILESYSTEM
 #if HAS_STD_FILESYSTEM_EXPERIMENTAL
@@ -91,7 +96,17 @@ dll_pll_veml_tracking::dll_pll_veml_tracking(const Dll_Pll_Conf &conf_) : gr::bl
 
     // Telemetry message port input
     this->message_port_register_in(pmt::mp("telemetry_to_trk"));
-    this->set_msg_handler(pmt::mp("telemetry_to_trk"), boost::bind(&dll_pll_veml_tracking::msg_handler_telemetry_to_trk, this, _1));
+    this->set_msg_handler(
+        pmt::mp("telemetry_to_trk"),
+#if HAS_GENERIC_LAMBDA
+        [this](auto &&PH1) { msg_handler_telemetry_to_trk(PH1); });
+#else
+#if BOOST_173_OR_GREATER
+        boost::bind(&dll_pll_veml_tracking::msg_handler_telemetry_to_trk, this, boost::placeholders::_1));
+#else
+        boost::bind(&dll_pll_veml_tracking::msg_handler_telemetry_to_trk, this, _1));
+#endif
+#endif
 
     // initialize internal vars
     d_dll_filt_history.set_capacity(1000);

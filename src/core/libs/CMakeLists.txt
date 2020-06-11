@@ -47,9 +47,18 @@ endif()
 list(SORT CORE_LIBS_HEADERS)
 list(SORT CORE_LIBS_SOURCES)
 
-source_group(Headers FILES ${CORE_LIBS_HEADERS})
-
-add_library(core_libs ${CORE_LIBS_SOURCES} ${CORE_LIBS_HEADERS})
+if(CMAKE_VERSION VERSION_GREATER 3.13)
+    add_library(core_libs STATIC)
+    target_sources(core_libs
+        PRIVATE
+            ${CORE_LIBS_SOURCES}
+        PUBLIC
+            ${CORE_LIBS_HEADERS}
+    )
+else()
+    source_group(Headers FILES ${CORE_LIBS_HEADERS})
+    add_library(core_libs ${CORE_LIBS_SOURCES} ${CORE_LIBS_HEADERS})
+endif()
 
 target_link_libraries(core_libs
     PUBLIC
@@ -68,6 +77,28 @@ target_link_libraries(core_libs
 if(GNURADIO_USES_STD_POINTERS)
     target_compile_definitions(core_libs
         PUBLIC -DGNURADIO_USES_STD_POINTERS=1
+    )
+endif()
+
+if(CMAKE_VERSION VERSION_GREATER 3.1 AND NOT ((CMAKE_CXX_COMPILER_ID STREQUAL "GNU") AND (CMAKE_CXX_COMPILER_VERSION VERSION_LESS 7.0)))
+    set(has_generic_lambdas HAS_GENERIC_LAMBDA=1)
+    set(no_has_generic_lambdas HAS_GENERIC_LAMBDA=0)
+    target_compile_definitions(core_libs
+        PRIVATE
+            "$<$<COMPILE_FEATURES:cxx_generic_lambdas>:${has_generic_lambdas}>"
+            "$<$<NOT:$<COMPILE_FEATURES:cxx_generic_lambdas>>:${no_has_generic_lambdas}>"
+    )
+else()
+    target_compile_definitions(core_libs
+        PRIVATE
+            -DHAS_GENERIC_LAMBDA=0
+    )
+endif()
+
+if(Boost_VERSION_STRING VERSION_GREATER 1.72.99)
+    target_compile_definitions(core_libs
+        PRIVATE
+            -DBOOST_173_OR_GREATER=1
     )
 endif()
 

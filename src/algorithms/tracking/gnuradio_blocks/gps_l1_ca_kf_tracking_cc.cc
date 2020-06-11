@@ -28,13 +28,13 @@
 
 #include "gps_l1_ca_kf_tracking_cc.h"
 #include "GPS_L1_CA.h"
+#include "gnss_satellite.h"
 #include "gnss_sdr_flags.h"
 #include "gps_sdr_signal_processing.h"
 #include "lock_detectors.h"
 #include "tracking_discriminators.h"
 #include <glog/logging.h>
 #include <gnuradio/io_signature.h>
-#include <gsl/gsl>
 #include <matio.h>
 #include <volk_gnsssdr/volk_gnsssdr.h>
 #include <algorithm>

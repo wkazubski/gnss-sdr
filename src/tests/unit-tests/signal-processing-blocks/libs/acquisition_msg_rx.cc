@@ -20,12 +20,14 @@
  */
 
 #include "acquisition_msg_rx.h"
-#include <boost/bind.hpp>
 #include <gflags/gflags.h>
 #include <glog/logging.h>
 #include <cstdint>
 #include <utility>
-
+#if HAS_GENERIC_LAMBDA
+#else
+#include <boost/bind/bind.hpp>
+#endif
 
 Acquisition_msg_rx_sptr Acquisition_msg_rx_make()
 {
@@ -52,7 +54,16 @@ void Acquisition_msg_rx::msg_handler_events(const pmt::pmt_t& msg)
 Acquisition_msg_rx::Acquisition_msg_rx() : gr::block("Acquisition_msg_rx", gr::io_signature::make(0, 0, 0), gr::io_signature::make(0, 0, 0))
 {
     this->message_port_register_in(pmt::mp("events"));
-    this->set_msg_handler(pmt::mp("events"), boost::bind(&Acquisition_msg_rx::msg_handler_events, this, _1));
+    this->set_msg_handler(pmt::mp("events"),
+#if HAS_GENERIC_LAMBDA
+        [this](auto&& PH1) { msg_handler_events(PH1); });
+#else
+#if BOOST_173_OR_GREATER
+        boost::bind(&Acquisition_msg_rx::msg_handler_events, this, boost::placeholders::_1));
+#else
+        boost::bind(&Acquisition_msg_rx::msg_handler_events, this, _1));
+#endif
+#endif
     rx_message = 0;
 }
 

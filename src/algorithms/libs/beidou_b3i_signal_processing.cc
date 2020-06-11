@@ -24,9 +24,9 @@
 #include <bitset>
 #include <string>
 
-auto auxCeil = [](float x) { return static_cast<int32_t>(static_cast<int64_t>((x) + 1)); };
+const auto AUX_CEIL = [](float x) { return static_cast<int32_t>(static_cast<int64_t>((x) + 1)); };
 
-void beidou_b3i_code_gen_int(gsl::span<int> _dest, int32_t _prn, uint32_t _chip_shift)
+void beidou_b3i_code_gen_int(own::span<int> _dest, int32_t _prn, uint32_t _chip_shift)
 {
     const uint32_t _code_length = 10230;
     std::bitset<_code_length> G1{};
@@ -168,7 +168,7 @@ void beidou_b3i_code_gen_int(gsl::span<int> _dest, int32_t _prn, uint32_t _chip_
 }
 
 
-void beidou_b3i_code_gen_float(gsl::span<float> _dest, int32_t _prn, uint32_t _chip_shift)
+void beidou_b3i_code_gen_float(own::span<float> _dest, int32_t _prn, uint32_t _chip_shift)
 {
     const uint32_t _code_length = 10230;
     std::array<int, _code_length> b3i_code_int{};
@@ -182,7 +182,7 @@ void beidou_b3i_code_gen_float(gsl::span<float> _dest, int32_t _prn, uint32_t _c
 }
 
 
-void beidou_b3i_code_gen_complex(gsl::span<std::complex<float>> _dest, int32_t _prn, uint32_t _chip_shift)
+void beidou_b3i_code_gen_complex(own::span<std::complex<float>> _dest, int32_t _prn, uint32_t _chip_shift)
 {
     const uint32_t _code_length = 10230;
     std::array<int, _code_length> b3i_code_int{};
@@ -196,7 +196,7 @@ void beidou_b3i_code_gen_complex(gsl::span<std::complex<float>> _dest, int32_t _
 }
 
 
-void beidou_b3i_code_gen_complex_sampled(gsl::span<std::complex<float>> _dest, uint32_t _prn, int _fs, uint32_t _chip_shift)
+void beidou_b3i_code_gen_complex_sampled(own::span<std::complex<float>> _dest, uint32_t _prn, int _fs, uint32_t _chip_shift)
 {
     // This function is based on the GNU software GPS for MATLAB in the Kay Borre book
     std::array<std::complex<float>, 10230> _code{};
@@ -226,7 +226,7 @@ void beidou_b3i_code_gen_complex_sampled(gsl::span<std::complex<float>> _dest, u
             // millisecond).
 
             aux = (_ts * (i + 1)) / _tc;
-            _codeValueIndex = auxCeil(aux) - 1;
+            _codeValueIndex = AUX_CEIL(aux) - 1;
 
             // --- Make the digitized version of the C/A code ------------------
             // The "upsampled" code is made by selecting values form the CA code

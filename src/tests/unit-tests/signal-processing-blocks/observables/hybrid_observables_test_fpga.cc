@@ -72,6 +72,10 @@
 #include <pthread.h>
 #include <unistd.h>
 #include <utility>
+#if HAS_GENERIC_LAMBDA
+#else
+#include <boost/bind/bind.hpp>
+#endif
 #ifdef GR_GREATER_38
 #include <gnuradio/filter/fir_filter_blk.h>
 #else
@@ -105,10 +109,12 @@ public:
     ~HybridObservablesTest_msg_rx_Fpga();  //!< Default destructor
 };
 
+
 HybridObservablesTest_msg_rx_Fpga_sptr HybridObservablesTest_msg_rx_Fpga_make()
 {
     return HybridObservablesTest_msg_rx_Fpga_sptr(new HybridObservablesTest_msg_rx_Fpga());
 }
+
 
 void HybridObservablesTest_msg_rx_Fpga::msg_handler_events(pmt::pmt_t msg)
 {
@@ -124,21 +130,35 @@ void HybridObservablesTest_msg_rx_Fpga::msg_handler_events(pmt::pmt_t msg)
         }
 }
 
+
 HybridObservablesTest_msg_rx_Fpga::HybridObservablesTest_msg_rx_Fpga() : gr::block("HybridObservablesTest_msg_rx", gr::io_signature::make(0, 0, 0), gr::io_signature::make(0, 0, 0))
 {
     this->message_port_register_in(pmt::mp("events"));
-    this->set_msg_handler(pmt::mp("events"), boost::bind(&HybridObservablesTest_msg_rx_Fpga::msg_handler_events, this, _1));
+    this->set_msg_handler(pmt::mp("events"),
+#if HAS_GENERIC_LAMBDA
+        [this](auto&& PH1) { msg_handler_events(PH1); });
+#else
+#if BOOST_173_OR_GREATER
+        boost::bind(&HybridObservablesTest_msg_rx_Fpga::msg_handler_events, this, boost::placeholders::_1));
+#else
+        boost::bind(&HybridObservablesTest_msg_rx_Fpga::msg_handler_events, this, _1));
+#endif
+#endif
     rx_message = 0;
 }
+
 
 HybridObservablesTest_msg_rx_Fpga::~HybridObservablesTest_msg_rx_Fpga() = default;
 
 
 class HybridObservablesTest_tlm_msg_rx_Fpga;
 
+
 using HybridObservablesTest_tlm_msg_rx_Fpga_sptr = std::shared_ptr<HybridObservablesTest_tlm_msg_rx_Fpga>;
 
+
 HybridObservablesTest_tlm_msg_rx_Fpga_sptr HybridObservablesTest_tlm_msg_rx_Fpga_make();
+
 
 class HybridObservablesTest_tlm_msg_rx_Fpga : public gr::block
 {
@@ -152,10 +172,12 @@ public:
     ~HybridObservablesTest_tlm_msg_rx_Fpga();  //!< Default destructor
 };
 
+
 HybridObservablesTest_tlm_msg_rx_Fpga_sptr HybridObservablesTest_tlm_msg_rx_Fpga_make()
 {
     return HybridObservablesTest_tlm_msg_rx_Fpga_sptr(new HybridObservablesTest_tlm_msg_rx_Fpga());
 }
+
 
 void HybridObservablesTest_tlm_msg_rx_Fpga::msg_handler_events(pmt::pmt_t msg)
 {
@@ -171,14 +193,17 @@ void HybridObservablesTest_tlm_msg_rx_Fpga::msg_handler_events(pmt::pmt_t msg)
         }
 }
 
+
 HybridObservablesTest_tlm_msg_rx_Fpga::HybridObservablesTest_tlm_msg_rx_Fpga() : gr::block("HybridObservablesTest_tlm_msg_rx_Fpga", gr::io_signature::make(0, 0, 0), gr::io_signature::make(0, 0, 0))
 {
     this->message_port_register_in(pmt::mp("events"));
-    this->set_msg_handler(pmt::mp("events"), boost::bind(&HybridObservablesTest_tlm_msg_rx_Fpga::msg_handler_events, this, _1));
+    this->set_msg_handler(pmt::mp("events"), boost::bind(&HybridObservablesTest_tlm_msg_rx_Fpga::msg_handler_events, this, boost::placeholders::_1));
     rx_message = 0;
 }
 
+
 HybridObservablesTest_tlm_msg_rx_Fpga::~HybridObservablesTest_tlm_msg_rx_Fpga() = default;
+
 
 class HybridObservablesTestFpga : public ::testing::Test
 {
@@ -272,6 +297,7 @@ public:
     static constexpr float DMA_SIGNAL_SCALING_FACTOR = 8.0;
 };
 
+
 int HybridObservablesTestFpga::configure_generator()
 {
     // Configure signal generator
@@ -317,6 +343,7 @@ int HybridObservablesTestFpga::generate_signal()
     return 0;
 }
 
+
 struct DMA_handler_args_obs_test
 {
     std::string file;
@@ -326,10 +353,12 @@ struct DMA_handler_args_obs_test
     float scaling_factor;
 };
 
+
 struct acquisition_handler_args_obs_test
 {
     std::shared_ptr<AcquisitionInterface> acquisition;
 };
+
 
 void* handler_acquisition_obs_test(void* arguments)
 {
@@ -339,6 +368,7 @@ void* handler_acquisition_obs_test(void* arguments)
     args->acquisition->reset();
     return nullptr;
 }
+
 
 void* handler_DMA_obs_test(void* arguments)
 {
@@ -2081,7 +2111,6 @@ TEST_F(HybridObservablesTestFpga, ValidationOfResults)
                         << "Failure reading RINEX file";
                 }
         }
-
 
     // read measured values
     Observables_Dump_Reader estimated_observables(tracking_ch_vec.size());
