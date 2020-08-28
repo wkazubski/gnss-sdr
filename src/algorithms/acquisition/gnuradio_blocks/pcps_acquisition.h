@@ -24,9 +24,9 @@
  *          <li> Antonio Ramos, 2017. antonio.ramos@cttc.es
  *          </ul>
  *
- * -------------------------------------------------------------------------
+ * -----------------------------------------------------------------------------
  *
- * Copyright (C) 2010-2019  (see AUTHORS file for a list of contributors)
+ * Copyright (C) 2010-2020  (see AUTHORS file for a list of contributors)
  *
  * GNSS-SDR is a software defined Global Navigation
  *          Satellite Systems receiver
@@ -35,7 +35,7 @@
  *
  * SPDX-License-Identifier: GPL-3.0-or-later
  *
- * -------------------------------------------------------------------------
+ * -----------------------------------------------------------------------------
  */
 
 #ifndef GNSS_SDR_PCPS_ACQUISITION_H
@@ -54,7 +54,6 @@
 #include <gnuradio/gr_complex.h>              // for gr_complex
 #include <gnuradio/thread/thread.h>           // for scoped_lock
 #include <gnuradio/types.h>                   // for gr_vector_const_void_star
-#include <gsl/gsl>                            // for Guidelines Support Library
 #include <volk/volk_complex.h>                // for lv_16sc_t
 #include <volk_gnsssdr/volk_gnsssdr_alloc.h>  // for volk_gnsssdr::vector
 #include <complex>
@@ -63,10 +62,27 @@
 #include <string>
 #include <utility>
 
+#if HAS_STD_SPAN
+#include <span>
+namespace own = std;
+#else
+#include <gsl/gsl>
+namespace own = gsl;
+#endif
+
+#if GNURADIO_USES_STD_POINTERS
+#else
+#include <boost/shared_ptr.hpp>
+#endif
+
 class Gnss_Synchro;
 class pcps_acquisition;
 
+#if GNURADIO_USES_STD_POINTERS
+using pcps_acquisition_sptr = std::shared_ptr<pcps_acquisition>;
+#else
 using pcps_acquisition_sptr = boost::shared_ptr<pcps_acquisition>;
+#endif
 
 pcps_acquisition_sptr pcps_make_acquisition(const Acq_Conf& conf_);
 
@@ -82,6 +98,11 @@ public:
     ~pcps_acquisition() = default;
 
     /*!
+     * \brief Initializes acquisition algorithm and reserves memory.
+     */
+    void init();
+
+    /*!
      * \brief Set acquisition/tracking common Gnss_Synchro object pointer
      * to exchange synchronization data between acquisition and tracking blocks.
      * \param p_gnss_synchro Satellite information shared by the processing blocks.
@@ -93,23 +114,27 @@ public:
     }
 
     /*!
+     * \brief Sets local code for PCPS acquisition algorithm.
+     * \param code - Pointer to the PRN code.
+     */
+    void set_local_code(std::complex<float>* code);
+
+    /*!
+     * \brief If set to 1, ensures that acquisition starts at the
+     * first available sample.
+     * \param state - int=1 forces start of acquisition
+     */
+    void set_state(int32_t state);
+
+    void set_resampler_latency(uint32_t latency_samples);
+
+    /*!
      * \brief Returns the maximum peak of grid search.
      */
     inline uint32_t mag() const
     {
         return d_mag;
     }
-
-    /*!
-     * \brief Initializes acquisition algorithm and reserves memory.
-     */
-    void init();
-
-    /*!
-     * \brief Sets local code for PCPS acquisition algorithm.
-     * \param code - Pointer to the PRN code.
-     */
-    void set_local_code(std::complex<float>* code);
 
     /*!
      * \brief Starts acquisition algorithm, turning from standby mode to
@@ -121,13 +146,6 @@ public:
         gr::thread::scoped_lock lock(d_setlock);  // require mutex with work function called by the scheduler
         d_active = active;
     }
-
-    /*!
-     * \brief If set to 1, ensures that acquisition starts at the
-     * first available sample.
-     * \param state - int=1 forces start of acquisition
-     */
-    void set_state(int32_t state);
 
     /*!
      * \brief Set acquisition channel unique ID
@@ -164,7 +182,7 @@ public:
     inline void set_doppler_max(uint32_t doppler_max)
     {
         gr::thread::scoped_lock lock(d_setlock);  // require mutex with work function called by the scheduler
-        acq_parameters.doppler_max = doppler_max;
+        d_acq_parameters.doppler_max = doppler_max;
     }
 
     /*!
@@ -192,8 +210,6 @@ public:
             }
     }
 
-    void set_resampler_latency(uint32_t latency_samples);
-
     /*!
      * \brief Parallel Code Phase Search Acquisition signal processing.
      */
@@ -204,50 +220,8 @@ public:
 private:
     friend pcps_acquisition_sptr pcps_make_acquisition(const Acq_Conf& conf_);
     explicit pcps_acquisition(const Acq_Conf& conf_);
-    bool d_active;
-    bool d_worker_active;
-    bool d_cshort;
-    bool d_step_two;
-    bool d_use_CFAR_algorithm_flag;
-    bool d_dump;
-    int32_t d_state;
-    int32_t d_positive_acq;
-    uint32_t d_channel;
-    uint32_t d_samplesPerChip;
-    uint32_t d_doppler_step;
-    int32_t d_doppler_center;
-    int32_t d_doppler_bias;
-    uint32_t d_num_noncoherent_integrations_counter;
-    uint32_t d_fft_size;
-    uint32_t d_consumed_samples;
-    uint32_t d_num_doppler_bins;
-    uint32_t d_num_doppler_bins_step2;
-    uint32_t d_dump_channel;
-    uint32_t d_buffer_count;
-    uint64_t d_sample_counter;
-    int64_t d_dump_number;
-    float d_threshold;
-    float d_mag;
-    float d_input_power;
-    float d_test_statistics;
-    float d_doppler_center_step_two;
-    std::string d_dump_filename;
-    volk_gnsssdr::vector<volk_gnsssdr::vector<float>> d_magnitude_grid;
-    volk_gnsssdr::vector<float> d_tmp_buffer;
-    volk_gnsssdr::vector<std::complex<float>> d_input_signal;
-    volk_gnsssdr::vector<volk_gnsssdr::vector<std::complex<float>>> d_grid_doppler_wipeoffs;
-    volk_gnsssdr::vector<volk_gnsssdr::vector<std::complex<float>>> d_grid_doppler_wipeoffs_step_two;
-    volk_gnsssdr::vector<std::complex<float>> d_fft_codes;
-    volk_gnsssdr::vector<std::complex<float>> d_data_buffer;
-    volk_gnsssdr::vector<lv_16sc_t> d_data_buffer_sc;
-    std::shared_ptr<gr::fft::fft_complex> d_fft_if;
-    std::shared_ptr<gr::fft::fft_complex> d_ifft;
-    std::weak_ptr<ChannelFsm> d_channel_fsm;
-    Acq_Conf acq_parameters;
-    Gnss_Synchro* d_gnss_synchro;
-    arma::fmat grid_;
-    arma::fmat narrow_grid_;
-    void update_local_carrier(gsl::span<gr_complex> carrier_vector, float freq);
+
+    void update_local_carrier(own::span<gr_complex> carrier_vector, float freq);
     void update_grid_doppler_wipeoffs();
     void update_grid_doppler_wipeoffs_step2();
     void acquisition_core(uint64_t samp_count);
@@ -259,6 +233,57 @@ private:
     void calculate_threshold(void);
     float first_vs_second_peak_statistic(uint32_t& indext, int32_t& doppler, uint32_t num_doppler_bins, int32_t doppler_max, int32_t doppler_step);
     float max_to_input_power_statistic(uint32_t& indext, int32_t& doppler, uint32_t num_doppler_bins, int32_t doppler_max, int32_t doppler_step);
+
+    volk_gnsssdr::vector<volk_gnsssdr::vector<float>> d_magnitude_grid;
+    volk_gnsssdr::vector<float> d_tmp_buffer;
+    volk_gnsssdr::vector<std::complex<float>> d_input_signal;
+    volk_gnsssdr::vector<volk_gnsssdr::vector<std::complex<float>>> d_grid_doppler_wipeoffs;
+    volk_gnsssdr::vector<volk_gnsssdr::vector<std::complex<float>>> d_grid_doppler_wipeoffs_step_two;
+    volk_gnsssdr::vector<std::complex<float>> d_fft_codes;
+    volk_gnsssdr::vector<std::complex<float>> d_data_buffer;
+    volk_gnsssdr::vector<lv_16sc_t> d_data_buffer_sc;
+
+    std::unique_ptr<gr::fft::fft_complex> d_fft_if;
+    std::unique_ptr<gr::fft::fft_complex> d_ifft;
+    std::weak_ptr<ChannelFsm> d_channel_fsm;
+
+    Acq_Conf d_acq_parameters;
+    Gnss_Synchro* d_gnss_synchro;
+    arma::fmat d_grid;
+    arma::fmat d_narrow_grid;
+
+    std::string d_dump_filename;
+
+    int64_t d_dump_number;
+    uint64_t d_sample_counter;
+
+    float d_threshold;
+    float d_mag;
+    float d_input_power;
+    float d_test_statistics;
+    float d_doppler_center_step_two;
+
+    int32_t d_state;
+    int32_t d_positive_acq;
+    int32_t d_doppler_center;
+    int32_t d_doppler_bias;
+    uint32_t d_channel;
+    uint32_t d_samplesPerChip;
+    uint32_t d_doppler_step;
+    uint32_t d_num_noncoherent_integrations_counter;
+    uint32_t d_fft_size;
+    uint32_t d_consumed_samples;
+    uint32_t d_num_doppler_bins;
+    uint32_t d_num_doppler_bins_step2;
+    uint32_t d_dump_channel;
+    uint32_t d_buffer_count;
+
+    bool d_active;
+    bool d_worker_active;
+    bool d_cshort;
+    bool d_step_two;
+    bool d_use_CFAR_algorithm_flag;
+    bool d_dump;
 };
 
 #endif  // GNSS_SDR_PCPS_ACQUISITION_H

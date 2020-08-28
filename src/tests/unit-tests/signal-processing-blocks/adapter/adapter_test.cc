@@ -4,9 +4,9 @@
  * \author Carles Fernandez-Prades, 2017. cfernandez(at)cttc.es
  *
  *
- * -------------------------------------------------------------------------
+ * -----------------------------------------------------------------------------
  *
- * Copyright (C) 2010-2019  (see AUTHORS file for a list of contributors)
+ * Copyright (C) 2010-2020  (see AUTHORS file for a list of contributors)
  *
  * GNSS-SDR is a software defined Global Navigation
  *          Satellite Systems receiver
@@ -15,7 +15,7 @@
  *
  * SPDX-License-Identifier: GPL-3.0-or-later
  *
- * -------------------------------------------------------------------------
+ * -----------------------------------------------------------------------------
  */
 
 #include "byte_to_short.h"
@@ -258,7 +258,7 @@ TEST_F(DataTypeAdapter, ByteToShortValidationOfResults)
         }
     catch (std::system_error& e)
         {
-            std::cerr << e.code().message() << std::endl;
+            std::cerr << e.code().message() << '\n';
         }
     ifs.close();
     ASSERT_EQ(remove(file_name_input.c_str()), 0) << "Problem deleting temporary file";
@@ -284,7 +284,7 @@ TEST_F(DataTypeAdapter, IbyteToCbyteValidationOfResults)
         }
     catch (std::system_error& e)
         {
-            std::cerr << e.code().message() << std::endl;
+            std::cerr << e.code().message() << '\n';
         }
     ifs.close();
     ASSERT_EQ(remove(file_name_input.c_str()), 0) << "Problem deleting temporary file";
@@ -310,7 +310,7 @@ TEST_F(DataTypeAdapter, IbyteToComplexValidationOfResults)
         }
     catch (std::system_error& e)
         {
-            std::cerr << e.code().message() << std::endl;
+            std::cerr << e.code().message() << '\n';
         }
     ifs.close();
     ASSERT_EQ(remove(file_name_input.c_str()), 0) << "Problem deleting temporary file";
@@ -336,7 +336,7 @@ TEST_F(DataTypeAdapter, IbyteToCshortValidationOfResults)
         }
     catch (std::system_error& e)
         {
-            std::cerr << e.code().message() << std::endl;
+            std::cerr << e.code().message() << '\n';
         }
     ifs.close();
     ASSERT_EQ(remove(file_name_input.c_str()), 0) << "Problem deleting temporary file";
@@ -362,7 +362,7 @@ TEST_F(DataTypeAdapter, IshortToComplexValidationOfResults)
         }
     catch (std::system_error& e)
         {
-            std::cerr << e.code().message() << std::endl;
+            std::cerr << e.code().message() << '\n';
         }
     ifs.close();
     ASSERT_EQ(remove(file_name_input.c_str()), 0) << "Problem deleting temporary file";
@@ -388,7 +388,7 @@ TEST_F(DataTypeAdapter, IshortToCshortValidationOfResults)
         }
     catch (std::system_error& e)
         {
-            std::cerr << e.code().message() << std::endl;
+            std::cerr << e.code().message() << '\n';
         }
     ifs.close();
     ASSERT_EQ(remove(file_name_input.c_str()), 0) << "Problem deleting temporary file";

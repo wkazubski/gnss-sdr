@@ -3,9 +3,9 @@
  * \brief  Interface of a Galileo Ionospheric Model storage
  * \author Javier Arribas, 2013. jarribas(at)cttc.es
  * \author Mara Branzanti 2013. mara.branzanti(at)gmail.com
- * -------------------------------------------------------------------------
+ * -----------------------------------------------------------------------------
  *
- * Copyright (C) 2010-2019  (see AUTHORS file for a list of contributors)
+ * Copyright (C) 2010-2020  (see AUTHORS file for a list of contributors)
  *
  * GNSS-SDR is a software defined Global Navigation
  *          Satellite Systems receiver
@@ -14,7 +14,7 @@
  *
  * SPDX-License-Identifier: GPL-3.0-or-later
  *
- * -------------------------------------------------------------------------
+ * -----------------------------------------------------------------------------
  */
 
 
@@ -32,26 +32,26 @@
 class Galileo_Iono
 {
 public:
-    // Ionospheric correction
-    double ai0_5;  //!< Effective Ionisation Level 1st order parameter [sfu]
-    double ai1_5;  //!< Effective Ionisation Level 2st order parameter [sfu/degree]
-    double ai2_5;  //!< Effective Ionisation Level 3st order parameter [sfu/degree]
-
-    // Ionospheric disturbance flag
-    bool Region1_flag_5;  //!<  Ionospheric Disturbance Flag for region 1
-    bool Region2_flag_5;  //!< Ionospheric Disturbance Flag for region 2
-    bool Region3_flag_5;  //!< Ionospheric Disturbance Flag for region 3
-    bool Region4_flag_5;  //!< Ionospheric Disturbance Flag for region 4
-    bool Region5_flag_5;  //!< Ionospheric Disturbance Flag for region 5
-
-    // from page 5 (UTC) to have a timestamp
-    int32_t TOW_5;  //!< UTC data reference Time of Week [s]
-    int32_t WN_5;   //!< UTC data reference Week number [week]
-
     /*!
      * Default constructor
      */
-    Galileo_Iono();
+    Galileo_Iono() = default;
+
+    // Ionospheric correction
+    double ai0_5{};  //!< Effective Ionisation Level 1st order parameter [sfu]
+    double ai1_5{};  //!< Effective Ionisation Level 2st order parameter [sfu/degree]
+    double ai2_5{};  //!< Effective Ionisation Level 3st order parameter [sfu/degree]
+
+    // from page 5 (UTC) to have a timestamp
+    int32_t TOW_5{};  //!< UTC data reference Time of Week [s]
+    int32_t WN_5{};   //!< UTC data reference Week number [week]
+
+    // Ionospheric disturbance flag
+    bool Region1_flag_5{};  //!<  Ionospheric Disturbance Flag for region 1
+    bool Region2_flag_5{};  //!< Ionospheric Disturbance Flag for region 2
+    bool Region3_flag_5{};  //!< Ionospheric Disturbance Flag for region 3
+    bool Region4_flag_5{};  //!< Ionospheric Disturbance Flag for region 4
+    bool Region5_flag_5{};  //!< Ionospheric Disturbance Flag for region 5
 
     template <class Archive>
 
@@ -68,13 +68,13 @@ public:
         archive& make_nvp("ai0_5", ai0_5);
         archive& make_nvp("ai1_5", ai1_5);
         archive& make_nvp("ai2_5", ai2_5);
+        archive& make_nvp("TOW_5", TOW_5);
+        archive& make_nvp("WN_5", WN_5);
         archive& make_nvp("Region1_flag_5", Region1_flag_5);
         archive& make_nvp("Region2_flag_5", Region2_flag_5);
         archive& make_nvp("Region3_flag_5", Region3_flag_5);
         archive& make_nvp("Region4_flag_5", Region4_flag_5);
         archive& make_nvp("Region5_flag_5", Region5_flag_5);
-        archive& make_nvp("TOW_5", TOW_5);
-        archive& make_nvp("WN_5", WN_5);
     }
 };
 

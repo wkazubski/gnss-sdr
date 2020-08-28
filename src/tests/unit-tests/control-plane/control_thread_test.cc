@@ -5,9 +5,9 @@
  *         Carles Fernandez-Prades, 2013. cfernandez(at)cttc.es
  *
  *
- * -------------------------------------------------------------------------
+ * -----------------------------------------------------------------------------
  *
- * Copyright (C) 2010-2019  (see AUTHORS file for a list of contributors)
+ * Copyright (C) 2010-2020  (see AUTHORS file for a list of contributors)
  *
  * GNSS-SDR is a software defined Global Navigation
  *          Satellite Systems receiver
@@ -16,7 +16,7 @@
  *
  * SPDX-License-Identifier: GPL-3.0-or-later
  *
- * -------------------------------------------------------------------------
+ * -----------------------------------------------------------------------------
  */
 
 
@@ -24,6 +24,7 @@
 #include "command_event.h"
 #include "concurrent_queue.h"
 #include "control_thread.h"
+#include "gnss_sdr_make_unique.h"
 #include "in_memory_configuration.h"
 #include <boost/exception/diagnostic_information.hpp>
 #include <boost/exception_ptr.hpp>
@@ -134,6 +135,7 @@ TEST_F(ControlThreadTest /*unused*/, InstantiateRunControlMessages /*unused*/)
     unsigned int expected1 = 1;
     EXPECT_EQ(expected3, control_thread->processed_control_messages());
     EXPECT_EQ(expected1, control_thread->applied_actions());
+    std::this_thread::sleep_for(std::chrono::milliseconds(500));
 }
 
 
@@ -167,7 +169,7 @@ TEST_F(ControlThreadTest /*unused*/, InstantiateRunControlMessages2 /*unused*/)
     config->set_property("PVT.item_type", "gr_complex");
     config->set_property("GNSS-SDR.internal_fs_sps", "4000000");
 
-    std::unique_ptr<ControlThread> control_thread2(new ControlThread(config));
+    auto control_thread2 = std::make_unique<ControlThread>(config);
     std::shared_ptr<Concurrent_Queue<pmt::pmt_t>> control_queue2 = std::make_shared<Concurrent_Queue<pmt::pmt_t>>();
 
     control_queue2->push(pmt::make_any(channel_event_make(0, 0)));
@@ -175,7 +177,6 @@ TEST_F(ControlThreadTest /*unused*/, InstantiateRunControlMessages2 /*unused*/)
     control_queue2->push(pmt::make_any(channel_event_make(1, 0)));
     control_queue2->push(pmt::make_any(channel_event_make(3, 0)));
     control_queue2->push(pmt::make_any(command_event_make(200, 0)));
-
 
     control_thread2->set_control_queue(control_queue2);
 
@@ -196,6 +197,7 @@ TEST_F(ControlThreadTest /*unused*/, InstantiateRunControlMessages2 /*unused*/)
     unsigned int expected1 = 1;
     EXPECT_EQ(expected5, control_thread2->processed_control_messages());
     EXPECT_EQ(expected1, control_thread2->applied_actions());
+    std::this_thread::sleep_for(std::chrono::milliseconds(500));
 }
 
 
@@ -249,4 +251,5 @@ TEST_F(ControlThreadTest /*unused*/, StopReceiverProgrammatically /*unused*/)
         }
 
     stop_receiver_thread.join();
+    std::this_thread::sleep_for(std::chrono::milliseconds(500));
 }

@@ -5,9 +5,9 @@
  * \author Cillian O'Driscoll, 2015. cillian.odriscoll (at) gmail.com
  *
  *
- * -------------------------------------------------------------------------
+ * -----------------------------------------------------------------------------
  *
- * Copyright (C) 2010-2019  (see AUTHORS file for a list of contributors)
+ * Copyright (C) 2010-2020  (see AUTHORS file for a list of contributors)
  *
  * GNSS-SDR is a software defined Global Navigation
  *          Satellite Systems receiver
@@ -16,7 +16,7 @@
  *
  * SPDX-License-Identifier: GPL-3.0-or-later
  *
- * -------------------------------------------------------------------------
+ * -----------------------------------------------------------------------------
  */
 
 #include "unpack_2bit_samples.h"
@@ -87,7 +87,7 @@ TEST(Unpack2bitSamplesTest, CheckBigEndianByte)
     gr::blocks::vector_source_b::sptr source =
         gr::blocks::vector_source_b::make(packed_data);
 
-    boost::shared_ptr<gr::block> unpacker =
+    auto unpacker =
         make_unpack_2bit_samples(big_endian_bytes,
             item_size,
             big_endian_items);
@@ -131,7 +131,7 @@ TEST(Unpack2bitSamplesTest, CheckLittleEndianByte)
     gr::blocks::vector_source_b::sptr source =
         gr::blocks::vector_source_b::make(packed_data);
 
-    boost::shared_ptr<gr::block> unpacker =
+    auto unpacker =
         make_unpack_2bit_samples(big_endian_bytes,
             item_size,
             big_endian_items);
@@ -195,7 +195,7 @@ TEST(Unpack2bitSamplesTest, CheckBigEndianShortBigEndianByte)
     gr::blocks::vector_source_s::sptr source =
         gr::blocks::vector_source_s::make(packed_data_short);
 
-    boost::shared_ptr<gr::block> unpacker =
+    auto unpacker =
         make_unpack_2bit_samples(big_endian_bytes,
             item_size,
             big_endian_items);
@@ -259,7 +259,7 @@ TEST(Unpack2bitSamplesTest, CheckBigEndianShortLittleEndianByte)
     gr::blocks::vector_source_s::sptr source =
         gr::blocks::vector_source_s::make(packed_data_short);
 
-    boost::shared_ptr<gr::block> unpacker =
+    auto unpacker =
         make_unpack_2bit_samples(big_endian_bytes,
             item_size,
             big_endian_items);

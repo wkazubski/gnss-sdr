@@ -7,9 +7,9 @@
  * This class represents a file signal source. Internally it uses a GNU Radio's
  * gr_file_source as a connector to the data.
  *
- * -------------------------------------------------------------------------
+ * -----------------------------------------------------------------------------
  *
- * Copyright (C) 2010-2019  (see AUTHORS file for a list of contributors)
+ * Copyright (C) 2010-2020  (see AUTHORS file for a list of contributors)
  *
  * GNSS-SDR is a software defined Global Navigation
  *          Satellite Systems receiver
@@ -18,7 +18,7 @@
  *
  * SPDX-License-Identifier: GPL-3.0-or-later
  *
- * -------------------------------------------------------------------------
+ * -----------------------------------------------------------------------------
  */
 
 #ifndef GNSS_SDR_MULTICHANNEL_FILE_SIGNAL_SOURCE_H
@@ -35,6 +35,10 @@
 #include <memory>
 #include <string>
 #include <vector>
+#if GNURADIO_USES_STD_POINTERS
+#else
+#include <boost/shared_ptr.hpp>
+#endif
 
 class ConfigurationInterface;
 
@@ -45,9 +49,9 @@ class ConfigurationInterface;
 class MultichannelFileSignalSource : public GNSSBlockInterface
 {
 public:
-    MultichannelFileSignalSource(ConfigurationInterface* configuration, const std::string& role,
+    MultichannelFileSignalSource(const ConfigurationInterface* configuration, const std::string& role,
         unsigned int in_streams, unsigned int out_streams,
-        const std::shared_ptr<Concurrent_Queue<pmt::pmt_t>>& queue);
+        Concurrent_Queue<pmt::pmt_t>* queue);
 
     ~MultichannelFileSignalSource() = default;
 
@@ -100,21 +104,24 @@ public:
     }
 
 private:
-    uint64_t samples_;
-    int64_t sampling_frequency_;
-    uint32_t n_channels_;
-    std::vector<std::string> filename_vec_;
-    std::string item_type_;
-    bool repeat_;
-    std::string role_;
-    uint32_t in_streams_;
-    uint32_t out_streams_;
     std::vector<gr::blocks::file_source::sptr> file_source_vec_;
+#if GNURADIO_USES_STD_POINTERS
+    std::shared_ptr<gr::block> valve_;
+#else
     boost::shared_ptr<gr::block> valve_;
+#endif
     gr::blocks::file_sink::sptr sink_;
     std::vector<gr::blocks::throttle::sptr> throttle_vec_;
-    std::shared_ptr<Concurrent_Queue<pmt::pmt_t>> queue_;
+    std::vector<std::string> filename_vec_;
+    std::string item_type_;
+    std::string role_;
+    uint64_t samples_;
+    int64_t sampling_frequency_;
     size_t item_size_;
+    int32_t n_channels_;
+    uint32_t in_streams_;
+    uint32_t out_streams_;
+    bool repeat_;
     // Throttle control
     bool enable_throttle_control_;
 };

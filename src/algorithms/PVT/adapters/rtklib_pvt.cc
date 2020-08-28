@@ -3,9 +3,9 @@
  * \brief Interface of a Position Velocity and Time computation block
  * \author Javier Arribas, 2017. jarribas(at)cttc.es
  *
- * -------------------------------------------------------------------------
+ * -----------------------------------------------------------------------------
  *
- * Copyright (C) 2010-2019  (see AUTHORS file for a list of contributors)
+ * Copyright (C) 2010-2020  (see AUTHORS file for a list of contributors)
  *
  * GNSS-SDR is a software defined Global Navigation
  *          Satellite Systems receiver
@@ -14,7 +14,7 @@
  *
  * SPDX-License-Identifier: GPL-3.0-or-later
  *
- * -------------------------------------------------------------------------
+ * -----------------------------------------------------------------------------
  */
 
 
@@ -30,7 +30,7 @@
 #include "rtklib_rtkpos.h"            // for rtkfree, rtkinit
 #include <glog/logging.h>             // for LOG
 #include <iostream>                   // for operator<<
-#if OLD_BOOST
+#if USE_OLD_BOOST_MATH_COMMON_FACTOR
 #include <boost/math/common_factor_rt.hpp>
 namespace bc = boost::math;
 #else
@@ -39,7 +39,7 @@ namespace bc = boost::integer;
 #endif
 
 
-Rtklib_Pvt::Rtklib_Pvt(ConfigurationInterface* configuration,
+Rtklib_Pvt::Rtklib_Pvt(const ConfigurationInterface* configuration,
     const std::string& role,
     unsigned int in_streams,
     unsigned int out_streams) : role_(role),
@@ -48,10 +48,10 @@ Rtklib_Pvt::Rtklib_Pvt(ConfigurationInterface* configuration,
 {
     Pvt_Conf pvt_output_parameters = Pvt_Conf();
     // dump parameters
-    std::string default_dump_filename = "./pvt.dat";
-    std::string default_nmea_dump_filename = "./nmea_pvt.nmea";
-    std::string default_nmea_dump_devname = "/dev/tty1";
-    std::string default_rtcm_dump_devname = "/dev/pts/1";
+    const std::string default_dump_filename("./pvt.dat");
+    const std::string default_nmea_dump_filename("./nmea_pvt.nmea");
+    const std::string default_nmea_dump_devname("/dev/tty1");
+    const std::string default_rtcm_dump_devname("/dev/pts/1");
     DLOG(INFO) << "role " << role;
     pvt_output_parameters.dump = configuration->property(role + ".dump", false);
     pvt_output_parameters.dump_filename = configuration->property(role + ".dump_filename", default_dump_filename);
@@ -69,31 +69,15 @@ Rtklib_Pvt::Rtklib_Pvt(ConfigurationInterface* configuration,
     // NMEA Printer settings
     pvt_output_parameters.flag_nmea_tty_port = configuration->property(role + ".flag_nmea_tty_port", false);
     pvt_output_parameters.nmea_dump_filename = configuration->property(role + ".nmea_dump_filename", default_nmea_dump_filename);
-    std::string nmea_dump_devname = configuration->property(role + ".nmea_dump_devname", default_nmea_dump_devname);
+    pvt_output_parameters.nmea_dump_devname = configuration->property(role + ".nmea_dump_devname", default_nmea_dump_devname);
 
     // RINEX version
     pvt_output_parameters.rinex_version = configuration->property(role + ".rinex_version", 3);
-    if (FLAGS_RINEX_version == "3.01")
+    if (FLAGS_RINEX_version == "3.01" || FLAGS_RINEX_version == "3.02" || FLAGS_RINEX_version == "3")
         {
             pvt_output_parameters.rinex_version = 3;
         }
-    else if (FLAGS_RINEX_version == "3.02")
-        {
-            pvt_output_parameters.rinex_version = 3;
-        }
-    else if (FLAGS_RINEX_version == "3")
-        {
-            pvt_output_parameters.rinex_version = 3;
-        }
-    else if (FLAGS_RINEX_version == "2.11")
-        {
-            pvt_output_parameters.rinex_version = 2;
-        }
-    else if (FLAGS_RINEX_version == "2.10")
-        {
-            pvt_output_parameters.rinex_version = 2;
-        }
-    else if (FLAGS_RINEX_version == "2")
+    else if (FLAGS_RINEX_version == "2.10" || FLAGS_RINEX_version == "2.11" || FLAGS_RINEX_version == "2")
         {
             pvt_output_parameters.rinex_version = 2;
         }
@@ -111,13 +95,13 @@ Rtklib_Pvt::Rtklib_Pvt(ConfigurationInterface* configuration,
     pvt_output_parameters.rtcm_tcp_port = configuration->property(role + ".rtcm_tcp_port", 2101);
     pvt_output_parameters.rtcm_station_id = configuration->property(role + ".rtcm_station_id", 1234);
     // RTCM message rates: least common multiple with output_rate_ms
-    int rtcm_MT1019_rate_ms = bc::lcm(configuration->property(role + ".rtcm_MT1019_rate_ms", 5000), pvt_output_parameters.output_rate_ms);
-    int rtcm_MT1020_rate_ms = bc::lcm(configuration->property(role + ".rtcm_MT1020_rate_ms", 5000), pvt_output_parameters.output_rate_ms);
-    int rtcm_MT1045_rate_ms = bc::lcm(configuration->property(role + ".rtcm_MT1045_rate_ms", 5000), pvt_output_parameters.output_rate_ms);
-    int rtcm_MSM_rate_ms = bc::lcm(configuration->property(role + ".rtcm_MSM_rate_ms", 1000), pvt_output_parameters.output_rate_ms);
-    int rtcm_MT1077_rate_ms = bc::lcm(configuration->property(role + ".rtcm_MT1077_rate_ms", rtcm_MSM_rate_ms), pvt_output_parameters.output_rate_ms);
-    int rtcm_MT1087_rate_ms = bc::lcm(configuration->property(role + ".rtcm_MT1087_rate_ms", rtcm_MSM_rate_ms), pvt_output_parameters.output_rate_ms);
-    int rtcm_MT1097_rate_ms = bc::lcm(configuration->property(role + ".rtcm_MT1097_rate_ms", rtcm_MSM_rate_ms), pvt_output_parameters.output_rate_ms);
+    const int rtcm_MT1019_rate_ms = bc::lcm(configuration->property(role + ".rtcm_MT1019_rate_ms", 5000), pvt_output_parameters.output_rate_ms);
+    const int rtcm_MT1020_rate_ms = bc::lcm(configuration->property(role + ".rtcm_MT1020_rate_ms", 5000), pvt_output_parameters.output_rate_ms);
+    const int rtcm_MT1045_rate_ms = bc::lcm(configuration->property(role + ".rtcm_MT1045_rate_ms", 5000), pvt_output_parameters.output_rate_ms);
+    const int rtcm_MSM_rate_ms = bc::lcm(configuration->property(role + ".rtcm_MSM_rate_ms", 1000), pvt_output_parameters.output_rate_ms);
+    const int rtcm_MT1077_rate_ms = bc::lcm(configuration->property(role + ".rtcm_MT1077_rate_ms", rtcm_MSM_rate_ms), pvt_output_parameters.output_rate_ms);
+    const int rtcm_MT1087_rate_ms = bc::lcm(configuration->property(role + ".rtcm_MT1087_rate_ms", rtcm_MSM_rate_ms), pvt_output_parameters.output_rate_ms);
+    const int rtcm_MT1097_rate_ms = bc::lcm(configuration->property(role + ".rtcm_MT1097_rate_ms", rtcm_MSM_rate_ms), pvt_output_parameters.output_rate_ms);
 
     pvt_output_parameters.rtcm_msg_rate_ms[1019] = rtcm_MT1019_rate_ms;
     pvt_output_parameters.rtcm_msg_rate_ms[1020] = rtcm_MT1020_rate_ms;
@@ -200,16 +184,16 @@ Rtklib_Pvt::Rtklib_Pvt(ConfigurationInterface* configuration,
      *    1000  |  GPS L1 C/A + GPS L2C + GPS L5
      *    1001  |  GPS L1 C/A + Galileo E1B + GPS L2C + GPS L5 + Galileo E5a
      */
-    int gps_1C_count = configuration->property("Channels_1C.count", 0);
-    int gps_2S_count = configuration->property("Channels_2S.count", 0);
-    int gps_L5_count = configuration->property("Channels_L5.count", 0);
-    int gal_1B_count = configuration->property("Channels_1B.count", 0);
-    int gal_E5a_count = configuration->property("Channels_5X.count", 0);
-    int gal_E5b_count = configuration->property("Channels_7X.count", 0);
-    int glo_1G_count = configuration->property("Channels_1G.count", 0);
-    int glo_2G_count = configuration->property("Channels_2G.count", 0);
-    int bds_B1_count = configuration->property("Channels_B1.count", 0);
-    int bds_B3_count = configuration->property("Channels_B3.count", 0);
+    const int gps_1C_count = configuration->property("Channels_1C.count", 0);
+    const int gps_2S_count = configuration->property("Channels_2S.count", 0);
+    const int gps_L5_count = configuration->property("Channels_L5.count", 0);
+    const int gal_1B_count = configuration->property("Channels_1B.count", 0);
+    const int gal_E5a_count = configuration->property("Channels_5X.count", 0);
+    const int gal_E5b_count = configuration->property("Channels_7X.count", 0);
+    const int glo_1G_count = configuration->property("Channels_1G.count", 0);
+    const int glo_2G_count = configuration->property("Channels_2G.count", 0);
+    const int bds_B1_count = configuration->property("Channels_B1.count", 0);
+    const int bds_B3_count = configuration->property("Channels_B3.count", 0);
 
     if ((gps_1C_count != 0) && (gps_2S_count == 0) && (gps_L5_count == 0) && (gal_1B_count == 0) && (gal_E5a_count == 0) && (gal_E5b_count == 0) && (glo_1G_count == 0) && (glo_2G_count == 0) && (bds_B1_count == 0) && (bds_B3_count == 0))
         {
@@ -392,8 +376,8 @@ Rtklib_Pvt::Rtklib_Pvt(ConfigurationInterface* configuration,
     // RTKLIB PVT solver options
     // Settings 1
     int positioning_mode = -1;
-    std::string default_pos_mode("Single");
-    std::string positioning_mode_str = configuration->property(role + ".positioning_mode", default_pos_mode);  // (PMODE_XXX) see src/algorithms/libs/rtklib/rtklib.h
+    const std::string default_pos_mode("Single");
+    const std::string positioning_mode_str = configuration->property(role + ".positioning_mode", default_pos_mode);  // (PMODE_XXX) see src/algorithms/libs/rtklib/rtklib.h
     if (positioning_mode_str == "Single")
         {
             positioning_mode = PMODE_SINGLE;
@@ -418,10 +402,10 @@ Rtklib_Pvt::Rtklib_Pvt(ConfigurationInterface* configuration,
     if (positioning_mode == -1)
         {
             // warn user and set the default
-            std::cout << "WARNING: Bad specification of positioning mode." << std::endl;
-            std::cout << "positioning_mode possible values: Single / Static / Kinematic / PPP_Static / PPP_Kinematic" << std::endl;
-            std::cout << "positioning_mode specified value: " << positioning_mode_str << std::endl;
-            std::cout << "Setting positioning_mode to Single" << std::endl;
+            std::cout << "WARNING: Bad specification of positioning mode.\n";
+            std::cout << "positioning_mode possible values: Single / Static / Kinematic / PPP_Static / PPP_Kinematic\n";
+            std::cout << "positioning_mode specified value: " << positioning_mode_str << '\n';
+            std::cout << "Setting positioning_mode to Single\n";
             positioning_mode = PMODE_SINGLE;
         }
 
@@ -467,8 +451,8 @@ Rtklib_Pvt::Rtklib_Pvt(ConfigurationInterface* configuration,
             dynamics_model = 0;
         }
 
-    std::string default_iono_model("OFF");
-    std::string iono_model_str = configuration->property(role + ".iono_model", default_iono_model); /*  (IONOOPT_XXX) see src/algorithms/libs/rtklib/rtklib.h */
+    const std::string default_iono_model("OFF");
+    const std::string iono_model_str = configuration->property(role + ".iono_model", default_iono_model); /*  (IONOOPT_XXX) see src/algorithms/libs/rtklib/rtklib.h */
     int iono_model = -1;
     if (iono_model_str == "OFF")
         {
@@ -497,16 +481,16 @@ Rtklib_Pvt::Rtklib_Pvt(ConfigurationInterface* configuration,
     if (iono_model == -1)
         {
             // warn user and set the default
-            std::cout << "WARNING: Bad specification of ionospheric model." << std::endl;
-            std::cout << "iono_model possible values: OFF / Broadcast / SBAS / Iono-Free-LC / Estimate_STEC / IONEX" << std::endl;
-            std::cout << "iono_model specified value: " << iono_model_str << std::endl;
-            std::cout << "Setting iono_model to OFF" << std::endl;
+            std::cout << "WARNING: Bad specification of ionospheric model.\n";
+            std::cout << "iono_model possible values: OFF / Broadcast / SBAS / Iono-Free-LC / Estimate_STEC / IONEX\n";
+            std::cout << "iono_model specified value: " << iono_model_str << '\n';
+            std::cout << "Setting iono_model to OFF\n";
             iono_model = IONOOPT_OFF; /* 0: ionosphere option: correction off */
         }
 
-    std::string default_trop_model("OFF");
+    const std::string default_trop_model("OFF");
     int trop_model = -1;
-    std::string trop_model_str = configuration->property(role + ".trop_model", default_trop_model); /*  (TROPOPT_XXX) see src/algorithms/libs/rtklib/rtklib.h */
+    const std::string trop_model_str = configuration->property(role + ".trop_model", default_trop_model); /*  (TROPOPT_XXX) see src/algorithms/libs/rtklib/rtklib.h */
     if (trop_model_str == "OFF")
         {
             trop_model = TROPOPT_OFF;
@@ -530,10 +514,10 @@ Rtklib_Pvt::Rtklib_Pvt(ConfigurationInterface* configuration,
     if (trop_model == -1)
         {
             // warn user and set the default
-            std::cout << "WARNING: Bad specification of tropospheric model." << std::endl;
-            std::cout << "trop_model possible values: OFF / Saastamoinen / SBAS / Estimate_ZTD / Estimate_ZTD_Grad" << std::endl;
-            std::cout << "trop_model specified value: " << trop_model_str << std::endl;
-            std::cout << "Setting trop_model to OFF" << std::endl;
+            std::cout << "WARNING: Bad specification of tropospheric model.\n";
+            std::cout << "trop_model possible values: OFF / Saastamoinen / SBAS / Estimate_ZTD / Estimate_ZTD_Grad\n";
+            std::cout << "trop_model specified value: " << trop_model_str << '\n';
+            std::cout << "Setting trop_model to OFF\n";
             trop_model = TROPOPT_OFF;
         }
 
@@ -542,18 +526,18 @@ Rtklib_Pvt::Rtklib_Pvt(ConfigurationInterface* configuration,
     int rec_PCV = 0; /*  Set whether the receiver antenna PCV (phase center variation) model is used or not. This feature requires a Receiver Antenna PCV File. */
 
     /* Set whether the phase windup correction for PPP modes is applied or not. Only applicable to PPP‐* modes.*/
-    int phwindup = configuration->property(role + ".phwindup", 0);
+    const int phwindup = configuration->property(role + ".phwindup", 0);
 
     /* Set whether the GPS Block IIA satellites in eclipse are excluded or not.
     The eclipsing Block IIA satellites often degrade the PPP solutions due to unpredicted behavior of yaw‐attitude. Only applicable to PPP‐* modes.*/
-    int reject_GPS_IIA = configuration->property(role + ".reject_GPS_IIA", 0);
+    const int reject_GPS_IIA = configuration->property(role + ".reject_GPS_IIA", 0);
 
     /* Set whether RAIM (receiver autonomous integrity monitoring) FDE (fault detection and exclusion) feature is enabled or not.
     In case of RAIM FDE enabled, a satellite is excluded if SSE (sum of squared errors) of residuals is over a threshold.
     The excluded satellite is selected to indicate the minimum SSE. */
-    int raim_fde = configuration->property(role + ".raim_fde", 0);
+    const int raim_fde = configuration->property(role + ".raim_fde", 0);
 
-    int earth_tide = configuration->property(role + ".earth_tide", 0);
+    const int earth_tide = configuration->property(role + ".earth_tide", 0);
 
     int nsys = 0;
     if ((gps_1C_count > 0) || (gps_2S_count > 0) || (gps_L5_count > 0))
@@ -582,8 +566,8 @@ Rtklib_Pvt::Rtklib_Pvt(ConfigurationInterface* configuration,
         }
 
     // Settings 2
-    std::string default_gps_ar("Continuous");
-    std::string integer_ambiguity_resolution_gps_str = configuration->property(role + ".AR_GPS", default_gps_ar); /* Integer Ambiguity Resolution mode for GPS (0:off,1:continuous,2:instantaneous,3:fix and hold,4:ppp-ar) */
+    const std::string default_gps_ar("Continuous");
+    const std::string integer_ambiguity_resolution_gps_str = configuration->property(role + ".AR_GPS", default_gps_ar); /* Integer Ambiguity Resolution mode for GPS (0:off,1:continuous,2:instantaneous,3:fix and hold,4:ppp-ar) */
     int integer_ambiguity_resolution_gps = -1;
     if (integer_ambiguity_resolution_gps_str == "OFF")
         {
@@ -608,10 +592,10 @@ Rtklib_Pvt::Rtklib_Pvt(ConfigurationInterface* configuration,
     if (integer_ambiguity_resolution_gps == -1)
         {
             // warn user and set the default
-            std::cout << "WARNING: Bad specification of GPS ambiguity resolution method." << std::endl;
-            std::cout << "AR_GPS possible values: OFF / Continuous / Instantaneous / Fix-and-Hold / PPP-AR" << std::endl;
-            std::cout << "AR_GPS specified value: " << integer_ambiguity_resolution_gps_str << std::endl;
-            std::cout << "Setting AR_GPS to OFF" << std::endl;
+            std::cout << "WARNING: Bad specification of GPS ambiguity resolution method.\n";
+            std::cout << "AR_GPS possible values: OFF / Continuous / Instantaneous / Fix-and-Hold / PPP-AR\n";
+            std::cout << "AR_GPS specified value: " << integer_ambiguity_resolution_gps_str << '\n';
+            std::cout << "Setting AR_GPS to OFF\n";
             integer_ambiguity_resolution_gps = ARMODE_OFF;
         }
 
@@ -631,54 +615,54 @@ Rtklib_Pvt::Rtklib_Pvt(ConfigurationInterface* configuration,
             integer_ambiguity_resolution_bds = 1;
         }
 
-    double min_ratio_to_fix_ambiguity = configuration->property(role + ".min_ratio_to_fix_ambiguity", 3.0); /* Set the integer ambiguity validation threshold for ratio‐test,
+    const double min_ratio_to_fix_ambiguity = configuration->property(role + ".min_ratio_to_fix_ambiguity", 3.0); /* Set the integer ambiguity validation threshold for ratio‐test,
                                                                                                                which uses the ratio of squared residuals of the best integer vector to the second‐best vector. */
 
-    int min_lock_to_fix_ambiguity = configuration->property(role + ".min_lock_to_fix_ambiguity", 0); /* Set the minimum lock count to fix integer ambiguity.FLAGS_RINEX_version.
+    const int min_lock_to_fix_ambiguity = configuration->property(role + ".min_lock_to_fix_ambiguity", 0); /* Set the minimum lock count to fix integer ambiguity.FLAGS_RINEX_version.
                                                                                                          If the lock count is less than the value, the ambiguity is excluded from the fixed integer vector. */
 
-    double min_elevation_to_fix_ambiguity = configuration->property(role + ".min_elevation_to_fix_ambiguity", 0.0); /* Set the minimum elevation (deg) to fix integer ambiguity.
+    const double min_elevation_to_fix_ambiguity = configuration->property(role + ".min_elevation_to_fix_ambiguity", 0.0); /* Set the minimum elevation (deg) to fix integer ambiguity.
                                                                                                                         If the elevation of the satellite is less than the value, the ambiguity is excluded from the fixed integer vector. */
 
-    int outage_reset_ambiguity = configuration->property(role + ".outage_reset_ambiguity", 5); /* Set the outage count to reset ambiguity. If the data outage count is over the value, the estimated ambiguity is reset to the initial value.  */
+    const int outage_reset_ambiguity = configuration->property(role + ".outage_reset_ambiguity", 5); /* Set the outage count to reset ambiguity. If the data outage count is over the value, the estimated ambiguity is reset to the initial value.  */
 
-    double slip_threshold = configuration->property(role + ".slip_threshold", 0.05); /* set the cycle‐slip threshold (m) of geometry‐free LC carrier‐phase difference between epochs */
+    const double slip_threshold = configuration->property(role + ".slip_threshold", 0.05); /* set the cycle‐slip threshold (m) of geometry‐free LC carrier‐phase difference between epochs */
 
-    double threshold_reject_gdop = configuration->property(role + ".threshold_reject_gdop", 30.0); /* reject threshold of GDOP. If the GDOP is over the value, the observable is excluded for the estimation process as an outlier. */
+    const double threshold_reject_gdop = configuration->property(role + ".threshold_reject_gdop", 30.0); /* reject threshold of GDOP. If the GDOP is over the value, the observable is excluded for the estimation process as an outlier. */
 
-    double threshold_reject_innovation = configuration->property(role + ".threshold_reject_innovation", 30.0); /* reject threshold of innovation (m). If the innovation is over the value, the observable is excluded for the estimation process as an outlier. */
+    const double threshold_reject_innovation = configuration->property(role + ".threshold_reject_innovation", 30.0); /* reject threshold of innovation (m). If the innovation is over the value, the observable is excluded for the estimation process as an outlier. */
 
-    int number_filter_iter = configuration->property(role + ".number_filter_iter", 1); /* Set the number of iteration in the measurement update of the estimation filter.
+    const int number_filter_iter = configuration->property(role + ".number_filter_iter", 1); /* Set the number of iteration in the measurement update of the estimation filter.
                                                                                          If the baseline length is very short like 1 m, the iteration may be effective to handle
                                                                                          the nonlinearity of measurement equation. */
 
     // Statistics
-    double bias_0 = configuration->property(role + ".bias_0", 30.0);
+    const double bias_0 = configuration->property(role + ".bias_0", 30.0);
 
-    double iono_0 = configuration->property(role + ".iono_0", 0.03);
+    const double iono_0 = configuration->property(role + ".iono_0", 0.03);
 
-    double trop_0 = configuration->property(role + ".trop_0", 0.3);
+    const double trop_0 = configuration->property(role + ".trop_0", 0.3);
 
-    double sigma_bias = configuration->property(role + ".sigma_bias", 1e-4); /* Set the process noise standard deviation of carrier‐phase
+    const double sigma_bias = configuration->property(role + ".sigma_bias", 1e-4); /* Set the process noise standard deviation of carrier‐phase
                                                                                 bias (ambiguity) (cycle/sqrt(s)) */
 
-    double sigma_iono = configuration->property(role + ".sigma_iono", 1e-3); /* Set the process noise standard deviation of vertical ionospheric delay per 10 km baseline (m/sqrt(s)). */
+    const double sigma_iono = configuration->property(role + ".sigma_iono", 1e-3); /* Set the process noise standard deviation of vertical ionospheric delay per 10 km baseline (m/sqrt(s)). */
 
-    double sigma_trop = configuration->property(role + ".sigma_trop", 1e-4); /* Set the process noise standard deviation of zenith tropospheric delay (m/sqrt(s)). */
+    const double sigma_trop = configuration->property(role + ".sigma_trop", 1e-4); /* Set the process noise standard deviation of zenith tropospheric delay (m/sqrt(s)). */
 
-    double sigma_acch = configuration->property(role + ".sigma_acch", 1e-1); /* Set the process noise standard deviation of the receiver acceleration as
+    const double sigma_acch = configuration->property(role + ".sigma_acch", 1e-1); /* Set the process noise standard deviation of the receiver acceleration as
                                                                                 the horizontal component. (m/s2/sqrt(s)). If Receiver Dynamics is set to OFF, they are not used. */
 
-    double sigma_accv = configuration->property(role + ".sigma_accv", 1e-2); /* Set the process noise standard deviation of the receiver acceleration as
+    const double sigma_accv = configuration->property(role + ".sigma_accv", 1e-2); /* Set the process noise standard deviation of the receiver acceleration as
                                                                                 the vertical component. (m/s2/sqrt(s)). If Receiver Dynamics is set to OFF, they are not used. */
 
-    double sigma_pos = configuration->property(role + ".sigma_pos", 0.0);
+    const double sigma_pos = configuration->property(role + ".sigma_pos", 0.0);
 
-    double code_phase_error_ratio_l1 = configuration->property(role + ".code_phase_error_ratio_l1", 100.0);
-    double code_phase_error_ratio_l2 = configuration->property(role + ".code_phase_error_ratio_l2", 100.0);
-    double code_phase_error_ratio_l5 = configuration->property(role + ".code_phase_error_ratio_l5", 100.0);
-    double carrier_phase_error_factor_a = configuration->property(role + ".carrier_phase_error_factor_a", 0.003);
-    double carrier_phase_error_factor_b = configuration->property(role + ".carrier_phase_error_factor_b", 0.003);
+    const double code_phase_error_ratio_l1 = configuration->property(role + ".code_phase_error_ratio_l1", 100.0);
+    const double code_phase_error_ratio_l2 = configuration->property(role + ".code_phase_error_ratio_l2", 100.0);
+    const double code_phase_error_ratio_l5 = configuration->property(role + ".code_phase_error_ratio_l5", 100.0);
+    const double carrier_phase_error_factor_a = configuration->property(role + ".carrier_phase_error_factor_a", 0.003);
+    const double carrier_phase_error_factor_b = configuration->property(role + ".carrier_phase_error_factor_b", 0.003);
 
     snrmask_t snrmask = {{}, {{}, {}}};
 
@@ -744,7 +728,7 @@ Rtklib_Pvt::Rtklib_Pvt(ConfigurationInterface* configuration,
     rtkinit(&rtk, &rtklib_configuration_options);
 
     // Outputs
-    bool default_output_enabled = configuration->property(role + ".output_enabled", true);
+    const bool default_output_enabled = configuration->property(role + ".output_enabled", true);
     pvt_output_parameters.output_enabled = default_output_enabled;
     pvt_output_parameters.rinex_output_enabled = configuration->property(role + ".rinex_output_enabled", default_output_enabled);
     pvt_output_parameters.gpx_output_enabled = configuration->property(role + ".gpx_output_enabled", default_output_enabled);
@@ -754,7 +738,7 @@ Rtklib_Pvt::Rtklib_Pvt(ConfigurationInterface* configuration,
     pvt_output_parameters.nmea_output_file_enabled = configuration->property(role + ".nmea_output_file_enabled", default_output_enabled);
     pvt_output_parameters.rtcm_output_file_enabled = configuration->property(role + ".rtcm_output_file_enabled", false);
 
-    std::string default_output_path = configuration->property(role + ".output_path", std::string("."));
+    const std::string default_output_path = configuration->property(role + ".output_path", std::string("."));
     pvt_output_parameters.output_path = default_output_path;
     pvt_output_parameters.rinex_output_path = configuration->property(role + ".rinex_output_path", default_output_path);
     pvt_output_parameters.gpx_output_path = configuration->property(role + ".gpx_output_path", default_output_path);
@@ -795,6 +779,7 @@ Rtklib_Pvt::Rtklib_Pvt(ConfigurationInterface* configuration,
 
 Rtklib_Pvt::~Rtklib_Pvt()
 {
+    DLOG(INFO) << "PVT adapter destructor called.";
     rtkfree(&rtk);
 }
 

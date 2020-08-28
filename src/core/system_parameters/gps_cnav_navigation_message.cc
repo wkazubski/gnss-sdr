@@ -5,9 +5,9 @@
  * See https://www.gps.gov/technical/icwg/IS-GPS-200K.pdf Appendix III
  * \author Javier Arribas, 2015. jarribas(at)cttc.es
  *
- * -------------------------------------------------------------------------
+ * -----------------------------------------------------------------------------
  *
- * Copyright (C) 2010-2019  (see AUTHORS file for a list of contributors)
+ * Copyright (C) 2010-2020  (see AUTHORS file for a list of contributors)
  *
  * GNSS-SDR is a software defined Global Navigation
  *          Satellite Systems receiver
@@ -16,7 +16,7 @@
  *
  * SPDX-License-Identifier: GPL-3.0-or-later
  *
- * -------------------------------------------------------------------------
+ * -----------------------------------------------------------------------------
  */
 
 #include "gps_cnav_navigation_message.h"
@@ -24,34 +24,8 @@
 #include <limits>  // for std::numeric_limits
 
 
-void Gps_CNAV_Navigation_Message::reset()
-{
-    b_flag_ephemeris_1 = false;
-    b_flag_ephemeris_2 = false;
-    b_flag_iono_valid = false;
-    b_flag_utc_valid = false;
-
-    // satellite positions
-    d_satpos_X = 0.0;
-    d_satpos_Y = 0.0;
-    d_satpos_Z = 0.0;
-
-    // info
-    i_channel_ID = 0;
-    i_satellite_PRN = 0U;
-
-    // Satellite velocity
-    d_satvel_X = 0.0;
-    d_satvel_Y = 0.0;
-    d_satvel_Z = 0.0;
-
-    d_TOW = 0;
-}
-
-
 Gps_CNAV_Navigation_Message::Gps_CNAV_Navigation_Message()
 {
-    reset();
     Gnss_Satellite gnss_satellite_ = Gnss_Satellite();
     for (uint32_t prn_ = 1; prn_ < 33; prn_++)
         {
@@ -62,7 +36,7 @@ Gps_CNAV_Navigation_Message::Gps_CNAV_Navigation_Message()
 }
 
 
-bool Gps_CNAV_Navigation_Message::read_navigation_bool(std::bitset<GPS_CNAV_DATA_PAGE_BITS> bits, const std::vector<std::pair<int32_t, int32_t>>& parameter)
+bool Gps_CNAV_Navigation_Message::read_navigation_bool(std::bitset<GPS_CNAV_DATA_PAGE_BITS> bits, const std::vector<std::pair<int32_t, int32_t>>& parameter) const
 {
     bool value;
 
@@ -78,10 +52,10 @@ bool Gps_CNAV_Navigation_Message::read_navigation_bool(std::bitset<GPS_CNAV_DATA
 }
 
 
-uint64_t Gps_CNAV_Navigation_Message::read_navigation_unsigned(std::bitset<GPS_CNAV_DATA_PAGE_BITS> bits, const std::vector<std::pair<int32_t, int32_t>>& parameter)
+uint64_t Gps_CNAV_Navigation_Message::read_navigation_unsigned(std::bitset<GPS_CNAV_DATA_PAGE_BITS> bits, const std::vector<std::pair<int32_t, int32_t>>& parameter) const
 {
     uint64_t value = 0ULL;
-    int32_t num_of_slices = parameter.size();
+    const int32_t num_of_slices = parameter.size();
     for (int32_t i = 0; i < num_of_slices; i++)
         {
             for (int32_t j = 0; j < parameter[i].second; j++)
@@ -97,10 +71,10 @@ uint64_t Gps_CNAV_Navigation_Message::read_navigation_unsigned(std::bitset<GPS_C
 }
 
 
-int64_t Gps_CNAV_Navigation_Message::read_navigation_signed(std::bitset<GPS_CNAV_DATA_PAGE_BITS> bits, const std::vector<std::pair<int32_t, int32_t>>& parameter)
+int64_t Gps_CNAV_Navigation_Message::read_navigation_signed(std::bitset<GPS_CNAV_DATA_PAGE_BITS> bits, const std::vector<std::pair<int32_t, int32_t>>& parameter) const
 {
     int64_t value = 0LL;
-    int32_t num_of_slices = parameter.size();
+    const int32_t num_of_slices = parameter.size();
 
     // read the MSB and perform the sign extension
     if (static_cast<int>(bits[GPS_CNAV_DATA_PAGE_BITS - parameter[0].first]) == 1)
@@ -130,12 +104,11 @@ int64_t Gps_CNAV_Navigation_Message::read_navigation_signed(std::bitset<GPS_CNAV
 
 void Gps_CNAV_Navigation_Message::decode_page(std::bitset<GPS_CNAV_DATA_PAGE_BITS> data_bits)
 {
-    int32_t PRN;
     int32_t page_type;
     bool alert_flag;
 
     // common to all messages
-    PRN = static_cast<int32_t>(read_navigation_unsigned(data_bits, CNAV_PRN));
+    const auto PRN = static_cast<int32_t>(read_navigation_unsigned(data_bits, CNAV_PRN));
     ephemeris_record.i_satellite_PRN = PRN;
 
     d_TOW = static_cast<int32_t>(read_navigation_unsigned(data_bits, CNAV_TOW));
@@ -322,7 +295,7 @@ bool Gps_CNAV_Navigation_Message::have_new_ephemeris()  // Check if we have a ne
             if (ephemeris_record.d_Toe1 == ephemeris_record.d_Toe2)  // and ephemeris_record.d_Toe1==ephemeris_record.d_Toc)
                 {
                     // if all ephemeris pages have the same TOE, then they belong to the same block
-                    // std::cout << "Ephemeris (1, 2) have been received and belong to the same batch" << std::endl;
+                    // std::cout << "Ephemeris (1, 2) have been received and belong to the same batch\n";
                     b_flag_ephemeris_1 = false;  // clear the flag
                     b_flag_ephemeris_2 = false;  // clear the flag
                     return true;
@@ -332,7 +305,7 @@ bool Gps_CNAV_Navigation_Message::have_new_ephemeris()  // Check if we have a ne
 }
 
 
-Gps_CNAV_Ephemeris Gps_CNAV_Navigation_Message::get_ephemeris()
+Gps_CNAV_Ephemeris Gps_CNAV_Navigation_Message::get_ephemeris() const
 {
     return ephemeris_record;
 }
@@ -349,7 +322,7 @@ bool Gps_CNAV_Navigation_Message::have_new_iono()  // Check if we have a new ion
 }
 
 
-Gps_CNAV_Iono Gps_CNAV_Navigation_Message::get_iono()
+Gps_CNAV_Iono Gps_CNAV_Navigation_Message::get_iono() const
 {
     return iono_record;
 }

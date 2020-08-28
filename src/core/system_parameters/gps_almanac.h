@@ -3,9 +3,9 @@
  * \brief  Interface of a GPS ALMANAC storage
  * \author Javier Arribas, 2013. jarribas(at)cttc.es
  *
- * -------------------------------------------------------------------------
+ * -----------------------------------------------------------------------------
  *
- * Copyright (C) 2010-2019  (see AUTHORS file for a list of contributors)
+ * Copyright (C) 2010-2020  (see AUTHORS file for a list of contributors)
  *
  * GNSS-SDR is a software defined Global Navigation
  *          Satellite Systems receiver
@@ -14,7 +14,7 @@
  *
  * SPDX-License-Identifier: GPL-3.0-or-later
  *
- * -------------------------------------------------------------------------
+ * -----------------------------------------------------------------------------
  */
 
 
@@ -32,25 +32,25 @@
 class Gps_Almanac
 {
 public:
-    uint32_t i_satellite_PRN;  //!< SV PRN NUMBER
-    double d_Delta_i;          //!< Inclination Angle at Reference Time (relative to i_0 = 0.30 semi-circles)
-    int32_t i_Toa;             //!< Almanac data reference time of week (Ref. 20.3.3.4.3 IS-GPS-200K) [s]
-    int32_t i_WNa;             //!< Almanac week number
-    double d_M_0;              //!< Mean Anomaly at Reference Time [semi-circles]
-    double d_e_eccentricity;   //!< Eccentricity [dimensionless]
-    double d_sqrt_A;           //!< Square Root of the Semi-Major Axis [sqrt(m)]
-    double d_OMEGA0;           //!< Longitude of Ascending Node of Orbit Plane at Weekly Epoch [semi-circles]
-    double d_OMEGA;            //!< Argument of Perigee [semi-cicles]
-    double d_OMEGA_DOT;        //!< Rate of Right Ascension [semi-circles/s]
-    int32_t i_SV_health;       //!< SV Health
-    int32_t i_AS_status;       //!< Anti-Spoofing Flags and SV Configuration
-    double d_A_f0;             //!< Coefficient 0 of code phase offset model [s]
-    double d_A_f1;             //!< Coefficient 1 of code phase offset model [s/s]
-
     /*!
      * Default constructor
      */
-    Gps_Almanac();
+    Gps_Almanac() = default;
+
+    uint32_t i_satellite_PRN{};  //!< SV PRN NUMBER
+    double d_Delta_i{};          //!< Inclination Angle at Reference Time (relative to i_0 = 0.30 semi-circles)
+    int32_t i_Toa{};             //!< Almanac data reference time of week (Ref. 20.3.3.4.3 IS-GPS-200K) [s]
+    int32_t i_WNa{};             //!< Almanac week number
+    double d_M_0{};              //!< Mean Anomaly at Reference Time [semi-circles]
+    double d_e_eccentricity{};   //!< Eccentricity [dimensionless]
+    double d_sqrt_A{};           //!< Square Root of the Semi-Major Axis [sqrt(m)]
+    double d_OMEGA0{};           //!< Longitude of Ascending Node of Orbit Plane at Weekly Epoch [semi-circles]
+    double d_OMEGA{};            //!< Argument of Perigee [semi-cicles]
+    double d_OMEGA_DOT{};        //!< Rate of Right Ascension [semi-circles/s]
+    int32_t i_SV_health{};       //!< SV Health
+    int32_t i_AS_status{};       //!< Anti-Spoofing Flags and SV Configuration
+    double d_A_f0{};             //!< Coefficient 0 of code phase offset model [s]
+    double d_A_f1{};             //!< Coefficient 1 of code phase offset model [s/s]
 
     template <class Archive>
 

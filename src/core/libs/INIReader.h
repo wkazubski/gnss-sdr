@@ -11,7 +11,7 @@
  * and value. It's done this way because it works well on low-memory
  * embedded systems, but also because it makes for a KISS implementation.
  *
- * -------------------------------------------------------------------------
+ * -----------------------------------------------------------------------------
  * inih and INIReader are released under the New BSD license:
  *
  * Copyright (c) 2009, Brush Technology
@@ -22,7 +22,7 @@
  * Go to the project home page for more info:
  *
  * https://github.com/benhoyt/inih
- * -------------------------------------------------------------------------
+ * -----------------------------------------------------------------------------
  */
 
 #ifndef GNSS_SDR_INIREADER_H
@@ -53,11 +53,12 @@ public:
     int64_t GetInteger(const std::string& section, const std::string& name, int64_t default_value);
 
 private:
-    int _error;
-    std::map<std::string, std::string> _values;
     static std::string MakeKey(const std::string& section, const std::string& name);
     static int ValueHandler(void* user, const char* section, const char* name,
         const char* value);
+
+    std::map<std::string, std::string> _values;
+    int _error;
 };
 
 #endif  // GNSS_SDR_INIREADER_H

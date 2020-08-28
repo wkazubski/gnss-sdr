@@ -3,9 +3,9 @@
  * \brief  Interface of an Assisted GNSS REFERENCE TIME storage
  * \author Javier Arribas, 2013. jarribas(at)cttc.es
  *
- * -------------------------------------------------------------------------
+ * -----------------------------------------------------------------------------
  *
- * Copyright (C) 2010-2019  (see AUTHORS file for a list of contributors)
+ * Copyright (C) 2010-2020  (see AUTHORS file for a list of contributors)
  *
  * GNSS-SDR is a software defined Global Navigation
  *          Satellite Systems receiver
@@ -14,7 +14,7 @@
  *
  * SPDX-License-Identifier: GPL-3.0-or-later
  *
- * -------------------------------------------------------------------------
+ * -----------------------------------------------------------------------------
  */
 
 
@@ -31,15 +31,16 @@
 class Agnss_Ref_Time
 {
 public:
-    bool valid;
-    double d_TOW;
-    double d_Week;
-    double d_tv_sec;
-    double d_tv_usec;
     /*!
      * Default constructor
      */
-    Agnss_Ref_Time();
+    Agnss_Ref_Time() = default;
+
+    double d_TOW{};
+    double d_Week{};
+    double d_tv_sec{};
+    double d_tv_usec{};
+    bool valid{};
 
     template <class Archive>
 
@@ -52,11 +53,11 @@ public:
         if (version)
             {
             };
-        archive& make_nvp("valid", valid);
         archive& make_nvp("d_TOW", d_TOW);
         archive& make_nvp("d_Week", d_Week);
         archive& make_nvp("d_tv_sec", d_tv_sec);
         archive& make_nvp("d_tv_usec", d_tv_usec);
+        archive& make_nvp("valid", valid);
     }
 };
 

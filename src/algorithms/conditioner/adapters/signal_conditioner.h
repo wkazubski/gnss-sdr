@@ -4,9 +4,9 @@
  * \author Luis Esteve, 2012. luis(at)epsilon-formacion.com
  *
  *
- * -------------------------------------------------------------------------
+ * -----------------------------------------------------------------------------
  *
- * Copyright (C) 2010-2019  (see AUTHORS file for a list of contributors)
+ * Copyright (C) 2010-2020  (see AUTHORS file for a list of contributors)
  *
  * GNSS-SDR is a software defined Global Navigation
  *          Satellite Systems receiver
@@ -15,7 +15,7 @@
  *
  * SPDX-License-Identifier: GPL-3.0-or-later
  *
- * -------------------------------------------------------------------------
+ * -----------------------------------------------------------------------------
  */
 
 #ifndef GNSS_SDR_SIGNAL_CONDITIONER_H
@@ -37,7 +37,7 @@ class SignalConditioner : public GNSSBlockInterface
 {
 public:
     //! Constructor
-    SignalConditioner(ConfigurationInterface *configuration,
+    SignalConditioner(const ConfigurationInterface *configuration,
         std::shared_ptr<GNSSBlockInterface> data_type_adapt, std::shared_ptr<GNSSBlockInterface> in_filt,
         std::shared_ptr<GNSSBlockInterface> res, std::string role, std::string implementation);
 

@@ -23,12 +23,21 @@ set(DATA_TYPE_GR_BLOCKS_HEADERS
 list(SORT DATA_TYPE_GR_BLOCKS_HEADERS)
 list(SORT DATA_TYPE_GR_BLOCKS_SOURCES)
 
-source_group(Headers FILES ${DATA_TYPE_GR_BLOCKS_HEADERS})
-
-add_library(data_type_gr_blocks
-    ${DATA_TYPE_GR_BLOCKS_SOURCES}
-    ${DATA_TYPE_GR_BLOCKS_HEADERS}
-)
+if(USE_CMAKE_TARGET_SOURCES)
+    add_library(data_type_gr_blocks STATIC)
+    target_sources(data_type_gr_blocks
+        PRIVATE
+            ${DATA_TYPE_GR_BLOCKS_SOURCES}
+        PUBLIC
+            ${DATA_TYPE_GR_BLOCKS_HEADERS}
+    )
+else()
+    source_group(Headers FILES ${DATA_TYPE_GR_BLOCKS_HEADERS})
+    add_library(data_type_gr_blocks
+        ${DATA_TYPE_GR_BLOCKS_SOURCES}
+        ${DATA_TYPE_GR_BLOCKS_HEADERS}
+    )
+endif()
 
 target_link_libraries(data_type_gr_blocks
     PUBLIC
@@ -37,6 +46,12 @@ target_link_libraries(data_type_gr_blocks
     PRIVATE
         Volk::volk
 )
+
+if(GNURADIO_USES_STD_POINTERS)
+    target_compile_definitions(data_type_gr_blocks
+        PUBLIC -DGNURADIO_USES_STD_POINTERS=1
+    )
+endif()
 
 set_property(TARGET data_type_gr_blocks
     APPEND PROPERTY INTERFACE_INCLUDE_DIRECTORIES

@@ -4,9 +4,9 @@
  * \author Carles Fernandez-Prades, 2012. cfernandez(at)cttc.es
  *
  *
- * -------------------------------------------------------------------------
+ * -----------------------------------------------------------------------------
  *
- * Copyright (C) 2010-2019 (see AUTHORS file for a list of contributors)
+ * Copyright (C) 2010-2020 (see AUTHORS file for a list of contributors)
  *
  * GNSS-SDR is a software defined Global Navigation
  * Satellite Systems receiver
@@ -15,7 +15,7 @@
  *
  * SPDX-License-Identifier: GPL-3.0-or-later
  *
- * -------------------------------------------------------------------------
+ * -----------------------------------------------------------------------------
  */
 
 #include "concurrent_map.h"
@@ -49,6 +49,7 @@ DECLARE_string(log_dir);
 #include "unit-tests/arithmetic/fft_speed_test.cc"
 #include "unit-tests/arithmetic/magnitude_squared_test.cc"
 #include "unit-tests/arithmetic/multiply_test.cc"
+#include "unit-tests/arithmetic/preamble_correlator_test.cc"
 #include "unit-tests/control-plane/control_thread_test.cc"
 #include "unit-tests/control-plane/file_configuration_test.cc"
 #include "unit-tests/control-plane/gnss_block_factory_test.cc"
@@ -64,6 +65,7 @@ DECLARE_string(log_dir);
 #include "unit-tests/signal-processing-blocks/acquisition/galileo_e1_pcps_quicksync_ambiguous_acquisition_gsoc2014_test.cc"
 #include "unit-tests/signal-processing-blocks/acquisition/galileo_e1_pcps_tong_ambiguous_acquisition_gsoc2013_test.cc"
 #include "unit-tests/signal-processing-blocks/acquisition/galileo_e5a_pcps_acquisition_gsoc2014_gensource_test.cc"
+#include "unit-tests/signal-processing-blocks/acquisition/galileo_e5b_pcps_acquisition_test.cc"
 #include "unit-tests/signal-processing-blocks/acquisition/glonass_l1_ca_pcps_acquisition_gsoc2017_test.cc"
 #include "unit-tests/signal-processing-blocks/acquisition/gps_l1_ca_pcps_acquisition_gsoc2013_test.cc"
 #include "unit-tests/signal-processing-blocks/acquisition/gps_l1_ca_pcps_acquisition_test.cc"
@@ -97,6 +99,7 @@ DECLARE_string(log_dir);
 #include "unit-tests/signal-processing-blocks/tracking/discriminator_test.cc"
 #include "unit-tests/signal-processing-blocks/tracking/galileo_e1_dll_pll_veml_tracking_test.cc"
 #include "unit-tests/signal-processing-blocks/tracking/galileo_e5a_tracking_test.cc"
+#include "unit-tests/signal-processing-blocks/tracking/galileo_e5b_dll_pll_tracking_test.cc"
 #include "unit-tests/signal-processing-blocks/tracking/glonass_l1_ca_dll_pll_c_aid_tracking_test.cc"
 #include "unit-tests/signal-processing-blocks/tracking/glonass_l1_ca_dll_pll_tracking_test.cc"
 #include "unit-tests/signal-processing-blocks/tracking/tracking_loop_filter_test.cc"
@@ -118,6 +121,7 @@ DECLARE_string(log_dir);
 #include "unit-tests/signal-processing-blocks/pvt/rtcm_test.cc"
 #include "unit-tests/signal-processing-blocks/pvt/serdes_monitor_pvt_test.cc"
 #include "unit-tests/signal-processing-blocks/telemetry_decoder/galileo_fnav_inav_decoder_test.cc"
+#include "unit-tests/system-parameters/glonass_gnav_crc_test.cc"
 #include "unit-tests/system-parameters/glonass_gnav_ephemeris_test.cc"
 #include "unit-tests/system-parameters/glonass_gnav_nav_message_test.cc"
 
@@ -151,7 +155,7 @@ Concurrent_Map<Gps_Acq_Assist> global_gps_acq_assist_map;
 
 int main(int argc, char **argv)
 {
-    std::cout << "Running GNSS-SDR Tests..." << std::endl;
+    std::cout << "Running GNSS-SDR Tests...\n";
     int res = 0;
     try
         {

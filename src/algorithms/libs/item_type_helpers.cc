@@ -5,9 +5,10 @@
  *          <li> Cillian O'Driscoll, 2019. cillian.odriscoll(at)gmail.com
  *          </ul>
  *
- * -------------------------------------------------------------------------
  *
- * Copyright (C) 2010-2019  (see AUTHORS file for a list of contributors)
+ * -----------------------------------------------------------------------------
+ *
+ * Copyright (C) 2010-2020  (see AUTHORS file for a list of contributors)
  *
  * GNSS-SDR is a software defined Global Navigation
  *          Satellite Systems receiver
@@ -16,7 +17,7 @@
  *
  * SPDX-License-Identifier: GPL-3.0-or-later
  *
- * -------------------------------------------------------------------------
+ * -----------------------------------------------------------------------------
  */
 
 #include "item_type_helpers.h"
@@ -177,9 +178,8 @@ item_type_converter_t make_vector_converter(const std::string &input_type,
     if (input_type == output_type)
         {
             size_t input_size = item_type_size(input_type);
-#ifdef OLDCOMPILER
-            return std::bind(copy_converter, std::placeholders::_1, std::placeholders::_2,
-                std::placeholders::_3, input_size);
+#ifdef DO_NOT_USE_LAMBDAS
+            return std::bind(copy_converter, std::placeholders::_1, std::placeholders::_2, std::placeholders::_3, input_size);  // NOLINT(modernize-avoid-bind)
 #else
             return [=](auto &&arg1, auto &&arg2, auto &&arg3) { return copy_converter(arg1, arg2, arg3, input_size); };
 #endif
@@ -189,18 +189,16 @@ item_type_converter_t make_vector_converter(const std::string &input_type,
         {
             if (output_type == "short")
                 {
-#ifdef OLDCOMPILER
-                    return std::bind(convert_8i_16i, std::placeholders::_1,
-                        std::placeholders::_2, std::placeholders::_3);
+#ifdef DO_NOT_USE_LAMBDAS
+                    return std::bind(convert_8i_16i, std::placeholders::_1, std::placeholders::_2, std::placeholders::_3);  // NOLINT(modernize-avoid-bind)
 #else
                     return [=](auto &&arg1, auto &&arg2, auto &&arg3) { return convert_8i_16i(arg1, arg2, arg3); };
 #endif
                 }
             else if (output_type == "float")
                 {
-#ifdef OLDCOMPILER
-                    return std::bind(convert_8i_32f, std::placeholders::_1,
-                        std::placeholders::_2, std::placeholders::_3);
+#ifdef DO_NOT_USE_LAMBDAS
+                    return std::bind(convert_8i_32f, std::placeholders::_1, std::placeholders::_2, std::placeholders::_3);  // NOLINT(modernize-avoid-bind)
 #else
                     return [=](auto &&arg1, auto &&arg2, auto &&arg3) { return convert_8i_32f(arg1, arg2, arg3); };
 #endif
@@ -211,27 +209,24 @@ item_type_converter_t make_vector_converter(const std::string &input_type,
             if (output_type == "ibyte")
                 {
                     size_t input_size = item_type_size(input_type);
-#ifdef OLDCOMPILER
-                    return std::bind(copy_converter, std::placeholders::_1, std::placeholders::_2,
-                        std::placeholders::_3, input_size);
+#ifdef DO_NOT_USE_LAMBDAS
+                    return std::bind(copy_converter, std::placeholders::_1, std::placeholders::_2, std::placeholders::_3, input_size);  // NOLINT(modernize-avoid-bind)
 #else
                     return [=](auto &&arg1, auto &&arg2, auto &&arg3) { return copy_converter(arg1, arg2, arg3, input_size); };
 #endif
                 }
             if (output_type == "cshort" or output_type == "ishort")
                 {
-#ifdef OLDCOMPILER
-                    return std::bind(convert_8ic_16ic, std::placeholders::_1,
-                        std::placeholders::_2, std::placeholders::_3);
+#ifdef DO_NOT_USE_LAMBDAS
+                    return std::bind(convert_8ic_16ic, std::placeholders::_1, std::placeholders::_2, std::placeholders::_3);  // NOLINT(modernize-avoid-bind)
 #else
                     return [=](auto &&arg1, auto &&arg2, auto &&arg3) { return convert_8ic_16ic(arg1, arg2, arg3); };
 #endif
                 }
             else if (output_type == "gr_complex")
                 {
-#ifdef OLDCOMPILER
-                    return std::bind(convert_8ic_32fc, std::placeholders::_1,
-                        std::placeholders::_2, std::placeholders::_3);
+#ifdef DO_NOT_USE_LAMBDAS
+                    return std::bind(convert_8ic_32fc, std::placeholders::_1, std::placeholders::_2, std::placeholders::_3);  // NOLINT(modernize-avoid-bind)
 #else
                     return [=](auto &&arg1, auto &&arg2, auto &&arg3) { return convert_8ic_32fc(arg1, arg2, arg3); };
 #endif
@@ -242,27 +237,24 @@ item_type_converter_t make_vector_converter(const std::string &input_type,
             if (output_type == "cbyte")
                 {
                     size_t input_size = item_type_size(input_type);
-#ifdef OLDCOMPILER
-                    return std::bind(copy_converter, std::placeholders::_1, std::placeholders::_2,
-                        std::placeholders::_3, input_size);
+#ifdef DO_NOT_USE_LAMBDAS
+                    return std::bind(copy_converter, std::placeholders::_1, std::placeholders::_2, std::placeholders::_3, input_size);  // NOLINT(modernize-avoid-bind)
 #else
                     return [=](auto &&arg1, auto &&arg2, auto &&arg3) { return copy_converter(arg1, arg2, arg3, input_size); };
 #endif
                 }
             else if (output_type == "cshort" or output_type == "ishort")
                 {
-#ifdef OLDCOMPILER
-                    return std::bind(convert_8i_16i, std::placeholders::_1,
-                        std::placeholders::_2, std::placeholders::_3);
+#ifdef DO_NOT_USE_LAMBDAS
+                    return std::bind(convert_8i_16i, std::placeholders::_1, std::placeholders::_2, std::placeholders::_3);  // NOLINT(modernize-avoid-bind)
 #else
                     return [=](auto &&arg1, auto &&arg2, auto &&arg3) { return convert_8i_16i(arg1, arg2, arg3); };
 #endif
                 }
             else if (output_type == "gr_complex")
                 {
-#ifdef OLDCOMPILER
-                    return std::bind(convert_8i_32f, std::placeholders::_1,
-                        std::placeholders::_2, std::placeholders::_3);
+#ifdef DO_NOT_USE_LAMBDAS
+                    return std::bind(convert_8i_32f, std::placeholders::_1, std::placeholders::_2, std::placeholders::_3);  // NOLINT(modernize-avoid-bind)
 #else
                     return [=](auto &&arg1, auto &&arg2, auto &&arg3) { return convert_8i_32f(arg1, arg2, arg3); };
 #endif
@@ -272,18 +264,16 @@ item_type_converter_t make_vector_converter(const std::string &input_type,
         {
             if (output_type == "byte")
                 {
-#ifdef OLDCOMPILER
-                    return std::bind(convert_16i_8i, std::placeholders::_1,
-                        std::placeholders::_2, std::placeholders::_3);
+#ifdef DO_NOT_USE_LAMBDAS
+                    return std::bind(convert_16i_8i, std::placeholders::_1, std::placeholders::_2, std::placeholders::_3);  // NOLINT(modernize-avoid-bind)
 #else
                     return [=](auto &&arg1, auto &&arg2, auto &&arg3) { return convert_16i_8i(arg1, arg2, arg3); };
 #endif
                 }
             else if (output_type == "float")
                 {
-#ifdef OLDCOMPILER
-                    return std::bind(convert_16i_32f, std::placeholders::_1,
-                        std::placeholders::_2, std::placeholders::_3);
+#ifdef DO_NOT_USE_LAMBDAS
+                    return std::bind(convert_16i_32f, std::placeholders::_1, std::placeholders::_2, std::placeholders::_3);  // NOLINT(modernize-avoid-bind)
 #else
                     return [=](auto &&arg1, auto &&arg2, auto &&arg3) { return convert_16i_32f(arg1, arg2, arg3); };
 #endif
@@ -293,9 +283,8 @@ item_type_converter_t make_vector_converter(const std::string &input_type,
         {
             if (output_type == "cbyte" or output_type == "ibyte")
                 {
-#ifdef OLDCOMPILER
-                    return std::bind(convert_16ic_8ic, std::placeholders::_1,
-                        std::placeholders::_2, std::placeholders::_3);
+#ifdef DO_NOT_USE_LAMBDAS
+                    return std::bind(convert_16ic_8ic, std::placeholders::_1, std::placeholders::_2, std::placeholders::_3);  // NOLINT(modernize-avoid-bind)
 #else
                     return [=](auto &&arg1, auto &&arg2, auto &&arg3) { return convert_16ic_8ic(arg1, arg2, arg3); };
 #endif
@@ -303,18 +292,16 @@ item_type_converter_t make_vector_converter(const std::string &input_type,
             if (output_type == "ishort")
                 {
                     size_t input_size = item_type_size(input_type);
-#ifdef OLDCOMPILER
-                    return std::bind(copy_converter, std::placeholders::_1, std::placeholders::_2,
-                        std::placeholders::_3, input_size);
+#ifdef DO_NOT_USE_LAMBDAS
+                    return std::bind(copy_converter, std::placeholders::_1, std::placeholders::_2, std::placeholders::_3, input_size);  // NOLINT(modernize-avoid-bind)
 #else
                     return [=](auto &&arg1, auto &&arg2, auto &&arg3) { return copy_converter(arg1, arg2, arg3, input_size); };
 #endif
                 }
             else if (output_type == "gr_complex")
                 {
-#ifdef OLDCOMPILER
-                    return std::bind(convert_16ic_32fc, std::placeholders::_1,
-                        std::placeholders::_2, std::placeholders::_3);
+#ifdef DO_NOT_USE_LAMBDAS
+                    return std::bind(convert_16ic_32fc, std::placeholders::_1, std::placeholders::_2, std::placeholders::_3);  // NOLINT(modernize-avoid-bind)
 #else
                     return [=](auto &&arg1, auto &&arg2, auto &&arg3) { return convert_16ic_32fc(arg1, arg2, arg3); };
 #endif
@@ -324,9 +311,8 @@ item_type_converter_t make_vector_converter(const std::string &input_type,
         {
             if (output_type == "cbyte" or output_type == "ibyte")
                 {
-#ifdef OLDCOMPILER
-                    return std::bind(convert_16i_8i, std::placeholders::_1,
-                        std::placeholders::_2, std::placeholders::_3);
+#ifdef DO_NOT_USE_LAMBDAS
+                    return std::bind(convert_16i_8i, std::placeholders::_1, std::placeholders::_2, std::placeholders::_3);  // NOLINT(modernize-avoid-bind)
 #else
                     return [=](auto &&arg1, auto &&arg2, auto &&arg3) { return convert_16i_8i(arg1, arg2, arg3); };
 #endif
@@ -334,18 +320,16 @@ item_type_converter_t make_vector_converter(const std::string &input_type,
             if (output_type == "cshort")
                 {
                     size_t input_size = item_type_size(input_type);
-#ifdef OLDCOMPILER
-                    return std::bind(copy_converter, std::placeholders::_1, std::placeholders::_2,
-                        std::placeholders::_3, input_size);
+#ifdef DO_NOT_USE_LAMBDAS
+                    return std::bind(copy_converter, std::placeholders::_1, std::placeholders::_2, std::placeholders::_3, input_size);  // NOLINT(modernize-avoid-bind)
 #else
                     return [=](auto &&arg1, auto &&arg2, auto &&arg3) { return copy_converter(arg1, arg2, arg3, input_size); };
 #endif
                 }
             else if (output_type == "gr_complex")
                 {
-#ifdef OLDCOMPILER
-                    return std::bind(convert_16i_32f, std::placeholders::_1,
-                        std::placeholders::_2, std::placeholders::_3);
+#ifdef DO_NOT_USE_LAMBDAS
+                    return std::bind(convert_16i_32f, std::placeholders::_1, std::placeholders::_2, std::placeholders::_3);  // NOLINT(modernize-avoid-bind)
 #else
                     return [=](auto &&arg1, auto &&arg2, auto &&arg3) { return convert_16i_32f(arg1, arg2, arg3); };
 #endif
@@ -355,18 +339,16 @@ item_type_converter_t make_vector_converter(const std::string &input_type,
         {
             if (output_type == "byte")
                 {
-#ifdef OLDCOMPILER
-                    return std::bind(convert_32f_8i, std::placeholders::_1,
-                        std::placeholders::_2, std::placeholders::_3);
+#ifdef DO_NOT_USE_LAMBDAS
+                    return std::bind(convert_32f_8i, std::placeholders::_1, std::placeholders::_2, std::placeholders::_3);  // NOLINT(modernize-avoid-bind)
 #else
                     return [=](auto &&arg1, auto &&arg2, auto &&arg3) { return convert_32f_8i(arg1, arg2, arg3); };
 #endif
                 }
             else if (output_type == "short")
                 {
-#ifdef OLDCOMPILER
-                    return std::bind(convert_32f_16i, std::placeholders::_1,
-                        std::placeholders::_2, std::placeholders::_3);
+#ifdef DO_NOT_USE_LAMBDAS
+                    return std::bind(convert_32f_16i, std::placeholders::_1, std::placeholders::_2, std::placeholders::_3);  // NOLINT(modernize-avoid-bind)
 #else
                     return [=](auto &&arg1, auto &&arg2, auto &&arg3) { return convert_32f_16i(arg1, arg2, arg3); };
 #endif
@@ -376,18 +358,16 @@ item_type_converter_t make_vector_converter(const std::string &input_type,
         {
             if (output_type == "cbyte" or output_type == "ibyte")
                 {
-#ifdef OLDCOMPILER
-                    return std::bind(convert_32fc_8ic, std::placeholders::_1,
-                        std::placeholders::_2, std::placeholders::_3);
+#ifdef DO_NOT_USE_LAMBDAS
+                    return std::bind(convert_32fc_8ic, std::placeholders::_1, std::placeholders::_2, std::placeholders::_3);  // NOLINT(modernize-avoid-bind)
 #else
                     return [=](auto &&arg1, auto &&arg2, auto &&arg3) { return convert_32fc_8ic(arg1, arg2, arg3); };
 #endif
                 }
             else if (output_type == "cshort" or output_type == "ishort")
                 {
-#ifdef OLDCOMPILER
-                    return std::bind(convert_32fc_16ic, std::placeholders::_1,
-                        std::placeholders::_2, std::placeholders::_3);
+#ifdef DO_NOT_USE_LAMBDAS
+                    return std::bind(convert_32fc_16ic, std::placeholders::_1, std::placeholders::_2, std::placeholders::_3);  // NOLINT(modernize-avoid-bind)
 #else
                     return [=](auto &&arg1, auto &&arg2, auto &&arg3) { return convert_32fc_16ic(arg1, arg2, arg3); };
 #endif

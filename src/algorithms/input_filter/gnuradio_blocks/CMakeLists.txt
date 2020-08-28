@@ -25,20 +25,38 @@ set(INPUT_FILTER_GR_BLOCKS_HEADERS
 list(SORT INPUT_FILTER_GR_BLOCKS_HEADERS)
 list(SORT INPUT_FILTER_GR_BLOCKS_SOURCES)
 
-source_group(Headers FILES ${INPUT_FILTER_GR_BLOCKS_HEADERS})
-
-add_library(input_filter_gr_blocks
-    ${INPUT_FILTER_GR_BLOCKS_SOURCES}
-    ${INPUT_FILTER_GR_BLOCKS_HEADERS})
+if(USE_CMAKE_TARGET_SOURCES)
+    add_library(input_filter_gr_blocks STATIC)
+    target_sources(input_filter_gr_blocks
+        PRIVATE
+            ${INPUT_FILTER_GR_BLOCKS_SOURCES}
+        PUBLIC
+            ${INPUT_FILTER_GR_BLOCKS_HEADERS}
+    )
+else()
+    source_group(Headers FILES ${INPUT_FILTER_GR_BLOCKS_HEADERS})
+    add_library(input_filter_gr_blocks
+        ${INPUT_FILTER_GR_BLOCKS_SOURCES}
+        ${INPUT_FILTER_GR_BLOCKS_HEADERS}
+    )
+endif()
 
 target_link_libraries(input_filter_gr_blocks
     PUBLIC
         Gnuradio::blocks
         Gnuradio::filter
+        Volkgnsssdr::volkgnsssdr
     PRIVATE
+        algorithms_libs
         Volk::volk
         Log4cpp::log4cpp
 )
+
+if(GNURADIO_USES_STD_POINTERS)
+    target_compile_definitions(input_filter_gr_blocks
+        PUBLIC -DGNURADIO_USES_STD_POINTERS=1
+    )
+endif()
 
 if(ENABLE_CLANG_TIDY)
     if(CLANG_TIDY_EXE)

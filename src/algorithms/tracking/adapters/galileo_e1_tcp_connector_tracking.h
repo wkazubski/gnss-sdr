@@ -11,9 +11,9 @@
  * A Software-Defined GPS and Galileo Receiver. A Single-Frequency
  * Approach, Birkhauser, 2007
  *
- * -------------------------------------------------------------------------
+ * -----------------------------------------------------------------------------
  *
- * Copyright (C) 2012-2019  (see AUTHORS file for a list of contributors)
+ * Copyright (C) 2012-2020  (see AUTHORS file for a list of contributors)
  *
  * GNSS-SDR is a software defined Global Navigation
  *          Satellite Systems receiver
@@ -22,7 +22,7 @@
  *
  * SPDX-License-Identifier: GPL-3.0-or-later
  *
- * -------------------------------------------------------------------------
+ * -----------------------------------------------------------------------------
  */
 
 #ifndef GNSS_SDR_GALILEO_E1_TCP_CONNECTOR_TRACKING_H
@@ -41,7 +41,8 @@ class ConfigurationInterface;
 class GalileoE1TcpConnectorTracking : public TrackingInterface
 {
 public:
-    GalileoE1TcpConnectorTracking(ConfigurationInterface* configuration,
+    GalileoE1TcpConnectorTracking(
+        const ConfigurationInterface* configuration,
         const std::string& role,
         unsigned int in_streams,
         unsigned int out_streams);

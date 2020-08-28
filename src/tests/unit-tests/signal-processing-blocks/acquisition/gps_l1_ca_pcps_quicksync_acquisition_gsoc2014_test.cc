@@ -5,9 +5,9 @@
  * \author Damian Miralles Sanchez, 2014. dmiralles2009(at)gmail.com
  *
  *
- * -------------------------------------------------------------------------
+ * -----------------------------------------------------------------------------
  *
- * Copyright (C) 2010-2019  (see AUTHORS file for a list of contributors)
+ * Copyright (C) 2010-2020  (see AUTHORS file for a list of contributors)
  *
  * GNSS-SDR is a software defined Global Navigation
  *          Satellite Systems receiver
@@ -16,12 +16,11 @@
  *
  * SPDX-License-Identifier: GPL-3.0-or-later
  *
- * -------------------------------------------------------------------------
+ * -----------------------------------------------------------------------------
  */
 
 
 #include "concurrent_queue.h"
-#include "gnss_block_factory.h"
 #include "gnss_block_interface.h"
 #include "gnss_sdr_valve.h"
 #include "gnss_synchro.h"
@@ -39,6 +38,10 @@
 #include <stdexcept>
 #include <thread>
 #include <utility>
+#if HAS_GENERIC_LAMBDA
+#else
+#include <boost/bind/bind.hpp>
+#endif
 #ifdef GR_GREATER_38
 #include <gnuradio/analog/sig_source.h>
 #else
@@ -52,7 +55,11 @@ DEFINE_int32(value_CN0_dB_0, 44, "Value for the CN0_dB_0 in channel 0");
 // ######## GNURADIO BLOCK MESSAGE RECEVER #########
 class GpsL1CaPcpsQuickSyncAcquisitionGSoC2014Test_msg_rx;
 
+#if GNURADIO_USES_STD_POINTERS
+using GpsL1CaPcpsQuickSyncAcquisitionGSoC2014Test_msg_rx_sptr = std::shared_ptr<GpsL1CaPcpsQuickSyncAcquisitionGSoC2014Test_msg_rx>;
+#else
 using GpsL1CaPcpsQuickSyncAcquisitionGSoC2014Test_msg_rx_sptr = boost::shared_ptr<GpsL1CaPcpsQuickSyncAcquisitionGSoC2014Test_msg_rx>;
+#endif
 
 GpsL1CaPcpsQuickSyncAcquisitionGSoC2014Test_msg_rx_sptr GpsL1CaPcpsQuickSyncAcquisitionGSoC2014Test_msg_rx_make(Concurrent_Queue<int>& queue);
 
@@ -96,7 +103,16 @@ void GpsL1CaPcpsQuickSyncAcquisitionGSoC2014Test_msg_rx::msg_handler_events(pmt:
 GpsL1CaPcpsQuickSyncAcquisitionGSoC2014Test_msg_rx::GpsL1CaPcpsQuickSyncAcquisitionGSoC2014Test_msg_rx(Concurrent_Queue<int>& queue) : gr::block("GpsL1CaPcpsQuickSyncAcquisitionGSoC2014Test_msg_rx", gr::io_signature::make(0, 0, 0), gr::io_signature::make(0, 0, 0)), channel_internal_queue(queue)
 {
     this->message_port_register_in(pmt::mp("events"));
-    this->set_msg_handler(pmt::mp("events"), boost::bind(&GpsL1CaPcpsQuickSyncAcquisitionGSoC2014Test_msg_rx::msg_handler_events, this, _1));
+    this->set_msg_handler(pmt::mp("events"),
+#if HAS_GENERIC_LAMBDA
+        [this](auto&& PH1) { msg_handler_events(PH1); });
+#else
+#if USE_BOOST_BIND_PLACEHOLDERS
+        boost::bind(&GpsL1CaPcpsQuickSyncAcquisitionGSoC2014Test_msg_rx::msg_handler_events, this, boost::placeholders::_1));
+#else
+        boost::bind(&GpsL1CaPcpsQuickSyncAcquisitionGSoC2014Test_msg_rx::msg_handler_events, this, _1));
+#endif
+#endif
     rx_message = 0;
 }
 
@@ -111,7 +127,6 @@ class GpsL1CaPcpsQuickSyncAcquisitionGSoC2014Test : public ::testing::Test
 protected:
     GpsL1CaPcpsQuickSyncAcquisitionGSoC2014Test()
     {
-        factory = std::make_shared<GNSSBlockFactory>();
         item_size = sizeof(gr_complex);
         stop = false;
         message = 0;
@@ -132,7 +147,6 @@ protected:
     Concurrent_Queue<int> channel_internal_queue;
     std::shared_ptr<Concurrent_Queue<pmt::pmt_t>> queue;
     gr::top_block_sptr top_block;
-    std::shared_ptr<GNSSBlockFactory> factory;
     std::shared_ptr<GpsL1CaPcpsQuickSyncAcquisition> acquisition;
     std::shared_ptr<InMemoryConfiguration> config;
     Gnss_Synchro gnss_synchro;
@@ -535,15 +549,15 @@ TEST_F(GpsL1CaPcpsQuickSyncAcquisitionGSoC2014Test, ConnectAndRun)
     std::chrono::duration<double> elapsed_seconds(0.0);
     top_block = gr::make_top_block("Acquisition test");
     queue = std::make_shared<Concurrent_Queue<pmt::pmt_t>>();
-    boost::shared_ptr<GpsL1CaPcpsAcquisitionGSoC2013Test_msg_rx> msg_rx = GpsL1CaPcpsAcquisitionGSoC2013Test_msg_rx_make(channel_internal_queue);
+    auto msg_rx = GpsL1CaPcpsAcquisitionGSoC2013Test_msg_rx_make(channel_internal_queue);
 
     config_1();
     acquisition = std::make_shared<GpsL1CaPcpsQuickSyncAcquisition>(config.get(), "Acquisition_1C", 1, 0);
 
     ASSERT_NO_THROW({
         acquisition->connect(top_block);
-        boost::shared_ptr<gr::analog::sig_source_c> source = gr::analog::sig_source_c::make(fs_in, gr::analog::GR_SIN_WAVE, 1000, 1, gr_complex(0));
-        boost::shared_ptr<gr::block> valve = gnss_sdr_make_valve(sizeof(gr_complex), nsamples, queue);
+        auto source = gr::analog::sig_source_c::make(fs_in, gr::analog::GR_SIN_WAVE, 1000, 1, gr_complex(0));
+        auto valve = gnss_sdr_make_valve(sizeof(gr_complex), nsamples, queue.get());
         top_block->connect(source, 0, valve, 0);
         top_block->connect(valve, 0, acquisition->get_left_block(), 0);
         top_block->msg_connect(acquisition->get_right_block(), pmt::mp("events"), msg_rx, pmt::mp("events"));
@@ -556,7 +570,7 @@ TEST_F(GpsL1CaPcpsQuickSyncAcquisitionGSoC2014Test, ConnectAndRun)
         elapsed_seconds = end - start;
     }) << "Failure running the top_block.";
 
-    std::cout << "Processed " << nsamples << " samples in " << elapsed_seconds.count() * 1e6 << " microseconds" << std::endl;
+    std::cout << "Processed " << nsamples << " samples in " << elapsed_seconds.count() * 1e6 << " microseconds\n";
 }
 
 
@@ -566,7 +580,7 @@ TEST_F(GpsL1CaPcpsQuickSyncAcquisitionGSoC2014Test, ValidationOfResults)
     top_block = gr::make_top_block("Acquisition test");
     queue = std::make_shared<Concurrent_Queue<pmt::pmt_t>>();
     acquisition = std::make_shared<GpsL1CaPcpsQuickSyncAcquisition>(config.get(), "Acquisition_1C", 1, 0);
-    boost::shared_ptr<GpsL1CaPcpsAcquisitionGSoC2013Test_msg_rx> msg_rx = GpsL1CaPcpsAcquisitionGSoC2013Test_msg_rx_make(channel_internal_queue);
+    auto msg_rx = GpsL1CaPcpsAcquisitionGSoC2013Test_msg_rx_make(channel_internal_queue);
 
     ASSERT_NO_THROW({
         acquisition->set_channel(1);
@@ -596,10 +610,9 @@ TEST_F(GpsL1CaPcpsQuickSyncAcquisitionGSoC2014Test, ValidationOfResults)
     acquisition->reset();
 
     ASSERT_NO_THROW({
-        boost::shared_ptr<GenSignalSource> signal_source;
-        SignalGenerator* signal_generator = new SignalGenerator(config.get(), "SignalSource", 0, 1, queue);
-        FirFilter* filter = new FirFilter(config.get(), "InputFilter", 1, 1);
-        signal_source.reset(new GenSignalSource(signal_generator, filter, "SignalSource", queue));
+        std::shared_ptr<GNSSBlockInterface> signal_generator = std::make_shared<SignalGenerator>(config.get(), "SignalSource", 0, 1, queue.get());
+        std::shared_ptr<GNSSBlockInterface> filter = std::make_shared<FirFilter>(config.get(), "InputFilter", 1, 1);
+        std::shared_ptr<GNSSBlockInterface> signal_source = std::make_shared<GenSignalSource>(signal_generator, filter, "SignalSource", queue.get());
         signal_source->connect(top_block);
         top_block->connect(signal_source->get_right_block(), 0, acquisition->get_left_block(), 0);
         top_block->msg_connect(acquisition->get_right_block(), pmt::mp("events"), msg_rx, pmt::mp("events"));
@@ -660,7 +673,7 @@ TEST_F(GpsL1CaPcpsQuickSyncAcquisitionGSoC2014Test, ValidationOfResultsWithNoise
     top_block = gr::make_top_block("Acquisition test");
     queue = std::make_shared<Concurrent_Queue<pmt::pmt_t>>();
     acquisition = std::make_shared<GpsL1CaPcpsQuickSyncAcquisition>(config.get(), "Acquisition_1C", 1, 0);
-    boost::shared_ptr<GpsL1CaPcpsAcquisitionGSoC2013Test_msg_rx> msg_rx = GpsL1CaPcpsAcquisitionGSoC2013Test_msg_rx_make(channel_internal_queue);
+    auto msg_rx = GpsL1CaPcpsAcquisitionGSoC2013Test_msg_rx_make(channel_internal_queue);
 
     ASSERT_NO_THROW({
         acquisition->set_channel(1);
@@ -690,10 +703,9 @@ TEST_F(GpsL1CaPcpsQuickSyncAcquisitionGSoC2014Test, ValidationOfResultsWithNoise
     acquisition->reset();
 
     ASSERT_NO_THROW({
-        boost::shared_ptr<GenSignalSource> signal_source;
-        SignalGenerator* signal_generator = new SignalGenerator(config.get(), "SignalSource", 0, 1, queue);
-        FirFilter* filter = new FirFilter(config.get(), "InputFilter", 1, 1);
-        signal_source.reset(new GenSignalSource(signal_generator, filter, "SignalSource", queue));
+        std::shared_ptr<GNSSBlockInterface> signal_generator = std::make_shared<SignalGenerator>(config.get(), "SignalSource", 0, 1, queue.get());
+        std::shared_ptr<GNSSBlockInterface> filter = std::make_shared<FirFilter>(config.get(), "InputFilter", 1, 1);
+        std::shared_ptr<GNSSBlockInterface> signal_source = std::make_shared<GenSignalSource>(signal_generator, filter, "SignalSource", queue.get());
         signal_source->connect(top_block);
         top_block->connect(signal_source->get_right_block(), 0, acquisition->get_left_block(), 0);
         top_block->msg_connect(acquisition->get_right_block(), pmt::mp("events"), msg_rx, pmt::mp("events"));
@@ -751,7 +763,7 @@ TEST_F(GpsL1CaPcpsQuickSyncAcquisitionGSoC2014Test, ValidationOfResultsProbabili
     top_block = gr::make_top_block("Acquisition test");
     queue = std::make_shared<Concurrent_Queue<pmt::pmt_t>>();
     acquisition = std::make_shared<GpsL1CaPcpsQuickSyncAcquisition>(config.get(), "Acquisition_1C", 1, 0);
-    boost::shared_ptr<GpsL1CaPcpsAcquisitionGSoC2013Test_msg_rx> msg_rx = GpsL1CaPcpsAcquisitionGSoC2013Test_msg_rx_make(channel_internal_queue);
+    auto msg_rx = GpsL1CaPcpsAcquisitionGSoC2013Test_msg_rx_make(channel_internal_queue);
 
     ASSERT_NO_THROW({
         acquisition->set_channel(1);
@@ -769,16 +781,15 @@ TEST_F(GpsL1CaPcpsQuickSyncAcquisitionGSoC2014Test, ValidationOfResultsProbabili
     acquisition->reset();
 
     ASSERT_NO_THROW({
-        boost::shared_ptr<GenSignalSource> signal_source;
-        SignalGenerator* signal_generator = new SignalGenerator(config.get(), "SignalSource", 0, 1, queue);
-        FirFilter* filter = new FirFilter(config.get(), "InputFilter", 1, 1);
-        signal_source.reset(new GenSignalSource(signal_generator, filter, "SignalSource", queue));
+        std::shared_ptr<GNSSBlockInterface> signal_generator = std::make_shared<SignalGenerator>(config.get(), "SignalSource", 0, 1, queue.get());
+        std::shared_ptr<GNSSBlockInterface> filter = std::make_shared<FirFilter>(config.get(), "InputFilter", 1, 1);
+        std::shared_ptr<GNSSBlockInterface> signal_source = std::make_shared<GenSignalSource>(signal_generator, filter, "SignalSource", queue.get());
         signal_source->connect(top_block);
         top_block->connect(signal_source->get_right_block(), 0, acquisition->get_left_block(), 0);
         top_block->msg_connect(acquisition->get_right_block(), pmt::mp("events"), msg_rx, pmt::mp("events"));
     }) << "Failure connecting the blocks of acquisition test.";
 
-    std::cout << "Probability of false alarm (target) = " << 0.1 << std::endl;
+    std::cout << "Probability of false alarm (target) = " << 0.1 << '\n';
 
     // i = 0 --> satellite in acquisition is visible (prob of detection and prob of detection with wrong estimation)
     // i = 1 --> satellite in acquisition is not visible (prob of false detection)
@@ -809,10 +820,10 @@ TEST_F(GpsL1CaPcpsQuickSyncAcquisitionGSoC2014Test, ValidationOfResultsProbabili
 
             if (i == 0)
                 {
-                    std::cout << "Estimated probability of detection = " << Pd << std::endl;
-                    std::cout << "Estimated probability of false alarm (satellite present) = " << Pfa_p << std::endl;
-                    std::cout << "Estimated probability of miss detection (satellite present) = " << Pmd << std::endl;
-                    std::cout << "Mean acq time = " << mean_acq_time_us << " microseconds." << std::endl;
+                    std::cout << "Estimated probability of detection = " << Pd << '\n';
+                    std::cout << "Estimated probability of false alarm (satellite present) = " << Pfa_p << '\n';
+                    std::cout << "Estimated probability of miss detection (satellite present) = " << Pmd << '\n';
+                    std::cout << "Mean acq time = " << mean_acq_time_us << " microseconds.\n";
 
                     if (dump_test_results)
                         {
@@ -823,14 +834,14 @@ TEST_F(GpsL1CaPcpsQuickSyncAcquisitionGSoC2014Test, ValidationOfResultsProbabili
                                        << gnss_synchro.PRN << "CN0_dB_0_" << FLAGS_value_CN0_dB_0 << "_dBHz.csv";
 
                             pdpfafile.open(filenamepd.str().c_str(), std::ios::app | std::ios::out);
-                            pdpfafile << FLAGS_value_threshold << "," << Pd << "," << Pfa_p << "," << Pmd << std::endl;
+                            pdpfafile << FLAGS_value_threshold << "," << Pd << "," << Pfa_p << "," << Pmd << '\n';
                             pdpfafile.close();
                         }
                 }
             else if (i == 1)
                 {
-                    std::cout << "Estimated probability of false alarm (satellite absent) = " << Pfa_a << std::endl;
-                    std::cout << "Mean acq time = " << mean_acq_time_us << " microseconds." << std::endl;
+                    std::cout << "Estimated probability of false alarm (satellite absent) = " << Pfa_a << '\n';
+                    std::cout << "Mean acq time = " << mean_acq_time_us << " microseconds.\n";
 
                     if (dump_test_results)
                         {
@@ -841,7 +852,7 @@ TEST_F(GpsL1CaPcpsQuickSyncAcquisitionGSoC2014Test, ValidationOfResultsProbabili
                                        << gnss_synchro.PRN << "CN0_dB_0_" << FLAGS_value_CN0_dB_0 << "_dBHz.csv";
 
                             pdpfafile.open(filenamepf.str().c_str(), std::ios::app | std::ios::out);
-                            pdpfafile << FLAGS_value_threshold << "," << Pfa_a << std::endl;
+                            pdpfafile << FLAGS_value_threshold << "," << Pfa_a << '\n';
                             pdpfafile.close();
                         }
                 }

@@ -7,9 +7,9 @@
  * This class represents a file signal source. Internally it uses a GNU Radio's
  * gr_file_source as a connector to the data.
  *
- * -------------------------------------------------------------------------
+ * -----------------------------------------------------------------------------
  *
- * Copyright (C) 2010-2019  (see AUTHORS file for a list of contributors)
+ * Copyright (C) 2010-2020  (see AUTHORS file for a list of contributors)
  *
  * GNSS-SDR is a software defined Global Navigation
  *          Satellite Systems receiver
@@ -18,7 +18,7 @@
  *
  * SPDX-License-Identifier: GPL-3.0-or-later
  *
- * -------------------------------------------------------------------------
+ * -----------------------------------------------------------------------------
  */
 
 #ifndef GNSS_SDR_FILE_SIGNAL_SOURCE_H
@@ -34,6 +34,10 @@
 #include <cstdint>
 #include <memory>
 #include <string>
+#if GNURADIO_USES_STD_POINTERS
+#else
+#include <boost/shared_ptr.hpp>
+#endif
 
 class ConfigurationInterface;
 
@@ -44,9 +48,9 @@ class ConfigurationInterface;
 class FileSignalSource : public GNSSBlockInterface
 {
 public:
-    FileSignalSource(ConfigurationInterface* configuration, const std::string& role,
+    FileSignalSource(const ConfigurationInterface* configuration, const std::string& role,
         unsigned int in_streams, unsigned int out_streams,
-        const std::shared_ptr<Concurrent_Queue<pmt::pmt_t>>& queue);
+        Concurrent_Queue<pmt::pmt_t>* queue);
 
     ~FileSignalSource() = default;
 
@@ -99,24 +103,30 @@ public:
     }
 
 private:
-    uint64_t samples_;
-    int64_t sampling_frequency_;
-    std::string filename_;
-    std::string item_type_;
-    bool repeat_;
-    bool dump_;
-    std::string dump_filename_;
-    std::string role_;
-    uint32_t in_streams_;
-    uint32_t out_streams_;
     gr::blocks::file_source::sptr file_source_;
+#if GNURADIO_USES_STD_POINTERS
+    std::shared_ptr<gr::block> valve_;
+#else
     boost::shared_ptr<gr::block> valve_;
+#endif
     gr::blocks::file_sink::sptr sink_;
     gr::blocks::throttle::sptr throttle_;
-    std::shared_ptr<Concurrent_Queue<pmt::pmt_t>> queue_;
+
+    std::string role_;
+    std::string item_type_;
+    std::string filename_;
+    std::string dump_filename_;
+
+    uint64_t samples_;
+    int64_t sampling_frequency_;
     size_t item_size_;
-    // Throttle control
+
+    uint32_t in_streams_;
+    uint32_t out_streams_;
+
     bool enable_throttle_control_;
+    bool repeat_;
+    bool dump_;
 };
 
 #endif  // GNSS_SDR_FILE_SIGNAL_SOURCE_H

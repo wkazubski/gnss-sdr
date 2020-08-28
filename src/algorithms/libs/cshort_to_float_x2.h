@@ -3,9 +3,10 @@
  * \brief Adapts a std::complex<short> stream into two float streams
  * \author Carles Fernandez Prades, cfernandez(at)cttc.es
  *
- * -------------------------------------------------------------------------
  *
- * Copyright (C) 2010-2019  (see AUTHORS file for a list of contributors)
+ * -----------------------------------------------------------------------------
+ *
+ * Copyright (C) 2010-2020  (see AUTHORS file for a list of contributors)
  *
  * GNSS-SDR is a software defined Global Navigation
  *          Satellite Systems receiver
@@ -14,20 +15,28 @@
  *
  * SPDX-License-Identifier: GPL-3.0-or-later
  *
- * -------------------------------------------------------------------------
+ * -----------------------------------------------------------------------------
  */
 
 #ifndef GNSS_SDR_CSHORT_TO_FLOAT_X2_H
 #define GNSS_SDR_CSHORT_TO_FLOAT_X2_H
 
 
+#if GNURADIO_USES_STD_POINTERS
+#include <memory>
+#else
 #include <boost/shared_ptr.hpp>
+#endif
 #include <gnuradio/sync_block.h>
 #include <gnuradio/types.h>  // for gr_vector_const_void_star
 
 class cshort_to_float_x2;
 
+#if GNURADIO_USES_STD_POINTERS
+using cshort_to_float_x2_sptr = std::shared_ptr<cshort_to_float_x2>;
+#else
 using cshort_to_float_x2_sptr = boost::shared_ptr<cshort_to_float_x2>;
+#endif
 
 cshort_to_float_x2_sptr make_cshort_to_float_x2();
 
@@ -37,14 +46,14 @@ cshort_to_float_x2_sptr make_cshort_to_float_x2();
  */
 class cshort_to_float_x2 : public gr::sync_block
 {
-private:
-    friend cshort_to_float_x2_sptr make_cshort_to_float_x2();
-    cshort_to_float_x2();
-
 public:
     int work(int noutput_items,
         gr_vector_const_void_star &input_items,
         gr_vector_void_star &output_items);
+
+private:
+    friend cshort_to_float_x2_sptr make_cshort_to_float_x2();
+    cshort_to_float_x2();
 };
 
 #endif

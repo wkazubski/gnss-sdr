@@ -6,9 +6,9 @@
  *
  * \author Carles Fernandez-Prades, 2014. cfernandez(at)cttc.es
  *
- * -------------------------------------------------------------------------
+ * -----------------------------------------------------------------------------
  *
- * Copyright (C) 2010-2019  (see AUTHORS file for a list of contributors)
+ * Copyright (C) 2010-2020  (see AUTHORS file for a list of contributors)
  *
  * GNSS-SDR is a software defined Global Navigation
  *          Satellite Systems receiver
@@ -17,13 +17,14 @@
  *
  * SPDX-License-Identifier: GPL-3.0-or-later
  *
- * -------------------------------------------------------------------------
+ * -----------------------------------------------------------------------------
  */
 
 #include "rtcm_printer.h"
 #include "galileo_ephemeris.h"
 #include "glonass_gnav_ephemeris.h"
 #include "glonass_gnav_utc_model.h"
+#include "gnss_sdr_make_unique.h"
 #include "gnss_synchro.h"
 #include "gps_cnav_ephemeris.h"
 #include "gps_ephemeris.h"
@@ -59,8 +60,8 @@ namespace errorlib = boost::system;
 
 Rtcm_Printer::Rtcm_Printer(const std::string& filename, bool flag_rtcm_file_dump, bool flag_rtcm_server, bool flag_rtcm_tty_port, uint16_t rtcm_tcp_port, uint16_t rtcm_station_id, const std::string& rtcm_dump_devname, bool time_tag_name, const std::string& base_path)
 {
-    boost::posix_time::ptime pt = boost::posix_time::second_clock::local_time();
-    tm timeinfo = boost::posix_time::to_tm(pt);
+    const boost::posix_time::ptime pt = boost::posix_time::second_clock::local_time();
+    const tm timeinfo = boost::posix_time::to_tm(pt);
     d_rtcm_file_dump = flag_rtcm_file_dump;
     rtcm_base_path = base_path;
     if (d_rtcm_file_dump)
@@ -78,7 +79,7 @@ Rtcm_Printer::Rtcm_Printer(const std::string& filename, bool flag_rtcm_file_dump
                                 {
                                     if (!fs::create_directory(new_folder, ec))
                                         {
-                                            std::cout << "Could not create the " << new_folder << " folder." << std::endl;
+                                            std::cout << "Could not create the " << new_folder << " folder.\n";
                                             rtcm_base_path = full_path.string();
                                         }
                                 }
@@ -91,7 +92,7 @@ Rtcm_Printer::Rtcm_Printer(const std::string& filename, bool flag_rtcm_file_dump
                 }
             if (rtcm_base_path != ".")
                 {
-                    std::cout << "RTCM binary file will be stored at " << rtcm_base_path << std::endl;
+                    std::cout << "RTCM binary file will be stored at " << rtcm_base_path << '\n';
                 }
 
             rtcm_base_path = rtcm_base_path + fs::path::preferred_separator;
@@ -149,7 +150,7 @@ Rtcm_Printer::Rtcm_Printer(const std::string& filename, bool flag_rtcm_file_dump
                 }
             else
                 {
-                    std::cout << "File " << rtcm_filename << "cannot be saved. Wrong permissions?" << std::endl;
+                    std::cout << "File " << rtcm_filename << "cannot be saved. Wrong permissions?\n";
                 }
         }
 
@@ -170,7 +171,7 @@ Rtcm_Printer::Rtcm_Printer(const std::string& filename, bool flag_rtcm_file_dump
     port = rtcm_tcp_port;
     station_id = rtcm_station_id;
 
-    rtcm = std::make_shared<Rtcm>(port);
+    rtcm = std::make_unique<Rtcm>(port);
 
     if (flag_rtcm_server)
         {
@@ -181,6 +182,7 @@ Rtcm_Printer::Rtcm_Printer(const std::string& filename, bool flag_rtcm_file_dump
 
 Rtcm_Printer::~Rtcm_Printer()
 {
+    DLOG(INFO) << "RTCM printer destructor called.";
     if (rtcm->is_server_running())
         {
             try
@@ -198,8 +200,7 @@ Rtcm_Printer::~Rtcm_Printer()
         }
     if (rtcm_file_descriptor.is_open())
         {
-            int64_t pos;
-            pos = rtcm_file_descriptor.tellp();
+            const auto pos = rtcm_file_descriptor.tellp();
             try
                 {
                     rtcm_file_descriptor.close();
@@ -230,7 +231,7 @@ Rtcm_Printer::~Rtcm_Printer()
 
 bool Rtcm_Printer::Print_Rtcm_MT1001(const Gps_Ephemeris& gps_eph, double obs_time, const std::map<int32_t, Gnss_Synchro>& observables)
 {
-    std::string m1001 = rtcm->print_MT1001(gps_eph, obs_time, observables, station_id);
+    const std::string m1001 = rtcm->print_MT1001(gps_eph, obs_time, observables, station_id);
     Rtcm_Printer::Print_Message(m1001);
     return true;
 }
@@ -238,7 +239,7 @@ bool Rtcm_Printer::Print_Rtcm_MT1001(const Gps_Ephemeris& gps_eph, double obs_ti
 
 bool Rtcm_Printer::Print_Rtcm_MT1002(const Gps_Ephemeris& gps_eph, double obs_time, const std::map<int32_t, Gnss_Synchro>& observables)
 {
-    std::string m1002 = rtcm->print_MT1002(gps_eph, obs_time, observables, station_id);
+    const std::string m1002 = rtcm->print_MT1002(gps_eph, obs_time, observables, station_id);
     Rtcm_Printer::Print_Message(m1002);
     return true;
 }
@@ -246,7 +247,7 @@ bool Rtcm_Printer::Print_Rtcm_MT1002(const Gps_Ephemeris& gps_eph, double obs_ti
 
 bool Rtcm_Printer::Print_Rtcm_MT1003(const Gps_Ephemeris& gps_eph, const Gps_CNAV_Ephemeris& cnav_eph, double obs_time, const std::map<int32_t, Gnss_Synchro>& observables)
 {
-    std::string m1003 = rtcm->print_MT1003(gps_eph, cnav_eph, obs_time, observables, station_id);
+    const std::string m1003 = rtcm->print_MT1003(gps_eph, cnav_eph, obs_time, observables, station_id);
     Rtcm_Printer::Print_Message(m1003);
     return true;
 }
@@ -254,7 +255,7 @@ bool Rtcm_Printer::Print_Rtcm_MT1003(const Gps_Ephemeris& gps_eph, const Gps_CNA
 
 bool Rtcm_Printer::Print_Rtcm_MT1004(const Gps_Ephemeris& gps_eph, const Gps_CNAV_Ephemeris& cnav_eph, double obs_time, const std::map<int32_t, Gnss_Synchro>& observables)
 {
-    std::string m1003 = rtcm->print_MT1004(gps_eph, cnav_eph, obs_time, observables, station_id);
+    const std::string m1003 = rtcm->print_MT1004(gps_eph, cnav_eph, obs_time, observables, station_id);
     Rtcm_Printer::Print_Message(m1003);
     return true;
 }
@@ -262,7 +263,7 @@ bool Rtcm_Printer::Print_Rtcm_MT1004(const Gps_Ephemeris& gps_eph, const Gps_CNA
 
 bool Rtcm_Printer::Print_Rtcm_MT1009(const Glonass_Gnav_Ephemeris& glonass_gnav_eph, double obs_time, const std::map<int32_t, Gnss_Synchro>& observables)
 {
-    std::string m1009 = rtcm->print_MT1009(glonass_gnav_eph, obs_time, observables, station_id);
+    const std::string m1009 = rtcm->print_MT1009(glonass_gnav_eph, obs_time, observables, station_id);
     Rtcm_Printer::Print_Message(m1009);
     return true;
 }
@@ -270,7 +271,7 @@ bool Rtcm_Printer::Print_Rtcm_MT1009(const Glonass_Gnav_Ephemeris& glonass_gnav_
 
 bool Rtcm_Printer::Print_Rtcm_MT1010(const Glonass_Gnav_Ephemeris& glonass_gnav_eph, double obs_time, const std::map<int32_t, Gnss_Synchro>& observables)
 {
-    std::string m1010 = rtcm->print_MT1010(glonass_gnav_eph, obs_time, observables, station_id);
+    const std::string m1010 = rtcm->print_MT1010(glonass_gnav_eph, obs_time, observables, station_id);
     Rtcm_Printer::Print_Message(m1010);
     return true;
 }
@@ -278,7 +279,7 @@ bool Rtcm_Printer::Print_Rtcm_MT1010(const Glonass_Gnav_Ephemeris& glonass_gnav_
 
 bool Rtcm_Printer::Print_Rtcm_MT1011(const Glonass_Gnav_Ephemeris& glonass_gnav_ephL1, const Glonass_Gnav_Ephemeris& glonass_gnav_ephL2, double obs_time, const std::map<int32_t, Gnss_Synchro>& observables)
 {
-    std::string m1011 = rtcm->print_MT1011(glonass_gnav_ephL1, glonass_gnav_ephL2, obs_time, observables, station_id);
+    const std::string m1011 = rtcm->print_MT1011(glonass_gnav_ephL1, glonass_gnav_ephL2, obs_time, observables, station_id);
     Rtcm_Printer::Print_Message(m1011);
     return true;
 }
@@ -286,7 +287,7 @@ bool Rtcm_Printer::Print_Rtcm_MT1011(const Glonass_Gnav_Ephemeris& glonass_gnav_
 
 bool Rtcm_Printer::Print_Rtcm_MT1012(const Glonass_Gnav_Ephemeris& glonass_gnav_ephL1, const Glonass_Gnav_Ephemeris& glonass_gnav_ephL2, double obs_time, const std::map<int32_t, Gnss_Synchro>& observables)
 {
-    std::string m1012 = rtcm->print_MT1012(glonass_gnav_ephL1, glonass_gnav_ephL2, obs_time, observables, station_id);
+    const std::string m1012 = rtcm->print_MT1012(glonass_gnav_ephL1, glonass_gnav_ephL2, obs_time, observables, station_id);
     Rtcm_Printer::Print_Message(m1012);
     return true;
 }
@@ -294,7 +295,7 @@ bool Rtcm_Printer::Print_Rtcm_MT1012(const Glonass_Gnav_Ephemeris& glonass_gnav_
 
 bool Rtcm_Printer::Print_Rtcm_MT1019(const Gps_Ephemeris& gps_eph)
 {
-    std::string m1019 = rtcm->print_MT1019(gps_eph);
+    const std::string m1019 = rtcm->print_MT1019(gps_eph);
     Rtcm_Printer::Print_Message(m1019);
     return true;
 }
@@ -302,7 +303,7 @@ bool Rtcm_Printer::Print_Rtcm_MT1019(const Gps_Ephemeris& gps_eph)
 
 bool Rtcm_Printer::Print_Rtcm_MT1020(const Glonass_Gnav_Ephemeris& glonass_gnav_eph, const Glonass_Gnav_Utc_Model& glonass_gnav_utc_model)
 {
-    std::string m1020 = rtcm->print_MT1020(glonass_gnav_eph, glonass_gnav_utc_model);
+    const std::string m1020 = rtcm->print_MT1020(glonass_gnav_eph, glonass_gnav_utc_model);
     Rtcm_Printer::Print_Message(m1020);
     return true;
 }
@@ -310,7 +311,7 @@ bool Rtcm_Printer::Print_Rtcm_MT1020(const Glonass_Gnav_Ephemeris& glonass_gnav_
 
 bool Rtcm_Printer::Print_Rtcm_MT1045(const Galileo_Ephemeris& gal_eph)
 {
-    std::string m1045 = rtcm->print_MT1045(gal_eph);
+    const std::string m1045 = rtcm->print_MT1045(gal_eph);
     Rtcm_Printer::Print_Message(m1045);
     return true;
 }
@@ -376,11 +377,11 @@ int Rtcm_Printer::init_serial(const std::string& serial_device)
     // clang-format off
     struct termios options{};
     // clang-format on
-    int64_t BAUD;
-    int64_t DATABITS;
-    int64_t STOPBITS;
-    int64_t PARITYON;
-    int64_t PARITY;
+    const int64_t BAUD = B9600;  // BAUD  =  B38400;
+    const int64_t DATABITS = CS8;
+    const int64_t STOPBITS = 0;
+    const int64_t PARITYON = 0;
+    const int64_t PARITY = 0;
 
     fd = open(serial_device.c_str(), O_RDWR | O_NOCTTY | O_NDELAY | O_CLOEXEC);
     if (fd == -1)
@@ -393,13 +394,6 @@ int Rtcm_Printer::init_serial(const std::string& serial_device)
             LOG(INFO) << "Error enabling direct I/O";  // clear all flags on descriptor, enable direct I/O
         }
     tcgetattr(fd, &options);  // read serial port options
-
-    BAUD = B9600;
-    // BAUD  =  B38400;
-    DATABITS = CS8;
-    STOPBITS = 0;
-    PARITYON = 0;
-    PARITY = 0;
 
     options.c_cflag = BAUD | DATABITS | STOPBITS | PARITYON | PARITY | CLOCAL | CREAD;
     // enable receiver, set 8 bit data, ignore control lines
@@ -428,7 +422,7 @@ bool Rtcm_Printer::Print_Message(const std::string& message)
         {
             try
                 {
-                    rtcm_file_descriptor << message << std::endl;
+                    rtcm_file_descriptor << message << '\n';
                 }
             catch (const std::exception& ex)
                 {
@@ -443,7 +437,7 @@ bool Rtcm_Printer::Print_Message(const std::string& message)
             if (write(rtcm_dev_descriptor, message.c_str(), message.length()) == -1)
                 {
                     DLOG(INFO) << "RTCM printer cannot write on serial device " << rtcm_devname.c_str();
-                    std::cout << "RTCM printer cannot write on serial device " << rtcm_devname.c_str() << std::endl;
+                    std::cout << "RTCM printer cannot write on serial device " << rtcm_devname.c_str() << '\n';
                     return false;
                 }
         }

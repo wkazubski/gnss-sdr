@@ -3,9 +3,9 @@
  * \brief  Interface of a Galileo UTC MODEL storage
  * \author Javier Arribas, 2013. jarribas(at)cttc.es
  *
- * -------------------------------------------------------------------------
+ * -----------------------------------------------------------------------------
  *
- * Copyright (C) 2010-2019  (see AUTHORS file for a list of contributors)
+ * Copyright (C) 2010-2020  (see AUTHORS file for a list of contributors)
  *
  * GNSS-SDR is a software defined Global Navigation
  *          Satellite Systems receiver
@@ -14,30 +14,11 @@
  *
  * SPDX-License-Identifier: GPL-3.0-or-later
  *
- * -------------------------------------------------------------------------
+ * -----------------------------------------------------------------------------
  */
 
 #include "galileo_utc_model.h"
 #include <cmath>
-
-Galileo_Utc_Model::Galileo_Utc_Model()
-{
-    // Word type 6: GST-UTC conversion parameters
-    A0_6 = 0.0;
-    A1_6 = 0.0;
-    Delta_tLS_6 = 0;
-    t0t_6 = 0;
-    WNot_6 = 0;
-    WN_LSF_6 = 0;
-    DN_6 = 0;
-    Delta_tLSF_6 = 0;
-    flag_utc_model = false;
-    // GPS to Galileo GST conversion parameters
-    A_0G_10 = 0.0;
-    A_1G_10 = 0.0;
-    t_0G_10 = 0;
-    WN_0G_10 = 0;
-}
 
 
 double Galileo_Utc_Model::GST_to_UTC_time(double t_e, int32_t WN)
@@ -46,12 +27,12 @@ double Galileo_Utc_Model::GST_to_UTC_time(double t_e, int32_t WN)
     double t_Utc_daytime;
     double Delta_t_Utc = 0;
     // Determine if the effectivity time of the leap second event is in the past
-    int32_t weeksToLeapSecondEvent = WN_LSF_6 - (WN % 256);
+    const int32_t weeksToLeapSecondEvent = WN_LSF_6 - (WN % 256);
 
     if ((weeksToLeapSecondEvent) >= 0)  // is not in the past
         {
             // Detect if the effectivity time and user's time is within six hours  = 6 * 60 *60 = 21600 s
-            int secondOfLeapSecondEvent = DN_6 * 24 * 60 * 60;
+            const int secondOfLeapSecondEvent = DN_6 * 24 * 60 * 60;
             if (std::abs(t_e - secondOfLeapSecondEvent) > 21600)
                 {
                     /* 5.1.7a GST->UTC case a
@@ -72,7 +53,7 @@ double Galileo_Utc_Model::GST_to_UTC_time(double t_e, int32_t WN)
                      * the effective time is computed according to the following equations:
                      */
                     Delta_t_Utc = Delta_tLS_6 + A0_6 + A1_6 * (t_e - t0t_6 + 604800 * static_cast<double>((WN % 256) - WNot_6));
-                    double W = fmod(t_e - Delta_t_Utc - 43200, 86400) + 43200;
+                    const double W = fmod(t_e - Delta_t_Utc - 43200, 86400) + 43200;
                     t_Utc_daytime = fmod(W, 86400 + Delta_tLSF_6 - Delta_tLS_6);
                     // implement something to handle a leap second event!
                 }
@@ -90,7 +71,7 @@ double Galileo_Utc_Model::GST_to_UTC_time(double t_e, int32_t WN)
             t_Utc_daytime = fmod(t_e - Delta_t_Utc, 86400);
         }
 
-    double secondsOfWeekBeforeToday = 86400 * floor(t_e / 86400);
+    const double secondsOfWeekBeforeToday = 86400 * floor(t_e / 86400);
     t_Utc = secondsOfWeekBeforeToday + t_Utc_daytime;
     return t_Utc;
 }

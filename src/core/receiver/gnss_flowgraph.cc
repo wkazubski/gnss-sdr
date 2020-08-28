@@ -3,13 +3,14 @@
  * \brief Implementation of a GNSS receiver flow graph
  * \author Carlos Aviles, 2010. carlos.avilesr(at)googlemail.com
  *         Luis Esteve, 2012. luis(at)epsilon-formacion.com
- *         Carles Fernandez-Prades, 2014. cfernandez(at)cttc.es
+ *         Carles Fernandez-Prades, 2014-2020. cfernandez(at)cttc.es
  *         Álvaro Cebrián Juan, 2018. acebrianjuan(at)gmail.com
  *         Javier Arribas, 2018. javiarribas(at)gmail.com
  *
- * -------------------------------------------------------------------------
  *
- * Copyright (C) 2010-2019  (see AUTHORS file for a list of contributors)
+ * -----------------------------------------------------------------------------
+ *
+ * Copyright (C) 2010-2020  (see AUTHORS file for a list of contributors)
  *
  * GNSS-SDR is a software defined Global Navigation
  *          Satellite Systems receiver
@@ -18,7 +19,7 @@
  *
  * SPDX-License-Identifier: GPL-3.0-or-later
  *
- * -------------------------------------------------------------------------
+ * -----------------------------------------------------------------------------
  */
 
 #include "gnss_flowgraph.h"
@@ -27,6 +28,7 @@
 #include "GPS_L5.h"
 #include "Galileo_E1.h"
 #include "Galileo_E5a.h"
+#include "Galileo_E5b.h"
 #include "channel.h"
 #include "channel_fsm.h"
 #include "channel_interface.h"
@@ -34,9 +36,9 @@
 #include "gnss_block_factory.h"
 #include "gnss_block_interface.h"
 #include "gnss_satellite.h"
+#include "gnss_sdr_make_unique.h"
 #include "gnss_synchro_monitor.h"
 #include <boost/lexical_cast.hpp>    // for boost::lexical_cast
-#include <boost/shared_ptr.hpp>      // for boost::shared_ptr
 #include <boost/tokenizer.hpp>       // for boost::tokenizer
 #include <glog/logging.h>            // for LOG
 #include <gnuradio/basic_block.h>    // for basic_block
@@ -50,9 +52,14 @@
 #include <exception>                 // for exception
 #include <iostream>                  // for operator<<
 #include <iterator>                  // for insert_iterator, inserter
+#include <memory>                    // for std::shared_ptr
 #include <set>                       // for set
+#include <sstream>                   // for std::stringstream
 #include <stdexcept>                 // for invalid_argument
-#include <thread>                    // for thread
+#include <thread>                    // for std::thread
+#include <utility>                   // for std::move
+
+
 #ifdef GR_GREATER_38
 #include <gnuradio/filter/fir_filter_blk.h>
 #else
@@ -63,12 +70,12 @@
 #define GNSS_SDR_ARRAY_SIGNAL_CONDITIONER_CHANNELS 8
 
 
-GNSSFlowgraph::GNSSFlowgraph(std::shared_ptr<ConfigurationInterface> configuration, const std::shared_ptr<Concurrent_Queue<pmt::pmt_t>> queue)  // NOLINT(performance-unnecessary-value-param)
+GNSSFlowgraph::GNSSFlowgraph(std::shared_ptr<ConfigurationInterface> configuration, std::shared_ptr<Concurrent_Queue<pmt::pmt_t>> queue)  // NOLINT(performance-unnecessary-value-param)
 {
     connected_ = false;
     running_ = false;
     configuration_ = std::move(configuration);
-    queue_ = queue;
+    queue_ = std::move(queue);
     multiband_ = GNSSFlowgraph::is_multiband();
     init();
 }
@@ -76,6 +83,7 @@ GNSSFlowgraph::GNSSFlowgraph(std::shared_ptr<ConfigurationInterface> configurati
 
 GNSSFlowgraph::~GNSSFlowgraph()
 {
+    DLOG(INFO) << "GNSSFlowgraph destructor called";
     if (connected_)
         {
             GNSSFlowgraph::disconnect();
@@ -108,6 +116,10 @@ void GNSSFlowgraph::start()
 
 void GNSSFlowgraph::stop()
 {
+    for (const auto& chan : channels_)
+        {
+            chan->stop_channel();  // stop the acquisition or tracking operation
+        }
     top_block_->stop();
     running_ = false;
 }
@@ -163,7 +175,7 @@ void GNSSFlowgraph::connect()
                 }
         }
 #endif
-    for (unsigned int i = 0; i < channels_count_; i++)
+    for (int i = 0; i < channels_count_; i++)
         {
             try
                 {
@@ -217,10 +229,10 @@ void GNSSFlowgraph::connect()
                     if (sig_source_.at(i)->implementation() == "Raw_Array_Signal_Source")
                         {
                             // Multichannel Array
-                            std::cout << "ARRAY MODE" << std::endl;
+                            std::cout << "ARRAY MODE\n";
                             for (int j = 0; j < GNSS_SDR_ARRAY_SIGNAL_CONDITIONER_CHANNELS; j++)
                                 {
-                                    std::cout << "connecting ch " << j << std::endl;
+                                    std::cout << "connecting ch " << j << '\n';
                                     top_block_->connect(sig_source_.at(i)->get_right_block(), j, sig_conditioner_.at(i)->get_left_block(), j);
                                 }
                         }
@@ -283,17 +295,17 @@ void GNSSFlowgraph::connect()
             // connect the sample counter to Observables
             try
                 {
-                    double fs = static_cast<double>(configuration_->property("GNSS-SDR.internal_fs_sps", 0));
+                    const double fs = static_cast<double>(configuration_->property("GNSS-SDR.internal_fs_sps", 0));
                     if (fs == 0.0)
                         {
                             LOG(WARNING) << "Set GNSS-SDR.internal_fs_sps in configuration file";
-                            std::cout << "Set GNSS-SDR.internal_fs_sps in configuration file" << std::endl;
+                            std::cout << "Set GNSS-SDR.internal_fs_sps in configuration file\n";
                             throw(std::invalid_argument("Set GNSS-SDR.internal_fs_sps in configuration"));
                         }
-                    int observable_interval_ms = static_cast<double>(configuration_->property("GNSS-SDR.observable_interval_ms", 20));
-                    ch_out_sample_counter = gnss_sdr_make_sample_counter(fs, observable_interval_ms, sig_conditioner_.at(0)->get_right_block()->output_signature()->sizeof_stream_item(0));
-                    top_block_->connect(sig_conditioner_.at(0)->get_right_block(), 0, ch_out_sample_counter, 0);
-                    top_block_->connect(ch_out_sample_counter, 0, observables_->get_left_block(), channels_count_);  // extra port for the sample counter pulse
+                    const int observable_interval_ms = configuration_->property("GNSS-SDR.observable_interval_ms", 20);
+                    ch_out_sample_counter_ = gnss_sdr_make_sample_counter(fs, observable_interval_ms, sig_conditioner_.at(0)->get_right_block()->output_signature()->sizeof_stream_item(0));
+                    top_block_->connect(sig_conditioner_.at(0)->get_right_block(), 0, ch_out_sample_counter_, 0);
+                    top_block_->connect(ch_out_sample_counter_, 0, observables_->get_left_block(), channels_count_);  // extra port for the sample counter pulse
                 }
             catch (const std::exception& e)
                 {
@@ -308,16 +320,16 @@ void GNSSFlowgraph::connect()
             // create a hardware-defined gnss_synchro pulse for the observables block
             try
                 {
-                    double fs = static_cast<double>(configuration_->property("GNSS-SDR.internal_fs_sps", 0));
+                    const double fs = static_cast<double>(configuration_->property("GNSS-SDR.internal_fs_sps", 0));
                     if (fs == 0.0)
                         {
                             LOG(WARNING) << "Set GNSS-SDR.internal_fs_sps in configuration file";
-                            std::cout << "Set GNSS-SDR.internal_fs_sps in configuration file" << std::endl;
+                            std::cout << "Set GNSS-SDR.internal_fs_sps in configuration file\n";
                             throw(std::invalid_argument("Set GNSS-SDR.internal_fs_sps in configuration"));
                         }
-                    int observable_interval_ms = static_cast<double>(configuration_->property("GNSS-SDR.observable_interval_ms", 20));
-                    ch_out_fpga_sample_counter = gnss_sdr_make_fpga_sample_counter(fs, observable_interval_ms);
-                    top_block_->connect(ch_out_fpga_sample_counter, 0, observables_->get_left_block(), channels_count_);  // extra port for the sample counter pulse
+                    const int observable_interval_ms = configuration_->property("GNSS-SDR.observable_interval_ms", 20);
+                    ch_out_fpga_sample_counter_ = gnss_sdr_make_fpga_sample_counter(fs, observable_interval_ms);
+                    top_block_->connect(ch_out_fpga_sample_counter_, 0, observables_->get_left_block(), channels_count_);  // extra port for the sample counter pulse
                 }
             catch (const std::exception& e)
                 {
@@ -332,18 +344,18 @@ void GNSSFlowgraph::connect()
     // connect the sample counter to Observables
     try
         {
-            double fs = static_cast<double>(configuration_->property("GNSS-SDR.internal_fs_sps", 0));
+            const double fs = static_cast<double>(configuration_->property("GNSS-SDR.internal_fs_sps", 0));
             if (fs == 0.0)
                 {
                     LOG(WARNING) << "Set GNSS-SDR.internal_fs_sps in configuration file";
-                    std::cout << "Set GNSS-SDR.internal_fs_sps in configuration file" << std::endl;
+                    std::cout << "Set GNSS-SDR.internal_fs_sps in configuration file\n";
                     throw(std::invalid_argument("Set GNSS-SDR.internal_fs_sps in configuration"));
                 }
 
-            int observable_interval_ms = static_cast<double>(configuration_->property("GNSS-SDR.observable_interval_ms", 20));
-            ch_out_sample_counter = gnss_sdr_make_sample_counter(fs, observable_interval_ms, sig_conditioner_.at(0)->get_right_block()->output_signature()->sizeof_stream_item(0));
-            top_block_->connect(sig_conditioner_.at(0)->get_right_block(), 0, ch_out_sample_counter, 0);
-            top_block_->connect(ch_out_sample_counter, 0, observables_->get_left_block(), channels_count_);  // extra port for the sample counter pulse
+            const int observable_interval_ms = configuration_->property("GNSS-SDR.observable_interval_ms", 20);
+            ch_out_sample_counter_ = gnss_sdr_make_sample_counter(fs, observable_interval_ms, sig_conditioner_.at(0)->get_right_block()->output_signature()->sizeof_stream_item(0));
+            top_block_->connect(sig_conditioner_.at(0)->get_right_block(), 0, ch_out_sample_counter_, 0);
+            top_block_->connect(ch_out_sample_counter_, 0, observables_->get_left_block(), channels_count_);  // extra port for the sample counter pulse
         }
     catch (const std::exception& e)
         {
@@ -356,16 +368,17 @@ void GNSSFlowgraph::connect()
 
     // Signal conditioner (selected_signal_source) >> channels (i) (dependent of their associated SignalSource_ID)
     std::vector<bool> signal_conditioner_connected;
+    signal_conditioner_connected.reserve(sig_conditioner_.size());
     for (size_t n = 0; n < sig_conditioner_.size(); n++)
         {
             signal_conditioner_connected.push_back(false);
         }
-    for (unsigned int i = 0; i < channels_count_; i++)
+    for (int i = 0; i < channels_count_; i++)
         {
 #ifndef ENABLE_FPGA
             int selected_signal_conditioner_ID = 0;
-            bool use_acq_resampler = configuration_->property("GNSS-SDR.use_acquisition_resampler", false);
-            uint32_t fs = configuration_->property("GNSS-SDR.internal_fs_sps", 0);
+            const bool use_acq_resampler = configuration_->property("GNSS-SDR.use_acquisition_resampler", false);
+            const uint32_t fs = configuration_->property("GNSS-SDR.internal_fs_sps", 0);
             if (configuration_->property(sig_source_.at(0)->role() + ".enable_FPGA", false) == false)
                 {
                     try
@@ -405,15 +418,12 @@ void GNSSFlowgraph::connect()
                                         case evGAL_5X:
                                             acq_fs = GALILEO_E5A_OPT_ACQ_FS_SPS;
                                             break;
+                                        case evGAL_7X:
+                                            acq_fs = GALILEO_E5B_OPT_ACQ_FS_SPS;
+                                            break;
                                         case evGLO_1G:
-                                            acq_fs = fs;
-                                            break;
                                         case evGLO_2G:
-                                            acq_fs = fs;
-                                            break;
                                         case evBDS_B1:
-                                            acq_fs = fs;
-                                            break;
                                         case evBDS_B3:
                                             acq_fs = fs;
                                             break;
@@ -424,36 +434,19 @@ void GNSSFlowgraph::connect()
                                     if (acq_fs < fs)
                                         {
                                             // check if the resampler is already created for the channel system/signal and for the specific RF Channel
-                                            std::string map_key = channels_.at(i)->implementation() + std::to_string(selected_signal_conditioner_ID);
+                                            const std::string map_key = channels_.at(i)->implementation() + std::to_string(selected_signal_conditioner_ID);
                                             resampler_ratio = static_cast<double>(fs) / acq_fs;
                                             int decimation = floor(resampler_ratio);
                                             while (fs % decimation > 0)
                                                 {
                                                     decimation--;
                                                 };
-                                            double acq_fs_decimated = static_cast<double>(fs) / static_cast<double>(decimation);
+                                            const double acq_fs_decimated = static_cast<double>(fs) / static_cast<double>(decimation);
 
                                             if (decimation > 1)
                                                 {
                                                     // create a FIR low pass filter
-                                                    std::vector<float> taps;
-
-                                                    // float beta = 7.0;
-                                                    // float halfband = 0.5;
-                                                    // float fractional_bw = 0.4;
-                                                    // float rate = 1.0 / static_cast<float>(decimation);
-                                                    //
-                                                    // float trans_width = rate * (halfband - fractional_bw);
-                                                    // float mid_transition_band = rate * halfband - trans_width / 2.0;
-                                                    //
-                                                    // taps = gr::filter::firdes::low_pass(1.0,
-                                                    //    1.0,
-                                                    //    mid_transition_band,
-                                                    //    trans_width,
-                                                    //    gr::filter::firdes::win_type::WIN_KAISER,
-                                                    //    beta);
-
-                                                    taps = gr::filter::firdes::low_pass(1.0,
+                                                    std::vector<float> taps = gr::filter::firdes::low_pass(1.0,
                                                         fs,
                                                         acq_fs_decimated / 2.1,
                                                         acq_fs_decimated / 2,
@@ -481,8 +474,7 @@ void GNSSFlowgraph::connect()
                                                     top_block_->connect(acq_resamplers_.at(map_key), 0,
                                                         channels_.at(i)->get_left_block_acq(), 0);
 
-                                                    std::shared_ptr<Channel> channel_ptr;
-                                                    channel_ptr = std::dynamic_pointer_cast<Channel>(channels_.at(i));
+                                                    std::shared_ptr<Channel> channel_ptr = std::dynamic_pointer_cast<Channel>(channels_.at(i));
                                                     channel_ptr->acquisition()->set_resampler_latency((taps.size() - 1) / 2);
                                                 }
                                             else
@@ -544,14 +536,14 @@ void GNSSFlowgraph::connect()
                             null_sinks_.push_back(gr::blocks::null_sink::make(sizeof(gr_complex)));
                             top_block_->connect(sig_conditioner_.at(n)->get_right_block(), 0,
                                 null_sinks_.back(), 0);
-                            LOG(INFO) << "Null sink connected to signal conditioner " << n << " due to lack of connection to any channel" << std::endl;
+                            LOG(INFO) << "Null sink connected to signal conditioner " << n << " due to lack of connection to any channel\n";
                         }
                 }
         }
 
     // Put channels fixed to a given satellite at the beginning of the vector, then the rest
     std::vector<unsigned int> vector_of_channels;
-    for (unsigned int i = 0; i < channels_count_; i++)
+    for (int i = 0; i < channels_count_; i++)
         {
             unsigned int sat = 0;
             try
@@ -576,7 +568,7 @@ void GNSSFlowgraph::connect()
     // Assign satellites to channels in the initialization
     for (unsigned int& i : vector_of_channels)
         {
-            std::string gnss_signal = channels_.at(i)->get_signal().get_signal_str();  // use channel's implicit signal
+            const std::string gnss_signal = channels_.at(i)->get_signal().get_signal_str();  // use channel's implicit signal
             unsigned int sat = 0;
             try
                 {
@@ -630,6 +622,12 @@ void GNSSFlowgraph::connect()
                             available_GAL_5X_signals_.remove(signal_value);
                             break;
 
+                        case evGAL_7X:
+                            gnss_system = "Galileo";
+                            signal_value = Gnss_Signal(Gnss_Satellite(gnss_system, sat), gnss_signal);
+                            available_GAL_7X_signals_.remove(signal_value);
+                            break;
+
                         case evGLO_1G:
                             gnss_system = "Glonass";
                             signal_value = Gnss_Signal(Gnss_Satellite(gnss_system, sat), gnss_signal);
@@ -669,7 +667,7 @@ void GNSSFlowgraph::connect()
     // Connect the observables output of each channel to the PVT block
     try
         {
-            for (unsigned int i = 0; i < channels_count_; i++)
+            for (int i = 0; i < channels_count_; i++)
                 {
                     top_block_->connect(observables_->get_right_block(), i, pvt_->get_left_block(), i);
                     top_block_->msg_connect(channels_.at(i)->get_right_block(), pmt::mp("telemetry"), pvt_->get_left_block(), pmt::mp("telemetry"));
@@ -693,7 +691,7 @@ void GNSSFlowgraph::connect()
         {
             try
                 {
-                    for (unsigned int i = 0; i < channels_count_; i++)
+                    for (int i = 0; i < channels_count_; i++)
                         {
                             top_block_->connect(observables_->get_right_block(), i, GnssSynchroMonitor_, i);
                         }
@@ -708,7 +706,7 @@ void GNSSFlowgraph::connect()
         }
 #ifndef ENABLE_FPGA
     // Activate acquisition in enabled channels
-    for (unsigned int i = 0; i < channels_count_; i++)
+    for (int i = 0; i < channels_count_; i++)
         {
             LOG(INFO) << "Channel " << i << " assigned to " << channels_.at(i)->get_signal();
             if (channels_state_[i] == 1)
@@ -857,8 +855,8 @@ void GNSSFlowgraph::disconnect()
             // disconnect the sample counter to Observables
             try
                 {
-                    top_block_->disconnect(sig_conditioner_.at(0)->get_right_block(), 0, ch_out_sample_counter, 0);
-                    top_block_->disconnect(ch_out_sample_counter, 0, observables_->get_left_block(), channels_count_);  // extra port for the sample counter pulse
+                    top_block_->disconnect(sig_conditioner_.at(0)->get_right_block(), 0, ch_out_sample_counter_, 0);
+                    top_block_->disconnect(ch_out_sample_counter_, 0, observables_->get_left_block(), channels_count_);  // extra port for the sample counter pulse
                 }
             catch (const std::exception& e)
                 {
@@ -872,7 +870,7 @@ void GNSSFlowgraph::disconnect()
         {
             try
                 {
-                    top_block_->disconnect(ch_out_fpga_sample_counter, 0, observables_->get_left_block(), channels_count_);
+                    top_block_->disconnect(ch_out_fpga_sample_counter_, 0, observables_->get_left_block(), channels_count_);
                 }
             catch (const std::exception& e)
                 {
@@ -887,8 +885,8 @@ void GNSSFlowgraph::disconnect()
     // disconnect the sample counter to Observables
     try
         {
-            top_block_->disconnect(sig_conditioner_.at(0)->get_right_block(), 0, ch_out_sample_counter, 0);
-            top_block_->disconnect(ch_out_sample_counter, 0, observables_->get_left_block(), channels_count_);  // extra port for the sample counter pulse
+            top_block_->disconnect(sig_conditioner_.at(0)->get_right_block(), 0, ch_out_sample_counter_, 0);
+            top_block_->disconnect(ch_out_sample_counter_, 0, observables_->get_left_block(), channels_count_);  // extra port for the sample counter pulse
         }
     catch (const std::exception& e)
         {
@@ -899,7 +897,7 @@ void GNSSFlowgraph::disconnect()
         }
 #endif
     // Signal conditioner (selected_signal_source) >> channels (i) (dependent of their associated SignalSource_ID)
-    for (unsigned int i = 0; i < channels_count_; i++)
+    for (int i = 0; i < channels_count_; i++)
         {
 #ifndef ENABLE_FPGA
             int selected_signal_conditioner_ID;
@@ -941,7 +939,7 @@ void GNSSFlowgraph::disconnect()
 
     try
         {
-            for (unsigned int i = 0; i < channels_count_; i++)
+            for (int i = 0; i < channels_count_; i++)
                 {
                     top_block_->disconnect(observables_->get_right_block(), i, pvt_->get_left_block(), i);
                     if (enable_monitor_)
@@ -988,7 +986,7 @@ void GNSSFlowgraph::disconnect()
                 }
         }
 
-    for (unsigned int i = 0; i < channels_count_; i++)
+    for (int i = 0; i < channels_count_; i++)
         {
             try
                 {
@@ -1081,6 +1079,11 @@ void GNSSFlowgraph::push_back_signal(const Gnss_Signal& gs)
             available_GAL_5X_signals_.push_back(gs);
             break;
 
+        case evGAL_7X:
+            available_GAL_7X_signals_.remove(gs);
+            available_GAL_7X_signals_.push_back(gs);
+            break;
+
         case evGLO_1G:
             available_GLO_1G_signals_.remove(gs);
             available_GLO_1G_signals_.push_back(gs);
@@ -1132,6 +1135,10 @@ void GNSSFlowgraph::remove_signal(const Gnss_Signal& gs)
             available_GAL_5X_signals_.remove(gs);
             break;
 
+        case evGAL_7X:
+            available_GAL_7X_signals_.remove(gs);
+            break;
+
         case evGLO_1G:
             available_GLO_1G_signals_.remove(gs);
             break;
@@ -1161,10 +1168,11 @@ double GNSSFlowgraph::project_doppler(const std::string& searched_signal, double
     switch (mapStringValues_[searched_signal])
         {
         case evGPS_L5:
-            return (primary_freq_doppler_hz / FREQ1) * FREQ5;
-            break;
         case evGAL_5X:
             return (primary_freq_doppler_hz / FREQ1) * FREQ5;
+            break;
+        case evGAL_7X:
+            return (primary_freq_doppler_hz / FREQ1) * FREQ7;
             break;
         case evGPS_2S:
             return (primary_freq_doppler_hz / FREQ1) * FREQ2;
@@ -1178,7 +1186,7 @@ double GNSSFlowgraph::project_doppler(const std::string& searched_signal, double
 void GNSSFlowgraph::acquisition_manager(unsigned int who)
 {
     unsigned int current_channel;
-    for (unsigned int i = 0; i < channels_count_; i++)
+    for (int i = 0; i < channels_count_; i++)
         {
             current_channel = (i + who + 1) % channels_count_;
             unsigned int sat_ = 0;
@@ -1279,7 +1287,7 @@ void GNSSFlowgraph::acquisition_manager(unsigned int who)
 void GNSSFlowgraph::apply_action(unsigned int who, unsigned int what)
 {
     // todo: the acquisition events are initiated from the acquisition success or failure queued msg. If the acquisition is disabled for non-assisted secondary freq channels, the engine stops..
-    std::lock_guard<std::mutex> lock(signal_list_mutex);
+    std::lock_guard<std::mutex> lock(signal_list_mutex_);
     DLOG(INFO) << "Received " << what << " from " << who;
     unsigned int sat = 0;
     Gnss_Signal gs;
@@ -1425,6 +1433,14 @@ void GNSSFlowgraph::priorize_satellites(const std::vector<std::pair<int, Gnss_Sa
                         {
                             available_GAL_5X_signals_.push_front(gs);
                         }
+
+                    gs = Gnss_Signal(visible_satellite.second, "7X");
+                    old_size = available_GAL_7X_signals_.size();
+                    available_GAL_7X_signals_.remove(gs);
+                    if (old_size > available_GAL_7X_signals_.size())
+                        {
+                            available_GAL_7X_signals_.push_front(gs);
+                        }
                 }
         }
 }
@@ -1448,7 +1464,7 @@ void GNSSFlowgraph::set_configuration(const std::shared_ptr<ConfigurationInterfa
 #ifdef ENABLE_FPGA
 void GNSSFlowgraph::start_acquisition_helper()
 {
-    for (unsigned int i = 0; i < channels_count_; i++)
+    for (int i = 0; i < channels_count_; i++)
         {
             if (channels_state_[i] == 1)
                 {
@@ -1463,7 +1479,7 @@ void GNSSFlowgraph::perform_hw_reset()
     // a stop acquisition command causes the SW to reset the HW
     std::shared_ptr<Channel> channel_ptr;
 
-    for (uint32_t i = 0; i < channels_count_; i++)
+    for (int i = 0; i < channels_count_; i++)
         {
             channel_ptr = std::dynamic_pointer_cast<Channel>(channels_.at(i));
             channel_ptr->tracking()->stop_tracking();
@@ -1482,7 +1498,7 @@ void GNSSFlowgraph::init()
     /*
      * Instantiates the receiver blocks
      */
-    std::unique_ptr<GNSSBlockFactory> block_factory_(new GNSSBlockFactory());
+    auto block_factory = std::make_unique<GNSSBlockFactory>();
 
     channels_status_ = channel_status_msg_receiver_make();
 
@@ -1496,16 +1512,16 @@ void GNSSFlowgraph::init()
         {
             for (int i = 0; i < sources_count_; i++)
                 {
-                    std::cout << "Creating source " << i << std::endl;
-                    sig_source_.push_back(block_factory_->GetSignalSource(configuration_, queue_, i));
+                    std::cout << "Creating source " << i << '\n';
+                    sig_source_.push_back(block_factory->GetSignalSource(configuration_.get(), queue_.get(), i));
                     // TODO: Create a class interface for SignalSources, derived from GNSSBlockInterface.
                     // Include GetRFChannels in the interface to avoid read config parameters here
                     // read the number of RF channels for each front-end
                     RF_Channels = configuration_->property(sig_source_.at(i)->role() + ".RF_channels", 1);
-                    std::cout << "RF Channels " << RF_Channels << std::endl;
+                    std::cout << "RF Channels " << RF_Channels << '\n';
                     for (int j = 0; j < RF_Channels; j++)
                         {
-                            sig_conditioner_.push_back(block_factory_->GetSignalConditioner(configuration_, signal_conditioner_ID));
+                            sig_conditioner_.push_back(block_factory->GetSignalConditioner(configuration_.get(), signal_conditioner_ID));
                             signal_conditioner_ID++;
                         }
                 }
@@ -1513,7 +1529,7 @@ void GNSSFlowgraph::init()
     else
         {
             // backwards compatibility for old config files
-            sig_source_.push_back(block_factory_->GetSignalSource(configuration_, queue_, -1));
+            sig_source_.push_back(block_factory->GetSignalSource(configuration_.get(), queue_.get(), -1));
             // TODO: Create a class interface for SignalSources, derived from GNSSBlockInterface.
             // Include GetRFChannels in the interface to avoid read config parameters here
             // read the number of RF channels for each front-end
@@ -1522,41 +1538,25 @@ void GNSSFlowgraph::init()
                 {
                     for (int j = 0; j < RF_Channels; j++)
                         {
-                            sig_conditioner_.push_back(block_factory_->GetSignalConditioner(configuration_, signal_conditioner_ID));
+                            sig_conditioner_.push_back(block_factory->GetSignalConditioner(configuration_.get(), signal_conditioner_ID));
                             signal_conditioner_ID++;
                         }
                 }
             else
                 {
                     // old config file, single signal source and single channel, not specified
-                    sig_conditioner_.push_back(block_factory_->GetSignalConditioner(configuration_, -1));
+                    sig_conditioner_.push_back(block_factory->GetSignalConditioner(configuration_.get(), -1));
                 }
         }
 
-    observables_ = block_factory_->GetObservables(configuration_);
-    // Mark old implementations as deprecated
-    std::string default_str("Default");
-    std::string obs_implementation = configuration_->property("Observables.implementation", default_str);
-    if ((obs_implementation == "GPS_L1_CA_Observables") || (obs_implementation == "GPS_L2C_Observables") ||
-        (obs_implementation == "Galileo_E1B_Observables") || (obs_implementation == "Galileo_E5A_Observables"))
-        {
-            std::cout << "WARNING: Implementation '" << obs_implementation << "' of the Observables block has been replaced by 'Hybrid_Observables'." << std::endl;
-            std::cout << "Please update your configuration file." << std::endl;
-        }
+    observables_ = block_factory->GetObservables(configuration_.get());
 
-    pvt_ = block_factory_->GetPVT(configuration_);
-    // Mark old implementations as deprecated
-    std::string pvt_implementation = configuration_->property("PVT.implementation", default_str);
-    if ((pvt_implementation == "GPS_L1_CA_PVT") || (pvt_implementation == "Galileo_E1_PVT") || (pvt_implementation == "Hybrid_PVT"))
-        {
-            std::cout << "WARNING: Implementation '" << pvt_implementation << "' of the PVT block has been replaced by 'RTKLIB_PVT'." << std::endl;
-            std::cout << "Please update your configuration file." << std::endl;
-        }
+    pvt_ = block_factory->GetPVT(configuration_.get());
 
-    std::shared_ptr<std::vector<std::unique_ptr<GNSSBlockInterface>>> channels = block_factory_->GetChannels(configuration_, queue_);
+    auto channels = block_factory->GetChannels(configuration_.get(), queue_.get());
 
-    channels_count_ = channels->size();
-    for (unsigned int i = 0; i < channels_count_; i++)
+    channels_count_ = static_cast<int>(channels->size());
+    for (int i = 0; i < channels_count_; i++)
         {
             std::shared_ptr<GNSSBlockInterface> chan_ = std::move(channels->at(i));
             channels_.push_back(std::dynamic_pointer_cast<ChannelInterface>(chan_));
@@ -1569,6 +1569,7 @@ void GNSSFlowgraph::init()
     mapStringValues_["L5"] = evGPS_L5;
     mapStringValues_["1B"] = evGAL_1B;
     mapStringValues_["5X"] = evGAL_5X;
+    mapStringValues_["7X"] = evGAL_7X;
     mapStringValues_["1G"] = evGLO_1G;
     mapStringValues_["2G"] = evGLO_2G;
     mapStringValues_["B1"] = evBDS_B1;
@@ -1658,6 +1659,30 @@ void GNSSFlowgraph::set_signals_list()
                 }
         }
 
+    std::string sv_banned = configuration_->property("GNSS-SDR.Galileo_banned_prns", std::string(""));
+    if (!sv_banned.empty())
+        {
+            std::stringstream ss(sv_banned);
+            while (ss.good())
+                {
+                    std::string substr;
+                    std::getline(ss, substr, ',');
+                    try
+                        {
+                            auto banned = static_cast<unsigned int>(std::stoi(substr));
+                            available_galileo_prn.erase(banned);
+                        }
+                    catch (const std::invalid_argument& ia)
+                        {
+                            std::cerr << "Invalid argument at GNSS-SDR.Galileo_banned_prns configuration parameter: " << ia.what() << '\n';
+                        }
+                    catch (const std::out_of_range& oor)
+                        {
+                            std::cerr << "Out of range at GNSS-SDR.Galileo_banned_prns configuration parameter: " << oor.what() << '\n';
+                        }
+                }
+        }
+
     sv_list = configuration_->property("GPS.prns", std::string(""));
 
     if (sv_list.length() > 0)
@@ -1671,6 +1696,30 @@ void GNSSFlowgraph::set_signals_list()
             if (!tmp_set.empty())
                 {
                     available_gps_prn = tmp_set;
+                }
+        }
+
+    sv_banned = configuration_->property("GNSS-SDR.GPS_banned_prns", std::string(""));
+    if (!sv_banned.empty())
+        {
+            std::stringstream ss(sv_banned);
+            while (ss.good())
+                {
+                    std::string substr;
+                    std::getline(ss, substr, ',');
+                    try
+                        {
+                            auto banned = static_cast<unsigned int>(std::stoi(substr));
+                            available_gps_prn.erase(banned);
+                        }
+                    catch (const std::invalid_argument& ia)
+                        {
+                            std::cerr << "Invalid argument at GNSS-SDR.GPS_banned_prns configuration parameter: " << ia.what() << '\n';
+                        }
+                    catch (const std::out_of_range& oor)
+                        {
+                            std::cerr << "Out of range at GNSS-SDR.GPS_banned_prns configuration parameter: " << oor.what() << '\n';
+                        }
                 }
         }
 
@@ -1690,6 +1739,30 @@ void GNSSFlowgraph::set_signals_list()
                 }
         }
 
+    sv_banned = configuration_->property("GNSS-SDR.SBAS_banned_prns", std::string(""));
+    if (!sv_banned.empty())
+        {
+            std::stringstream ss(sv_banned);
+            while (ss.good())
+                {
+                    std::string substr;
+                    std::getline(ss, substr, ',');
+                    try
+                        {
+                            auto banned = static_cast<unsigned int>(std::stoi(substr));
+                            available_sbas_prn.erase(banned);
+                        }
+                    catch (const std::invalid_argument& ia)
+                        {
+                            std::cerr << "Invalid argument at GNSS-SDR.SBAS_banned_prns configuration parameter: " << ia.what() << '\n';
+                        }
+                    catch (const std::out_of_range& oor)
+                        {
+                            std::cerr << "Out of range at GNSS-SDR.SBAS_banned_prns configuration parameter: " << oor.what() << '\n';
+                        }
+                }
+        }
+
     sv_list = configuration_->property("Glonass.prns", std::string(""));
 
     if (sv_list.length() > 0)
@@ -1706,6 +1779,30 @@ void GNSSFlowgraph::set_signals_list()
                 }
         }
 
+    sv_banned = configuration_->property("GNSS-SDR.Glonass_banned_prns", std::string(""));
+    if (!sv_banned.empty())
+        {
+            std::stringstream ss(sv_banned);
+            while (ss.good())
+                {
+                    std::string substr;
+                    std::getline(ss, substr, ',');
+                    try
+                        {
+                            auto banned = static_cast<unsigned int>(std::stoi(substr));
+                            available_glonass_prn.erase(banned);
+                        }
+                    catch (const std::invalid_argument& ia)
+                        {
+                            std::cerr << "Invalid argument at GNSS-SDR.Glonass_banned_prns configuration parameter: " << ia.what() << '\n';
+                        }
+                    catch (const std::out_of_range& oor)
+                        {
+                            std::cerr << "Out of range at GNSS-SDR.Glonass_banned_prns configuration parameter: " << oor.what() << '\n';
+                        }
+                }
+        }
+
     sv_list = configuration_->property("Beidou.prns", std::string(""));
 
     if (sv_list.length() > 0)
@@ -1719,6 +1816,30 @@ void GNSSFlowgraph::set_signals_list()
             if (!tmp_set.empty())
                 {
                     available_beidou_prn = tmp_set;
+                }
+        }
+
+    sv_banned = configuration_->property("GNSS-SDR.Beidou_banned_prns", std::string(""));
+    if (!sv_banned.empty())
+        {
+            std::stringstream ss(sv_banned);
+            while (ss.good())
+                {
+                    std::string substr;
+                    std::getline(ss, substr, ',');
+                    try
+                        {
+                            auto banned = static_cast<unsigned int>(std::stoi(substr));
+                            available_beidou_prn.erase(banned);
+                        }
+                    catch (const std::invalid_argument& ia)
+                        {
+                            std::cerr << "Invalid argument at GNSS-SDR.Beidou_banned_prns configuration parameter: " << ia.what() << '\n';
+                        }
+                    catch (const std::out_of_range& oor)
+                        {
+                            std::cerr << "Out of range at GNSS-SDR.Beidou_banned_prns configuration parameter: " << oor.what() << '\n';
+                        }
                 }
         }
 
@@ -1800,6 +1921,19 @@ void GNSSFlowgraph::set_signals_list()
                 }
         }
 
+    if (configuration_->property("Channels_7X.count", 0) > 0)
+        {
+            // Loop to create the list of Galileo E5b signals
+            for (available_gnss_prn_iter = available_galileo_prn.cbegin();
+                 available_gnss_prn_iter != available_galileo_prn.cend();
+                 available_gnss_prn_iter++)
+                {
+                    available_GAL_7X_signals_.emplace_back(
+                        Gnss_Satellite(std::string("Galileo"), *available_gnss_prn_iter),
+                        std::string("7X"));
+                }
+        }
+
     if (configuration_->property("Channels_1G.count", 0) > 0)
         {
             // Loop to create the list of GLONASS L1 C/A signals
@@ -1856,7 +1990,7 @@ void GNSSFlowgraph::set_signals_list()
 
 void GNSSFlowgraph::set_channels_state()
 {
-    std::lock_guard<std::mutex> lock(signal_list_mutex);
+    std::lock_guard<std::mutex> lock(signal_list_mutex_);
     max_acq_channels_ = configuration_->property("Channels.in_acquisition", channels_count_);
     if (max_acq_channels_ > channels_count_)
         {
@@ -1864,7 +1998,7 @@ void GNSSFlowgraph::set_channels_state()
             LOG(WARNING) << "Channels_in_acquisition is bigger than number of channels. Variable acq_channels_count_ is set to " << channels_count_;
         }
     channels_state_.reserve(channels_count_);
-    for (unsigned int i = 0; i < channels_count_; i++)
+    for (int i = 0; i < channels_count_; i++)
         {
             if (i < max_acq_channels_)
                 {
@@ -1898,6 +2032,10 @@ bool GNSSFlowgraph::is_multiband() const
     if (configuration_->property("Channels_1B.count", 0) > 0)
         {
             if (configuration_->property("Channels_5X.count", 0) > 0)
+                {
+                    multiband = true;
+                }
+            if (configuration_->property("Channels_7X.count", 0) > 0)
                 {
                     multiband = true;
                 }
@@ -1960,7 +2098,7 @@ Gnss_Signal GNSSFlowgraph::search_next_signal(const std::string& searched_signal
 
                                     if (it2 != available_GPS_2S_signals_.end())
                                         {
-                                            estimated_doppler = current_status.second->Carrier_Doppler_hz;
+                                            estimated_doppler = static_cast<float>(current_status.second->Carrier_Doppler_hz);
                                             RX_time = current_status.second->RX_time;
                                             // 3. return the GPS L2 satellite and remove it from list
                                             result = *it2;
@@ -2012,7 +2150,7 @@ Gnss_Signal GNSSFlowgraph::search_next_signal(const std::string& searched_signal
 
                                     if (it2 != available_GPS_L5_signals_.end())
                                         {
-                                            estimated_doppler = current_status.second->Carrier_Doppler_hz;
+                                            estimated_doppler = static_cast<float>(current_status.second->Carrier_Doppler_hz);
                                             RX_time = current_status.second->RX_time;
                                             // std::cout << " Channel: " << it->first << " => Doppler: " << estimated_doppler << "[Hz] \n";
                                             // 3. return the GPS L5 satellite and remove it from list
@@ -2066,7 +2204,7 @@ Gnss_Signal GNSSFlowgraph::search_next_signal(const std::string& searched_signal
 
                                     if (it2 != available_GAL_5X_signals_.end())
                                         {
-                                            estimated_doppler = current_status.second->Carrier_Doppler_hz;
+                                            estimated_doppler = static_cast<float>(current_status.second->Carrier_Doppler_hz);
                                             RX_time = current_status.second->RX_time;
                                             // std::cout << " Channel: " << it->first << " => Doppler: " << estimated_doppler << "[Hz] \n";
                                             // 3. return the Gal 5X satellite and remove it from list
@@ -2090,6 +2228,50 @@ Gnss_Signal GNSSFlowgraph::search_next_signal(const std::string& searched_signal
                     if (!pop)
                         {
                             available_GAL_5X_signals_.push_back(result);
+                        }
+                }
+            break;
+
+        case evGAL_7X:
+            if (configuration_->property("Channels_1B.count", 0) > 0)
+                {
+                    // 1. Get the current channel status map
+                    std::map<int, std::shared_ptr<Gnss_Synchro>> current_channels_status = channels_status_->get_current_status_map();
+                    // 2. search the currently tracked Galileo E1 satellites and assist the Galileo E5 acquisition if the satellite is not tracked on E5
+                    for (auto& current_status : current_channels_status)
+                        {
+                            if (std::string(current_status.second->Signal) == "1B")
+                                {
+                                    std::list<Gnss_Signal>::iterator it2;
+                                    it2 = std::find_if(std::begin(available_GAL_7X_signals_), std::end(available_GAL_7X_signals_),
+                                        [&](Gnss_Signal const& sig) { return sig.get_satellite().get_PRN() == current_status.second->PRN; });
+
+                                    if (it2 != available_GAL_7X_signals_.end())
+                                        {
+                                            estimated_doppler = static_cast<float>(current_status.second->Carrier_Doppler_hz);
+                                            RX_time = current_status.second->RX_time;
+                                            // std::cout << " Channel: " << it->first << " => Doppler: " << estimated_doppler << "[Hz] \n";
+                                            // 3. return the Gal 7X satellite and remove it from list
+                                            result = *it2;
+                                            if (pop)
+                                                {
+                                                    available_GAL_7X_signals_.erase(it2);
+                                                }
+                                            found_signal = true;
+                                            assistance_available = true;
+                                            break;
+                                        }
+                                }
+                        }
+                }
+            // fallback: pick the front satellite because there is no tracked satellites in E1 to assist E5
+            if (found_signal == false)
+                {
+                    result = available_GAL_7X_signals_.front();
+                    available_GAL_7X_signals_.pop_front();
+                    if (!pop)
+                        {
+                            available_GAL_7X_signals_.push_back(result);
                         }
                 }
             break;

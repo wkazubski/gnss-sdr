@@ -43,6 +43,7 @@ set(TRACKING_ADAPTER_SOURCES
     gps_l1_ca_dll_pll_tracking.cc
     gps_l1_ca_tcp_connector_tracking.cc
     galileo_e5a_dll_pll_tracking.cc
+    galileo_e5b_dll_pll_tracking.cc
     gps_l2_m_dll_pll_tracking.cc
     glonass_l1_ca_dll_pll_tracking.cc
     glonass_l1_ca_dll_pll_c_aid_tracking.cc
@@ -61,6 +62,7 @@ set(TRACKING_ADAPTER_HEADERS
     gps_l1_ca_dll_pll_tracking.h
     gps_l1_ca_tcp_connector_tracking.h
     galileo_e5a_dll_pll_tracking.h
+    galileo_e5b_dll_pll_tracking.h
     gps_l2_m_dll_pll_tracking.h
     glonass_l1_ca_dll_pll_tracking.h
     glonass_l1_ca_dll_pll_c_aid_tracking.h
@@ -76,22 +78,28 @@ set(TRACKING_ADAPTER_HEADERS
 list(SORT TRACKING_ADAPTER_HEADERS)
 list(SORT TRACKING_ADAPTER_SOURCES)
 
-source_group(Headers FILES ${TRACKING_ADAPTER_HEADERS})
-
-add_library(tracking_adapters
-    ${TRACKING_ADAPTER_SOURCES}
-    ${TRACKING_ADAPTER_HEADERS}
-)
+if(USE_CMAKE_TARGET_SOURCES)
+    add_library(tracking_adapters STATIC)
+    target_sources(tracking_adapters
+        PRIVATE
+            ${TRACKING_ADAPTER_SOURCES}
+        PUBLIC
+            ${TRACKING_ADAPTER_HEADERS}
+    )
+else()
+    source_group(Headers FILES ${TRACKING_ADAPTER_HEADERS})
+    add_library(tracking_adapters
+        ${TRACKING_ADAPTER_SOURCES}
+        ${TRACKING_ADAPTER_HEADERS}
+    )
+endif()
 
 target_link_libraries(tracking_adapters
     PUBLIC
         tracking_gr_blocks
-        algorithms_libs
-        Gnuradio::runtime
     PRIVATE
         gnss_sdr_flags
         Glog::glog
-        Volkgnsssdr::volkgnsssdr
 )
 
 target_include_directories(tracking_adapters

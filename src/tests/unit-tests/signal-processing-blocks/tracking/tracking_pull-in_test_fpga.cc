@@ -8,9 +8,9 @@
  *          </ul>
  *
  *
- * -------------------------------------------------------------------------
+ * -----------------------------------------------------------------------------
  *
- * Copyright (C) 2012-2019  (see AUTHORS file for a list of contributors)
+ * Copyright (C) 2012-2020  (see AUTHORS file for a list of contributors)
  *
  * GNSS-SDR is a software defined Global Navigation
  *          Satellite Systems receiver
@@ -19,7 +19,7 @@
  *
  * SPDX-License-Identifier: GPL-3.0-or-later
  *
- * -------------------------------------------------------------------------
+ * -----------------------------------------------------------------------------
  */
 
 #include "GPS_L1_CA.h"
@@ -57,6 +57,11 @@
 #include <utility>
 #include <vector>
 
+#if HAS_GENERIC_LAMBDA
+#else
+#include <boost/bind/bind.hpp>
+#endif
+
 #ifdef GR_GREATER_38
 #include <gnuradio/filter/fir_filter_blk.h>
 #else
@@ -76,10 +81,21 @@ namespace fs = std::filesystem;
 namespace fs = boost::filesystem;
 #endif
 
+#if GNURADIO_USES_STD_POINTERS
+#include <memory>
+#else
+#include <boost/shared_ptr.hpp>
+#endif
+
+
 // ######## GNURADIO TRACKING BLOCK MESSAGE RECEVER #########
 class TrackingPullInTest_msg_rx_Fpga;
 
+#if GNURADIO_USES_STD_POINTERS
+using TrackingPullInTest_msg_rx_Fpga_sptr = std::shared_ptr<TrackingPullInTest_msg_rx_Fpga>;
+#else
 using TrackingPullInTest_msg_rx_Fpga_sptr = boost::shared_ptr<TrackingPullInTest_msg_rx_Fpga>;
+#endif
 
 TrackingPullInTest_msg_rx_Fpga_sptr TrackingPullInTest_msg_rx_Fpga_make();
 
@@ -120,7 +136,16 @@ void TrackingPullInTest_msg_rx_Fpga::msg_handler_events(pmt::pmt_t msg)
 TrackingPullInTest_msg_rx_Fpga::TrackingPullInTest_msg_rx_Fpga() : gr::block("TrackingPullInTest_msg_rx_Fpga", gr::io_signature::make(0, 0, 0), gr::io_signature::make(0, 0, 0))
 {
     this->message_port_register_in(pmt::mp("events"));
-    this->set_msg_handler(pmt::mp("events"), boost::bind(&TrackingPullInTest_msg_rx_Fpga::msg_handler_events, this, _1));
+    this->set_msg_handler(pmt::mp("events"),
+#if HAS_GENERIC_LAMBDA
+        [this](auto&& PH1) { msg_handler_events(PH1); });
+#else
+#if USE_BOOST_BIND_PLACEHOLDERS
+        boost::bind(&TrackingPullInTest_msg_rx_Fpga::msg_handler_events, this, boost::placeholders::_1));
+#else
+        boost::bind(&TrackingPullInTest_msg_rx_Fpga::msg_handler_events, this, _1));
+#endif
+#endif
     rx_message = 0;
 }
 
@@ -181,7 +206,7 @@ void* handler_DMA_trk_pull_in_test(void* arguments)
         }
     catch (const std::ifstream::failure& e)
         {
-            std::cerr << "Exception opening file " << Filename << std::endl;
+            std::cerr << "Exception opening file " << Filename << '\n';
             return nullptr;
         }
 
@@ -191,7 +216,7 @@ void* handler_DMA_trk_pull_in_test(void* arguments)
     tx_fd = open("/dev/loop_tx", O_WRONLY);
     if (tx_fd < 0)
         {
-            std::cout << "Cannot open loop device" << std::endl;
+            std::cout << "Cannot open loop device\n";
             return nullptr;
         }
 
@@ -208,7 +233,7 @@ void* handler_DMA_trk_pull_in_test(void* arguments)
                 }
             catch (const std::ifstream::failure& e)
                 {
-                    std::cerr << "Exception reading file " << Filename << std::endl;
+                    std::cerr << "Exception reading file " << Filename << '\n';
                 }
         }
 
@@ -235,7 +260,7 @@ void* handler_DMA_trk_pull_in_test(void* arguments)
                 }
             catch (const std::ifstream::failure& e)
                 {
-                    std::cerr << "Exception reading file " << Filename << std::endl;
+                    std::cerr << "Exception reading file " << Filename << '\n';
                 }
 
             for (int index0 = 0; index0 < (nsamples_block_size * 2); index0 += 2)
@@ -264,12 +289,11 @@ void* handler_DMA_trk_pull_in_test(void* arguments)
 
             if (write(tx_fd, input_samples_dma.data(), nsamples_block_size * 2 * 2) != nsamples_block_size * 2 * 2)
                 {
-                    std::cerr << "Error: DMA could not send all the required samples " << std::endl;
+                    std::cerr << "Error: DMA could not send all the required samples \n";
                 }
 
             // Throttle the DMA
             std::this_thread::sleep_for(std::chrono::milliseconds(1));
-
 
             nsamples_remaining -= nsamples_block_size;
 
@@ -285,7 +309,7 @@ void* handler_DMA_trk_pull_in_test(void* arguments)
         }
     catch (const std::ifstream::failure& e)
         {
-            std::cerr << "Exception closing files " << Filename << std::endl;
+            std::cerr << "Exception closing files " << Filename << '\n';
         }
 
     try
@@ -294,7 +318,7 @@ void* handler_DMA_trk_pull_in_test(void* arguments)
         }
     catch (const std::ifstream::failure& e)
         {
-            std::cerr << "Exception closing loop device " << std::endl;
+            std::cerr << "Exception closing loop device \n";
         }
 
     return nullptr;
@@ -420,13 +444,13 @@ int TrackingPullInTestFpga::generate_signal()
     else if (pid == 0)
         {
             execv(&generator_binary[0], parmList);
-            std::cout << "Return not expected. Must be an execv err." << std::endl;
+            std::cout << "Return not expected. Must be an execv err.\n";
             std::terminate();
         }
 
     waitpid(pid, &child_status, 0);
 
-    std::cout << "Signal and Observables RINEX and RAW files created." << std::endl;
+    std::cout << "Signal and Observables RINEX and RAW files created.\n";
     return 0;
 }
 
@@ -449,13 +473,11 @@ public:
         return true;
     }
 
-
     bool Event_failed_acquisition_repeat() override
     {
         acquisition_successful = false;
         return true;
     }
-
 
     bool Event_failed_acquisition_no_repeat() override
     {
@@ -725,7 +747,7 @@ bool TrackingPullInTestFpga::acquire_signal(int SV_ID)
                     // create DMA child process
                     if (pthread_create(&thread_DMA, nullptr, handler_DMA_trk_pull_in_test, reinterpret_cast<void*>(&args)) < 0)
                         {
-                            std::cout << "ERROR cannot create DMA Process" << std::endl;
+                            std::cout << "ERROR cannot create DMA Process\n";
                         }
 
                     pthread_join(thread_DMA, nullptr);
@@ -747,13 +769,13 @@ bool TrackingPullInTestFpga::acquire_signal(int SV_ID)
 
             if (pthread_create(&thread_acquisition, nullptr, handler_acquisition_trk_pull_in_test, reinterpret_cast<void*>(&args_acq)) < 0)
                 {
-                    std::cout << "ERROR cannot create acquisition Process" << std::endl;
+                    std::cout << "ERROR cannot create acquisition Process\n";
                 }
 
             if (start_msg == true)
                 {
-                    std::cout << "Reading external signal file: " << FLAGS_signal_file << std::endl;
-                    std::cout << "Searching for " << System_and_Signal << " Satellites..." << std::endl;
+                    std::cout << "Reading external signal file: " << FLAGS_signal_file << '\n';
+                    std::cout << "Searching for " << System_and_Signal << " Satellites...\n";
                     std::cout << "[";
                     start_msg = false;
                 }
@@ -764,7 +786,7 @@ bool TrackingPullInTestFpga::acquire_signal(int SV_ID)
             // create DMA child process
             if (pthread_create(&thread_DMA, nullptr, handler_DMA_trk_pull_in_test, reinterpret_cast<void*>(&args)) < 0)
                 {
-                    std::cout << "ERROR cannot create DMA Process" << std::endl;
+                    std::cout << "ERROR cannot create DMA Process\n";
                 }
 
             // wait until the acquisition is finished
@@ -790,7 +812,7 @@ bool TrackingPullInTestFpga::acquire_signal(int SV_ID)
             std::cout.flush();
         }
 
-    std::cout << "]" << std::endl;
+    std::cout << "]\n";
     std::cout << "-------------------------------------------\n";
 
     for (auto& x : doppler_measurements_map)
@@ -803,7 +825,7 @@ bool TrackingPullInTestFpga::acquire_signal(int SV_ID)
     elapsed_seconds = end - start;
     std::cout << "Total signal acquisition run time "
               << elapsed_seconds.count()
-              << " [seconds]" << std::endl;
+              << " [seconds]\n";
     return true;
 }
 
@@ -857,7 +879,6 @@ TEST_F(TrackingPullInTestFpga, ValidationOfResults)
                 }
         }
 
-
     // use generator or use an external capture file
     if (FLAGS_enable_external_signal_file)
         {
@@ -909,11 +930,11 @@ TEST_F(TrackingPullInTestFpga, ValidationOfResults)
             ASSERT_EQ(true_obs_data.open_obs_file(true_obs_file), true) << "Failure opening true observables file";
             // load acquisition data based on the first epoch of the true observations
             ASSERT_EQ(true_obs_data.read_binary_obs(), true)
-                << "Failure reading true tracking dump file." << std::endl
+                << "Failure reading true tracking dump file.\n"
                 << "Maybe sat PRN #" + std::to_string(FLAGS_test_satellite_PRN) +
                        " is not available?";
-            std::cout << "Testing satellite PRN=" << test_satellite_PRN << std::endl;
-            std::cout << "True Initial Doppler " << true_obs_data.doppler_l1_hz << " [Hz], true Initial code delay [Chips]=" << true_obs_data.prn_delay_chips << "[Chips]" << std::endl;
+            std::cout << "Testing satellite PRN=" << test_satellite_PRN << '\n';
+            std::cout << "True Initial Doppler " << true_obs_data.doppler_l1_hz << " [Hz], true Initial code delay [Chips]=" << true_obs_data.prn_delay_chips << "[Chips]\n";
             true_acq_doppler_hz = true_obs_data.doppler_l1_hz;
             true_acq_delay_samples = (GPS_L1_CA_CODE_LENGTH_CHIPS - true_obs_data.prn_delay_chips / GPS_L1_CA_CODE_LENGTH_CHIPS) * static_cast<double>(baseband_sampling_freq) * GPS_L1_CA_CODE_PERIOD_S;
             acq_samplestamp_samples = 0;
@@ -926,7 +947,7 @@ TEST_F(TrackingPullInTestFpga, ValidationOfResults)
 
             std::cout << "Estimated Initial Doppler " << true_acq_doppler_hz
                       << " [Hz], estimated Initial code delay " << true_acq_delay_samples << " [Samples]"
-                      << " Acquisition SampleStamp is " << acq_samplestamp_map.find(FLAGS_test_satellite_PRN)->second << std::endl;
+                      << " Acquisition SampleStamp is " << acq_samplestamp_map.find(FLAGS_test_satellite_PRN)->second << '\n';
         }
 
     int64_t acq_to_trk_delay_samples = ceil(static_cast<double>(FLAGS_fs_gen_sps) * FLAGS_acq_to_trk_delay_s);
@@ -986,9 +1007,9 @@ TEST_F(TrackingPullInTestFpga, ValidationOfResults)
 
                             // create flowgraph
                             top_block = gr::make_top_block("Tracking test");
-                            std::shared_ptr<GNSSBlockInterface> trk_ = factory->GetBlock(config, "Tracking", config->property("Tracking.implementation", std::string("undefined")), 1, 1);
+                            std::shared_ptr<GNSSBlockInterface> trk_ = factory->GetBlock(config.get(), "Tracking", 1, 1);
                             std::shared_ptr<TrackingInterface> tracking = std::dynamic_pointer_cast<TrackingInterface>(trk_);
-                            boost::shared_ptr<TrackingPullInTest_msg_rx_Fpga> msg_rx = TrackingPullInTest_msg_rx_Fpga_make();
+                            auto msg_rx = TrackingPullInTest_msg_rx_Fpga_make();
 
                             ASSERT_NO_THROW({
                                 tracking->set_channel(gnss_synchro.Channel_ID);
@@ -1023,7 +1044,7 @@ TEST_F(TrackingPullInTestFpga, ValidationOfResults)
                             // ********************************************************************
                             // ***** STEP 5: Perform the signal tracking and read the results *****
                             // ********************************************************************
-                            std::cout << "--- START TRACKING WITH PULL-IN ERROR: " << acq_doppler_error_hz_values.at(current_acq_doppler_error_idx) << " [Hz] and " << acq_delay_error_chips_values.at(current_acq_doppler_error_idx).at(current_acq_code_error_idx) << " [Chips] ---" << std::endl;
+                            std::cout << "--- START TRACKING WITH PULL-IN ERROR: " << acq_doppler_error_hz_values.at(current_acq_doppler_error_idx) << " [Hz] and " << acq_delay_error_chips_values.at(current_acq_doppler_error_idx).at(current_acq_code_error_idx) << " [Chips] ---\n";
                             std::chrono::time_point<std::chrono::system_clock> start, end;
 
                             top_block->start();
@@ -1041,7 +1062,7 @@ TEST_F(TrackingPullInTestFpga, ValidationOfResults)
 
                                     if (pthread_create(&thread_DMA, nullptr, handler_DMA_trk_pull_in_test, reinterpret_cast<void*>(&args)) < 0)
                                         {
-                                            std::cout << "ERROR cannot create DMA Process" << std::endl;
+                                            std::cout << "ERROR cannot create DMA Process\n";
                                         }
                                 }
 
@@ -1057,7 +1078,7 @@ TEST_F(TrackingPullInTestFpga, ValidationOfResults)
 
                             if (pthread_create(&thread_DMA, nullptr, handler_DMA_trk_pull_in_test, reinterpret_cast<void*>(&args)) < 0)
                                 {
-                                    std::cout << "ERROR cannot create DMA Process" << std::endl;
+                                    std::cout << "ERROR cannot create DMA Process\n";
                                 }
 
                             // wait for the child DMA process to finish
@@ -1073,7 +1094,7 @@ TEST_F(TrackingPullInTestFpga, ValidationOfResults)
                             acquisition->stop_acquisition();
 
                             std::chrono::duration<double> elapsed_seconds = end - start;
-                            std::cout << "Signal tracking completed in " << elapsed_seconds.count() << " seconds" << std::endl;
+                            std::cout << "Signal tracking completed in " << elapsed_seconds.count() << " seconds\n";
 
                             pull_in_results_v.push_back(msg_rx->rx_message != 3);  // save last asynchronous tracking message in order to detect a loss of lock
 
@@ -1107,7 +1128,7 @@ TEST_F(TrackingPullInTestFpga, ValidationOfResults)
                                     while (trk_dump.read_binary_obs())
                                         {
                                             trk_timestamp_s(epoch_counter) = static_cast<double>(trk_dump.PRN_start_sample_count) / static_cast<double>(baseband_sampling_freq);
-                                            trk_acc_carrier_phase_cycles(epoch_counter) = trk_dump.acc_carrier_phase_rad / GPS_TWO_PI;
+                                            trk_acc_carrier_phase_cycles(epoch_counter) = trk_dump.acc_carrier_phase_rad / TWO_PI;
                                             trk_Doppler_Hz(epoch_counter) = trk_dump.carrier_doppler_hz;
                                             double delay_chips = GPS_L1_CA_CODE_LENGTH_CHIPS - GPS_L1_CA_CODE_LENGTH_CHIPS * (fmod((static_cast<double>(trk_dump.PRN_start_sample_count) + trk_dump.aux1) / static_cast<double>(baseband_sampling_freq), 1.0e-3) / 1.0e-3);
 
@@ -1129,9 +1150,9 @@ TEST_F(TrackingPullInTestFpga, ValidationOfResults)
                                     const std::string gnuplot_executable(FLAGS_gnuplot_executable);
                                     if (gnuplot_executable.empty())
                                         {
-                                            std::cout << "WARNING: Although the flag show_plots has been set to TRUE," << std::endl;
-                                            std::cout << "gnuplot has not been found in your system." << std::endl;
-                                            std::cout << "Test results will not be plotted." << std::endl;
+                                            std::cout << "WARNING: Although the flag show_plots has been set to TRUE,\n";
+                                            std::cout << "gnuplot has not been found in your system.\n";
+                                            std::cout << "Test results will not be plotted.\n";
                                         }
                                     else
                                         {
@@ -1236,7 +1257,7 @@ TEST_F(TrackingPullInTestFpga, ValidationOfResults)
                                                 }
                                             catch (const GnuplotException& ge)
                                                 {
-                                                    std::cout << ge.what() << std::endl;
+                                                    std::cout << ge.what() << '\n';
                                                 }
                                         }
                                 }  // end plot

@@ -9,9 +9,9 @@
  * GPS and Galileo Receiver. A Single-Frequency Approach,
  * Birkhauser, 2007, Applied and Numerical Harmonic Analysis.
  *
- * -------------------------------------------------------------------------
+ * -----------------------------------------------------------------------------
  *
- * Copyright (C) 2010-2019  (see AUTHORS file for a list of contributors)
+ * Copyright (C) 2010-2020  (see AUTHORS file for a list of contributors)
  *
  * GNSS-SDR is a software defined Global Navigation
  *          Satellite Systems receiver
@@ -20,7 +20,7 @@
  *
  * SPDX-License-Identifier: GPL-3.0-or-later
  *
- * -------------------------------------------------------------------------
+ * -----------------------------------------------------------------------------
  */
 
 
@@ -30,10 +30,10 @@
 void Tracking_2nd_DLL_filter::calculate_lopp_coef(float* tau1, float* tau2, float lbw, float zeta, float k)
 {
     // Solve natural frequency
-    float Wn = lbw * 8.0 * zeta / (4.0 * zeta * zeta + 1.0);
+    const float Wn = lbw * 8.0F * zeta / (4.0F * zeta * zeta + 1.0F);
     // solve for t1 & t2
     *tau1 = k / (Wn * Wn);
-    *tau2 = 2.0 * zeta / Wn;
+    *tau2 = 2.0F * zeta / Wn;
 }
 
 
@@ -55,7 +55,7 @@ void Tracking_2nd_DLL_filter::initialize()
 
 float Tracking_2nd_DLL_filter::get_code_nco(float DLL_discriminator)
 {
-    float code_nco = d_old_code_nco + (d_tau2_code / d_tau1_code) * (DLL_discriminator - d_old_code_error) + (DLL_discriminator + d_old_code_error) * (d_pdi_code / (2.0 * d_tau1_code));
+    float code_nco = d_old_code_nco + (d_tau2_code / d_tau1_code) * (DLL_discriminator - d_old_code_error) + (DLL_discriminator + d_old_code_error) * (d_pdi_code / (2.0F * d_tau1_code));
     d_old_code_nco = code_nco;
     d_old_code_error = DLL_discriminator;  // [chips]
     return code_nco;

@@ -12,6 +12,7 @@ SPDX-FileCopyrightText: 2011-2020 Carles Fernandez-Prades <carles.fernandez@cttc
 
 [![License: GPL v3](https://img.shields.io/badge/License-GPL%20v3-blue.svg)](https://www.gnu.org/licenses/gpl-3.0)
 [![REUSE status](https://api.reuse.software/badge/github.com/gnss-sdr/gnss-sdr)](https://api.reuse.software/info/github.com/gnss-sdr/gnss-sdr)
+[![Contributor Covenant](https://img.shields.io/badge/Contributor%20Covenant-v2.0%20adopted-ff69b4.svg)](CODE_OF_CONDUCT.md)
 
 **Welcome to GNSS-SDR!**
 
@@ -96,7 +97,7 @@ $ sudo apt-get install build-essential cmake git pkg-config libboost-dev libboos
        libboost-serialization-dev liblog4cpp5-dev libuhd-dev gnuradio-dev gr-osmosdr \
        libblas-dev liblapack-dev libarmadillo-dev libgflags-dev libgoogle-glog-dev \
        libgnutls-openssl-dev libpcap-dev libmatio-dev libpugixml-dev libgtest-dev \
-       libprotobuf-dev protobuf-compiler python3-mako python3-six
+       libprotobuf-dev protobuf-compiler python3-mako
 ```
 
 Please note that the required files from `libgtest-dev` were moved to
@@ -115,11 +116,13 @@ the `libmatio-dev` package and install `libtool`, `automake` and `libhdf5-dev`
 instead. A recent version of the library will be downloaded and built
 automatically if CMake does not find it installed.
 
-In distributions older than Ubuntu 16.04 or Debian 9, `python3-mako` and
-`python3-six` must be replaced by `python-mako` and `python-six`.
+In distributions older than Ubuntu 16.04 or Debian 9, `python3-mako` must be
+replaced by `python-mako`. For Ubuntu 14.04, you will need to add the package
+`python-six` to the list of dependencies.
 
 **Note for Debian 8 "jessie" users:** please see the note about `libmatio-dev`
-above. Install `libtool`, `automake` and `libhdf5-dev` instead.
+above. Install `libtool`, `automake` and `libhdf5-dev` instead. You will also
+need `python-six`.
 
 Once you have installed these packages, you can jump directly to
 [download the source code and build GNSS-SDR](#download-and-build-linux).
@@ -130,8 +133,8 @@ If you are using Arch Linux:
 
 ```
 $ pacman -S gcc make cmake pkgconf git boost boost-libs log4cpp libvolk gnuradio \
-       blas lapack gflags google-glog openssl pugixml \
-       python-mako python-six libmatio libpcap gtest protobuf
+       blas lapack gflags google-glog openssl pugixml libmatio protobuf \
+       python-mako libpcap gtest
 ```
 
 Once you have installed these packages, you can jump directly to
@@ -166,8 +169,8 @@ $ sudo yum install make automake gcc gcc-c++ kernel-devel cmake git boost-devel 
        boost-date-time boost-system boost-filesystem boost-thread boost-chrono \
        boost-serialization log4cpp-devel gnuradio-devel gr-osmosdr-devel \
        blas-devel lapack-devel matio-devel armadillo-devel gflags-devel \
-       glog-devel openssl-devel libpcap-devel python3-mako python3-six \
-       pugixml-devel protobuf-devel protobuf-compiler
+       glog-devel openssl-devel libpcap-devel pugixml-devel python3-mako \
+       protobuf-devel protobuf-compiler
 ```
 
 Once you have installed these packages, you can jump directly to
@@ -182,7 +185,7 @@ zypper install cmake git gcc-c++ boost-devel libboost_atomic-devel \
        libboost_system-devel libboost_filesystem-devel libboost_chrono-devel \
        libboost_thread-devel libboost_serialization-devel log4cpp-devel \
        gnuradio-devel pugixml-devel libpcap-devel armadillo-devel libtool \
-       automake hdf5-devel openssl-devel python3-Mako python3-six protobuf-devel
+       automake hdf5-devel openssl-devel python3-Mako protobuf-devel
 ```
 
 If you are using openSUSE Tumbleweed:
@@ -193,7 +196,7 @@ zypper install cmake git gcc-c++ boost-devel libboost_atomic-devel \
        libboost_thread-devel libboost_chrono-devel libboost_serialization-devel \
        log4cpp-devel gtest gnuradio-devel pugixml-devel libpcap-devel \
        armadillo-devel libtool automake hdf5-devel libopenssl-devel \
-       python3-Mako python3-six protobuf-devel
+       python3-Mako protobuf-devel
 ```
 
 Once you have installed these packages, you can jump directly to
@@ -289,9 +292,9 @@ $ sudo apt-get install libblas-dev liblapack-dev       # For Debian/Ubuntu/Linux
 $ sudo yum install lapack-devel blas-devel             # For Fedora/CentOS/RHEL
 $ sudo zypper install lapack-devel blas-devel          # For OpenSUSE
 $ sudo pacman -S blas lapack                           # For Arch Linux
-$ wget https://sourceforge.net/projects/arma/files/armadillo-9.850.1.tar.xz
-$ tar xvfz armadillo-9.850.1.tar.xz
-$ cd armadillo-9.850.1
+$ wget https://sourceforge.net/projects/arma/files/armadillo-9.880.1.tar.xz
+$ tar xvfz armadillo-9.880.1.tar.xz
+$ cd armadillo-9.880.1
 $ cmake .
 $ make
 $ sudo make install
@@ -392,9 +395,9 @@ $ sudo apt-get install autoconf automake libtool curl make g++ unzip
 and then:
 
 ```
-$ wget https://github.com/protocolbuffers/protobuf/releases/download/v3.11.4/protobuf-cpp-3.11.4.tar.gz
-$ tar xvfz protobuf-cpp-3.11.4.tar.gz
-$ cd protobuf-3.11.4
+$ wget https://github.com/protocolbuffers/protobuf/releases/download/v3.12.3/protobuf-cpp-3.12.3.tar.gz
+$ tar xvfz protobuf-cpp-3.12.3.tar.gz
+$ cd protobuf-3.12.3
 $ ./autogen.sh
 $ ./configure
 $ make
@@ -517,20 +520,29 @@ the function to execute. It mimics GNU Radio's [VOLK](https://www.libvolk.org/)
 library, so if you still have not run `volk_profile`, this is a good moment to
 do so.
 
-If you are using Eclipse as your development environment, CMake can create the
-project for you. Type:
+If you are using [Eclipse](https://www.eclipse.org/ide/) as your development
+environment, CMake can create the project for you. However, if the build
+directory is a subdirectory of the source directory (as is the case of the
+`gnss-sdr/build` folder), this is not supported well by Eclipse. It is strongly
+recommended to use a build directory which is a sibling of the source directory.
+Hence, type from the `gnss-sdr` root folder:
 
 ```
-$ cmake -G "Eclipse CDT4 - Unix Makefiles" -DCMAKE_BUILD_TYPE=Debug -DECLIPSE_GENERATE_SOURCE_PROJECT=TRUE -DCMAKE_ECLIPSE_VERSION=4.5 .
+$ cd ..
+$ mkdir eclipse && cd eclipse
+$ cmake -G "Eclipse CDT4 - Unix Makefiles" -DCMAKE_ECLIPSE_GENERATE_SOURCE_PROJECT=TRUE -DCMAKE_ECLIPSE_VERSION=4.5 ../gnss-sdr
 ```
 
-and then import the created project file into Eclipse:
+and then import the created project into Eclipse:
 
 1. Import project using Menu File -> Import.
 2. Select General -> Existing projects into workspace.
-3. Browse where your build tree is and select the root build tree directory.
-   Keep "Copy projects into workspace" unchecked.
-4. You get a fully functional Eclipse project.
+3. Select your root directory: Browse and select your newly created `eclipse/`
+   directory. Keep "Copy projects into workspace" unchecked.
+4. Click on "Finish" and you will get a fully functional Eclipse project.
+
+After building the project, you will find the generated binaries at
+`eclipse/install`.
 
 ###### Build GN3S V2 Custom firmware and driver (OPTIONAL):
 
@@ -739,7 +751,7 @@ $ sudo port selfupdate
 $ sudo port upgrade outdated
 $ sudo port install armadillo cmake gnuradio gnutls lapack libad9361-iio libiio \
     matio pkgconfig protobuf3-cpp pugixml google-glog +gflags
-$ sudo port install py37-mako py37-six
+$ sudo port install py37-mako
 $ sudo port install doxygen +docs
 ```
 
@@ -781,7 +793,6 @@ $ brew update && brew upgrade
 $ brew install armadillo cmake hdf5 gflags glog gnuradio lapack libmatio log4cpp \
     openssl pkg-config protobuf pugixml
 $ pip3 install mako
-$ pip3 install six
 $ brew cask install mactex  # when completed, restart Terminal
 $ brew install graphviz doxygen
 ```

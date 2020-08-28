@@ -8,9 +8,9 @@
  *
  * Class that implements a highly optimized vector multiTAP correlator class for CPUs
  *
- * -------------------------------------------------------------------------
+ * -----------------------------------------------------------------------------
  *
- * Copyright (C) 2010-2019  (see AUTHORS file for a list of contributors)
+ * Copyright (C) 2010-2020  (see AUTHORS file for a list of contributors)
  *
  * GNSS-SDR is a software defined Global Navigation
  *          Satellite Systems receiver
@@ -19,7 +19,7 @@
  *
  * SPDX-License-Identifier: GPL-3.0-or-later
  *
- * -------------------------------------------------------------------------
+ * -----------------------------------------------------------------------------
  */
 
 #ifndef GNSS_SDR_CPU_MULTICORRELATOR_REAL_CODES_H
@@ -48,13 +48,13 @@ public:
 private:
     // Allocate the device input vectors
     const std::complex<float> *d_sig_in;
-    float **d_local_codes_resampled;
     const float *d_local_code_in;
     std::complex<float> *d_corr_out;
+    float **d_local_codes_resampled;
     float *d_shifts_chips;
-    bool d_use_high_dynamics_resampler;
     int d_code_length_chips;
     int d_n_correlators;
+    bool d_use_high_dynamics_resampler;
 };
 
 

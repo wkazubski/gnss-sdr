@@ -19,7 +19,7 @@
  * Neither the executive binaries nor the shared libraries are required by, used
  * or included in GNSS-SDR.
  *
- * -------------------------------------------------------------------------
+ * -----------------------------------------------------------------------------
  * Copyright (C) 2007-2013, T. Takasu
  * Copyright (C) 2017, Javier Arribas
  * Copyright (C) 2017, Carles Fernandez
@@ -27,7 +27,8 @@
  *
  * SPDX-License-Identifier: BSD-2-Clause
  *
- *----------------------------------------------------------------------------*/
+ * -----------------------------------------------------------------------------
+ */
 
 #ifndef GNSS_SDR_RTKLIB_H
 #define GNSS_SDR_RTKLIB_H
@@ -42,6 +43,7 @@
 #include <cstdlib>
 #include <netinet/in.h>
 #include <pthread.h>
+#include <string>
 
 
 /* macros --------------------------------------------------------------------*/
@@ -1293,8 +1295,8 @@ const double CHISQR[100] = {/* chi-sqr(n) (alpha=0.001) */
 
 
 const double LAM_CARR[MAXFREQ] = {/* carrier wave length (m) */
-    SPEED_OF_LIGHT / FREQ1, SPEED_OF_LIGHT / FREQ2, SPEED_OF_LIGHT / FREQ5, SPEED_OF_LIGHT / FREQ6, SPEED_OF_LIGHT / FREQ7,
-    SPEED_OF_LIGHT / FREQ8, SPEED_OF_LIGHT / FREQ9};
+    SPEED_OF_LIGHT_M_S / FREQ1, SPEED_OF_LIGHT_M_S / FREQ2, SPEED_OF_LIGHT_M_S / FREQ5, SPEED_OF_LIGHT_M_S / FREQ6, SPEED_OF_LIGHT_M_S / FREQ7,
+    SPEED_OF_LIGHT_M_S / FREQ8, SPEED_OF_LIGHT_M_S / FREQ9};
 
 const int STRFMT_RTCM2 = 0;   /* stream format: RTCM 2 */
 const int STRFMT_RTCM3 = 1;   /* stream format: RTCM 3 */

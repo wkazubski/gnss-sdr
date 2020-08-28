@@ -9,9 +9,9 @@
  * Class that controls a switch in the FPGA
  *
  *
- * -------------------------------------------------------------------------
+ * -----------------------------------------------------------------------------
  *
- * Copyright (C) 2010-2019  (see AUTHORS file for a list of contributors)
+ * Copyright (C) 2010-2020  (see AUTHORS file for a list of contributors)
  *
  * GNSS-SDR is a software defined Global Navigation
  *          Satellite Systems receiver
@@ -20,7 +20,7 @@
  *
  * SPDX-License-Identifier: GPL-3.0-or-later
  *
- * -------------------------------------------------------------------------
+ * -----------------------------------------------------------------------------
  */
 
 #ifndef GNSS_SDR_FPGA_SWITCH_H
@@ -55,12 +55,12 @@ private:
     static const uint32_t TEST_REGISTER_TRACK_WRITEVAL = 0x55AA;
     static const uint32_t MAX_LENGTH_DEVICEIO_NAME = 50;
 
-    int d_device_descriptor;        // driver descriptor
-    volatile unsigned* d_map_base;  // driver memory map
-
     // private functions
     unsigned fpga_switch_test_register(unsigned writeval);
     void close_device(void);
+
+    volatile unsigned* d_map_base;  // driver memory map
+    int d_device_descriptor;        // driver descriptor
 };
 
 #endif  // GNSS_SDR_FPGA_SWITCH_H

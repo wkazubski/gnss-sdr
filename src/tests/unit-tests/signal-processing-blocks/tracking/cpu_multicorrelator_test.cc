@@ -4,9 +4,9 @@
  * \author Carles Fernandez-Prades, 2016. cfernandez(at)cttc.es
  *
  *
- * -------------------------------------------------------------------------
+ * -----------------------------------------------------------------------------
  *
- * Copyright (C) 2010-2019  (see AUTHORS file for a list of contributors)
+ * Copyright (C) 2010-2020  (see AUTHORS file for a list of contributors)
  *
  * GNSS-SDR is a software defined Global Navigation
  *          Satellite Systems receiver
@@ -15,7 +15,7 @@
  *
  * SPDX-License-Identifier: GPL-3.0-or-later
  *
- * -------------------------------------------------------------------------
+ * -----------------------------------------------------------------------------
  */
 
 #include "GPS_L1_CA.h"
@@ -93,7 +93,7 @@ TEST(CpuMulticorrelatorTest, MeasureExecutionTime)
 
     // local code resampler on GPU
     // generate local reference (1 sample per chip)
-    gps_l1_ca_code_gen_complex(gsl::span<gr_complex>(d_ca_code, static_cast<int>(GPS_L1_CA_CODE_LENGTH_CHIPS) * sizeof(gr_complex)), 1, 0);
+    gps_l1_ca_code_gen_complex(own::span<gr_complex>(d_ca_code, static_cast<int>(GPS_L1_CA_CODE_LENGTH_CHIPS) * sizeof(gr_complex)), 1, 0);
     // generate inut signal
     std::random_device r;
     std::default_random_engine e1(r());
@@ -120,7 +120,7 @@ TEST(CpuMulticorrelatorTest, MeasureExecutionTime)
         for (int correlation_sizes_idx = 0; correlation_sizes_idx < 3; correlation_sizes_idx++) {
             for (int current_max_threads = 1; current_max_threads < (max_threads + 1); current_max_threads++)
                 {
-                    std::cout << "Running " << current_max_threads << " concurrent correlators" << std::endl;
+                    std::cout << "Running " << current_max_threads << " concurrent correlators\n";
                     start = std::chrono::system_clock::now();
                     // create the concurrent correlator threads
                     for (int current_thread = 0; current_thread < current_max_threads; current_thread++)
@@ -143,7 +143,7 @@ TEST(CpuMulticorrelatorTest, MeasureExecutionTime)
                     elapsed_seconds = end - start;
                     execution_times[correlation_sizes_idx] = elapsed_seconds.count() / static_cast<double>(FLAGS_cpu_multicorrelator_iterations_test);
                     std::cout << "CPU Multicorrelator execution time for length=" << correlation_sizes[correlation_sizes_idx]
-                              << " : " << execution_times[correlation_sizes_idx] << " [s]" << std::endl;
+                              << " : " << execution_times[correlation_sizes_idx] << " [s]\n";
                 }
         });
 
@@ -218,7 +218,7 @@ TEST(CpuMulticorrelatorTest, MeasureExecutionTimeAlloc)
         for (int correlation_sizes_idx = 0; correlation_sizes_idx < 3; correlation_sizes_idx++) {
             for (int current_max_threads = 1; current_max_threads < (max_threads + 1); current_max_threads++)
                 {
-                    std::cout << "Running " << current_max_threads << " concurrent correlators" << std::endl;
+                    std::cout << "Running " << current_max_threads << " concurrent correlators\n";
                     start = std::chrono::system_clock::now();
                     // create the concurrent correlator threads
                     for (int current_thread = 0; current_thread < current_max_threads; current_thread++)
@@ -241,7 +241,7 @@ TEST(CpuMulticorrelatorTest, MeasureExecutionTimeAlloc)
                     elapsed_seconds = end - start;
                     execution_times[correlation_sizes_idx] = elapsed_seconds.count() / static_cast<double>(FLAGS_cpu_multicorrelator_iterations_test);
                     std::cout << "CPU Multicorrelator execution time for length=" << correlation_sizes[correlation_sizes_idx]
-                              << " : " << execution_times[correlation_sizes_idx] << " [s]" << std::endl;
+                              << " : " << execution_times[correlation_sizes_idx] << " [s]\n";
                 }
         });
 

@@ -61,12 +61,21 @@ set(TRACKING_GR_BLOCKS_HEADERS
 list(SORT TRACKING_GR_BLOCKS_HEADERS)
 list(SORT TRACKING_GR_BLOCKS_SOURCES)
 
-source_group(Headers FILES ${TRACKING_GR_BLOCKS_HEADERS})
-
-add_library(tracking_gr_blocks
-    ${TRACKING_GR_BLOCKS_SOURCES}
-    ${TRACKING_GR_BLOCKS_HEADERS}
-)
+if(USE_CMAKE_TARGET_SOURCES)
+    add_library(tracking_gr_blocks STATIC)
+    target_sources(tracking_gr_blocks
+        PRIVATE
+            ${TRACKING_GR_BLOCKS_SOURCES}
+        PUBLIC
+            ${TRACKING_GR_BLOCKS_HEADERS}
+    )
+else()
+    source_group(Headers FILES ${TRACKING_GR_BLOCKS_HEADERS})
+    add_library(tracking_gr_blocks
+        ${TRACKING_GR_BLOCKS_SOURCES}
+        ${TRACKING_GR_BLOCKS_HEADERS}
+    )
+endif()
 
 if(${FILESYSTEM_FOUND})
     target_compile_definitions(tracking_gr_blocks PRIVATE -DHAS_STD_FILESYSTEM=1)
@@ -80,17 +89,19 @@ endif()
 
 target_link_libraries(tracking_gr_blocks
     PUBLIC
-        Boost::headers
-        Armadillo::armadillo
         Gnuradio::blocks
-        Volkgnsssdr::volkgnsssdr
-        algorithms_libs
         tracking_libs
     PRIVATE
         Matio::matio
         gnss_sdr_flags
         Glog::glog
 )
+
+if(GNURADIO_USES_STD_POINTERS)
+    target_compile_definitions(tracking_gr_blocks
+        PUBLIC -DGNURADIO_USES_STD_POINTERS=1
+    )
+endif()
 
 if(ENABLE_CUDA AND NOT CMAKE_VERSION VERSION_GREATER 3.11)
     target_link_libraries(tracking_gr_blocks
@@ -106,6 +117,34 @@ endif()
 if(ENABLE_ARMA_NO_DEBUG)
     target_compile_definitions(tracking_gr_blocks
         PUBLIC -DARMA_NO_BOUND_CHECKING=1
+    )
+endif()
+
+if(USE_GENERIC_LAMBDAS)
+    set(has_generic_lambdas HAS_GENERIC_LAMBDA=1)
+    set(no_has_generic_lambdas HAS_GENERIC_LAMBDA=0)
+    target_compile_definitions(tracking_gr_blocks
+        PRIVATE
+            "$<$<COMPILE_FEATURES:cxx_generic_lambdas>:${has_generic_lambdas}>"
+            "$<$<NOT:$<COMPILE_FEATURES:cxx_generic_lambdas>>:${no_has_generic_lambdas}>"
+    )
+else()
+    target_compile_definitions(tracking_gr_blocks
+        PRIVATE
+            -DHAS_GENERIC_LAMBDA=0
+    )
+endif()
+
+if(USE_BOOST_BIND_PLACEHOLDERS)
+    target_compile_definitions(tracking_gr_blocks
+        PRIVATE
+            -DUSE_BOOST_BIND_PLACEHOLDERS=1
+    )
+endif()
+
+if(has_span)
+    target_compile_definitions(tracking_gr_blocks
+        PUBLIC -DHAS_STD_SPAN=1
     )
 endif()
 

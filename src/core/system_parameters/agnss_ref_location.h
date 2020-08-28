@@ -3,9 +3,9 @@
  * \brief  Interface of an Assisted GNSS REFERENCE LOCATION storage
  * \author Javier Arribas, 2013. jarribas(at)cttc.es
  *
- * -------------------------------------------------------------------------
+ * -----------------------------------------------------------------------------
  *
- * Copyright (C) 2010-2019  (see AUTHORS file for a list of contributors)
+ * Copyright (C) 2010-2020  (see AUTHORS file for a list of contributors)
  *
  * GNSS-SDR is a software defined Global Navigation
  *          Satellite Systems receiver
@@ -14,7 +14,7 @@
  *
  * SPDX-License-Identifier: GPL-3.0-or-later
  *
- * -------------------------------------------------------------------------
+ * -----------------------------------------------------------------------------
  */
 
 
@@ -31,14 +31,15 @@
 class Agnss_Ref_Location
 {
 public:
-    bool valid;
-    double lat;
-    double lon;
-    double uncertainty;
     /*!
      * Default constructor
      */
-    Agnss_Ref_Location();
+    Agnss_Ref_Location() = default;
+
+    double lat{};
+    double lon{};
+    double uncertainty{};
+    bool valid{};
 
     template <class Archive>
 
@@ -51,10 +52,10 @@ public:
         if (version)
             {
             };
-        archive& make_nvp("valid", valid);
         archive& make_nvp("lat", lat);
         archive& make_nvp("lon", lon);
         archive& make_nvp("uncertainty", uncertainty);
+        archive& make_nvp("valid", valid);
     }
 };
 

@@ -7,15 +7,21 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
 #
 
-set(SIGNAL_GENERATOR_ADAPTER_SOURCES signal_generator.cc)
-set(SIGNAL_GENERATOR_ADAPTER_HEADERS signal_generator.h)
-
-source_group(Headers FILES ${SIGNAL_GENERATOR_ADAPTER_HEADERS})
-
-add_library(signal_generator_adapters
-    ${SIGNAL_GENERATOR_ADAPTER_SOURCES}
-    ${SIGNAL_GENERATOR_ADAPTER_HEADERS}
-)
+if(USE_CMAKE_TARGET_SOURCES)
+    add_library(signal_generator_adapters STATIC)
+    target_sources(signal_generator_adapters
+        PRIVATE
+            signal_generator.cc
+        PUBLIC
+            signal_generator.h
+    )
+else()
+    source_group(Headers FILES signal_generator.h)
+    add_library(signal_generator_adapters
+        signal_generator.cc
+        signal_generator.h
+    )
+endif()
 
 target_link_libraries(signal_generator_adapters
     PUBLIC
@@ -32,6 +38,12 @@ target_include_directories(signal_generator_adapters
         ${CMAKE_SOURCE_DIR}/src/core/interfaces
         ${CMAKE_SOURCE_DIR}/src/core/receiver
 )
+
+if(GNURADIO_USES_STD_POINTERS)
+    target_compile_definitions(signal_generator_adapters
+        PUBLIC -DGNURADIO_USES_STD_POINTERS=1
+    )
+endif()
 
 if(ENABLE_CLANG_TIDY)
     if(CLANG_TIDY_EXE)

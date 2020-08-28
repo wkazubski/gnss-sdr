@@ -4,9 +4,9 @@
  * Protocol Buffers
  * \author Carles Fernandez-Prades, 2019. cfernandez(at)cttc.es
  *
- * -------------------------------------------------------------------------
+ * -----------------------------------------------------------------------------
  *
- * Copyright (C) 2010-2019  (see AUTHORS file for a list of contributors)
+ * Copyright (C) 2010-2020  (see AUTHORS file for a list of contributors)
  *
  * GNSS-SDR is a software defined Global Navigation
  *          Satellite Systems receiver
@@ -15,7 +15,7 @@
  *
  * SPDX-License-Identifier: GPL-3.0-or-later
  *
- * -------------------------------------------------------------------------
+ * -----------------------------------------------------------------------------
  */
 
 #ifndef GNSS_SDR_SERDES_GNSS_SYNCHRO_H
@@ -47,23 +47,23 @@ public:
         google::protobuf::ShutdownProtobufLibrary();
     }
 
-    inline Serdes_Gnss_Synchro(Serdes_Gnss_Synchro&& other)  //!< Copy constructor
+    inline Serdes_Gnss_Synchro(const Serdes_Gnss_Synchro& other) noexcept  //!< Copy constructor
     {
         this->observables = other.observables;
     }
 
-    inline Serdes_Gnss_Synchro& operator=(const Serdes_Gnss_Synchro& rhs)  //!< Copy assignment operator
+    inline Serdes_Gnss_Synchro& operator=(const Serdes_Gnss_Synchro& rhs) noexcept  //!< Copy assignment operator
     {
         this->observables = rhs.observables;
         return *this;
     }
 
-    inline Serdes_Gnss_Synchro(const Serdes_Gnss_Synchro& other)  //!< Move constructor
+    inline Serdes_Gnss_Synchro(Serdes_Gnss_Synchro&& other) noexcept  //!< Move constructor
     {
         this->observables = std::move(other.observables);
     }
 
-    inline Serdes_Gnss_Synchro& operator=(Serdes_Gnss_Synchro&& other)  //!< Move assignment operator
+    inline Serdes_Gnss_Synchro& operator=(Serdes_Gnss_Synchro&& other) noexcept  //!< Move assignment operator
     {
         if (this != &other)
             {

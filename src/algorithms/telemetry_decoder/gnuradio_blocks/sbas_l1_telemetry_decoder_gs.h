@@ -3,9 +3,9 @@
  * \brief Interface of a SBAS telemetry data decoder block
  * \author Daniel Fehr 2013. daniel.co(at)bluewin.ch
  *
- * -------------------------------------------------------------------------
+ * -----------------------------------------------------------------------------
  *
- * Copyright (C) 2010-2019  (see AUTHORS file for a list of contributors)
+ * Copyright (C) 2010-2020  (see AUTHORS file for a list of contributors)
  *
  * GNSS-SDR is a software defined Global Navigation
  *          Satellite Systems receiver
@@ -14,31 +14,39 @@
  *
  * SPDX-License-Identifier: GPL-3.0-or-later
  *
- * -------------------------------------------------------------------------
+ * -----------------------------------------------------------------------------
  */
 
 #ifndef GNSS_SDR_SBAS_L1_TELEMETRY_DECODER_GS_H
 #define GNSS_SDR_SBAS_L1_TELEMETRY_DECODER_GS_H
 
 #include "gnss_satellite.h"
-#include <boost/crc.hpp>         // for crc_optimal
-#include <boost/shared_ptr.hpp>  // for boost::shared_ptr
+#include <boost/crc.hpp>  // for crc_optimal
 #include <gnuradio/block.h>
 #include <gnuradio/types.h>  // for gr_vector_const_void_star
 #include <cstddef>           // for size_t
 #include <cstdint>
 #include <deque>
 #include <fstream>
-#include <memory>
+#include <memory>  // for std::shared_ptr
 #include <string>
 #include <utility>  // for pair
 #include <vector>
+#if GNURADIO_USES_STD_POINTERS
+#include <memory>  // for std::shared_ptr
+#else
+#include <boost/shared_ptr.hpp>
+#endif
 
 class Viterbi_Decoder;
 
 class sbas_l1_telemetry_decoder_gs;
 
+#if GNURADIO_USES_STD_POINTERS
+using sbas_l1_telemetry_decoder_gs_sptr = std::shared_ptr<sbas_l1_telemetry_decoder_gs>;
+#else
 using sbas_l1_telemetry_decoder_gs_sptr = boost::shared_ptr<sbas_l1_telemetry_decoder_gs>;
+#endif
 
 sbas_l1_telemetry_decoder_gs_sptr sbas_l1_make_telemetry_decoder_gs(
     const Gnss_Satellite &satellite,

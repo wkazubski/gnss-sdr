@@ -4,9 +4,10 @@
  *        std::complex<signed char> input and std::complex<signed char> output
  * \author Luis Esteve, 2011. luis(at)epsilon-formacion.com
  *
- * -------------------------------------------------------------------------
  *
- * Copyright (C) 2010-2019  (see AUTHORS file for a list of contributors)
+ * -----------------------------------------------------------------------------
+ *
+ * Copyright (C) 2010-2020  (see AUTHORS file for a list of contributors)
  *
  * GNSS-SDR is a software defined Global Navigation
  *          Satellite Systems receiver
@@ -15,18 +16,27 @@
  *
  * SPDX-License-Identifier: GPL-3.0-or-later
  *
- * -------------------------------------------------------------------------
+ * -----------------------------------------------------------------------------
  */
 
 #ifndef GNSS_SDR_DIRECT_RESAMPLER_CONDITIONER_CB_H
 #define GNSS_SDR_DIRECT_RESAMPLER_CONDITIONER_CB_H
 
-#include <boost/shared_ptr.hpp>
 #include <gnuradio/block.h>
 #include <cstdint>
+#if GNURADIO_USES_STD_POINTERS
+#include <memory>
+#else
+#include <boost/shared_ptr.hpp>
+#endif
 
 class direct_resampler_conditioner_cb;
+
+#if GNURADIO_USES_STD_POINTERS
+using direct_resampler_conditioner_cb_sptr = std::shared_ptr<direct_resampler_conditioner_cb>;
+#else
 using direct_resampler_conditioner_cb_sptr = boost::shared_ptr<direct_resampler_conditioner_cb>;
+#endif
 
 direct_resampler_conditioner_cb_sptr direct_resampler_make_conditioner_cb(
     double sample_freq_in,

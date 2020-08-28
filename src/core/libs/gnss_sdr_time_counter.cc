@@ -4,9 +4,9 @@
  * \author Antonio Ramos 2018. antonio.ramos(at)gmail.com
  *
  *
- * -------------------------------------------------------------------------
+ * -----------------------------------------------------------------------------
  *
- * Copyright (C) 2010-2019  (see AUTHORS file for a list of contributors)
+ * Copyright (C) 2010-2020  (see AUTHORS file for a list of contributors)
  *
  * GNSS-SDR is a software defined Global Navigation
  *          Satellite Systems receiver
@@ -15,7 +15,7 @@
  *
  * SPDX-License-Identifier: GPL-3.0-or-later
  *
- * -------------------------------------------------------------------------
+ * -----------------------------------------------------------------------------
  */
 
 #include "gnss_sdr_time_counter.h"
@@ -87,23 +87,23 @@ int gnss_sdr_time_counter::general_work(int noutput_items __attribute__((unused)
                         {
                             day = " days ";
                         }
-                    std::cout << "Current receiver time: " << current_days << day << current_h << " h " << current_m << " min " << current_s << " s" << std::endl;
+                    std::cout << "Current receiver time: " << current_days << day << current_h << " h " << current_m << " min " << current_s << " s\n";
                 }
             else
                 {
                     if (flag_h)
                         {
-                            std::cout << "Current receiver time: " << current_h << " h " << current_m << " min " << current_s << " s" << std::endl;
+                            std::cout << "Current receiver time: " << current_h << " h " << current_m << " min " << current_s << " s\n";
                         }
                     else
                         {
                             if (flag_m)
                                 {
-                                    std::cout << "Current receiver time: " << current_m << " min " << current_s << " s" << std::endl;
+                                    std::cout << "Current receiver time: " << current_m << " min " << current_s << " s\n";
                                 }
                             else
                                 {
-                                    std::cout << "Current receiver time: " << current_s << " s" << std::endl;
+                                    std::cout << "Current receiver time: " << current_s << " s\n";
                                 }
                         }
                 }

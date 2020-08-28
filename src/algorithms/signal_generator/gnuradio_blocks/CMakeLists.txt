@@ -7,15 +7,21 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
 #
 
-set(SIGNAL_GENERATOR_BLOCK_SOURCES signal_generator_c.cc)
-set(SIGNAL_GENERATOR_BLOCK_HEADERS signal_generator_c.h)
-
-source_group(Headers FILES ${SIGNAL_GENERATOR_BLOCK_HEADERS})
-
-add_library(signal_generator_gr_blocks
-    ${SIGNAL_GENERATOR_BLOCK_SOURCES}
-    ${SIGNAL_GENERATOR_BLOCK_HEADERS}
-)
+if(USE_CMAKE_TARGET_SOURCES)
+    add_library(signal_generator_gr_blocks STATIC)
+    target_sources(signal_generator_gr_blocks
+        PRIVATE
+            signal_generator_c.cc
+        PUBLIC
+            signal_generator_c.h
+    )
+else()
+    source_group(Headers FILES signal_generator_c.h)
+    add_library(signal_generator_gr_blocks
+        signal_generator_c.cc
+        signal_generator_c.h
+    )
+endif()
 
 target_link_libraries(signal_generator_gr_blocks
     PUBLIC
@@ -30,6 +36,12 @@ target_include_directories(signal_generator_gr_blocks
     PUBLIC
         ${CMAKE_SOURCE_DIR}/src/algorithms/libs
 )
+
+if(GNURADIO_USES_STD_POINTERS)
+    target_compile_definitions(signal_generator_gr_blocks
+        PUBLIC -DGNURADIO_USES_STD_POINTERS=1
+    )
+endif()
 
 if(ENABLE_CLANG_TIDY)
     if(CLANG_TIDY_EXE)

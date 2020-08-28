@@ -6,9 +6,9 @@
  *
  * \author Carles Fernandez-Prades, 2014. cfernandez(at)cttc.es
  *
- * -------------------------------------------------------------------------
+ * -----------------------------------------------------------------------------
  *
- * Copyright (C) 2010-2019  (see AUTHORS file for a list of contributors)
+ * Copyright (C) 2010-2020  (see AUTHORS file for a list of contributors)
  *
  * GNSS-SDR is a software defined Global Navigation
  *          Satellite Systems receiver
@@ -17,7 +17,7 @@
  *
  * SPDX-License-Identifier: GPL-3.0-or-later
  *
- * -------------------------------------------------------------------------
+ * -----------------------------------------------------------------------------
  */
 
 #ifndef GNSS_SDR_RTCM_PRINTER_H
@@ -146,17 +146,18 @@ public:
     uint32_t lock_time(const Glonass_Gnav_Ephemeris& eph, double obs_time, const Gnss_Synchro& gnss_synchro);
 
 private:
-    std::string rtcm_filename;  // String with the RTCM log filename
-    std::string rtcm_base_path;
-    std::ofstream rtcm_file_descriptor;  // Output file stream for RTCM log file
-    std::string rtcm_devname;
-    uint16_t port;
-    uint16_t station_id;
-    int32_t rtcm_dev_descriptor;                            // RTCM serial device descriptor (i.e. COM port)
     int32_t init_serial(const std::string& serial_device);  // serial port control
     void close_serial();
-    std::shared_ptr<Rtcm> rtcm;
     bool Print_Message(const std::string& message);
+
+    std::unique_ptr<Rtcm> rtcm;
+    std::ofstream rtcm_file_descriptor;  // Output file stream for RTCM log file
+    std::string rtcm_filename;           // String with the RTCM log filename
+    std::string rtcm_base_path;
+    std::string rtcm_devname;
+    int32_t rtcm_dev_descriptor;  // RTCM serial device descriptor (i.e. COM port)
+    uint16_t port;
+    uint16_t station_id;
     bool d_rtcm_file_dump;
 };
 

@@ -3,9 +3,9 @@
  * \brief Implementation of a CNAV message demodulator block
  * \author Antonio Ramos, 2017. antonio.ramos(at)cttc.es
  *
- * -------------------------------------------------------------------------
+ * -----------------------------------------------------------------------------
  *
- * Copyright (C) 2010-2019  (see AUTHORS file for a list of contributors)
+ * Copyright (C) 2010-2020  (see AUTHORS file for a list of contributors)
  *
  * GNSS-SDR is a software defined Global Navigation
  *          Satellite Systems receiver
@@ -14,7 +14,7 @@
  *
  * SPDX-License-Identifier: GPL-3.0-or-later
  *
- * -------------------------------------------------------------------------
+ * -----------------------------------------------------------------------------
  */
 
 
@@ -28,11 +28,11 @@
 #include <gnuradio/io_signature.h>
 #include <pmt/pmt.h>        // for make_any
 #include <pmt/pmt_sugar.h>  // for mp
-#include <bitset>
-#include <cstdlib>    // for abs
-#include <exception>  // for exception
-#include <iostream>
-#include <memory>  // for shared_ptr, make_shared
+#include <bitset>           // for std::bitset
+#include <cstdlib>          // for std::llabs
+#include <exception>        // for std::exception
+#include <iostream>         // for std::cout
+#include <memory>           // for shared_ptr, make_shared
 
 
 gps_l5_telemetry_decoder_gs_sptr
@@ -69,12 +69,13 @@ gps_l5_telemetry_decoder_gs::gps_l5_telemetry_decoder_gs(
     cnav_msg_decoder_init(&d_cnav_decoder);
 
     d_sample_counter = 0;
-    flag_PLL_180_deg_phase_locked = false;
+    d_flag_PLL_180_deg_phase_locked = false;
 }
 
 
 gps_l5_telemetry_decoder_gs::~gps_l5_telemetry_decoder_gs()
 {
+    DLOG(INFO) << "GPS L5 Telemetry decoder block (channel " << d_channel << ") destructor called.";
     if (d_dump_file.is_open() == true)
         {
             try
@@ -93,14 +94,14 @@ void gps_l5_telemetry_decoder_gs::set_satellite(const Gnss_Satellite &satellite)
 {
     d_satellite = Gnss_Satellite(satellite.get_system(), satellite.get_PRN());
     DLOG(INFO) << "GPS L5 CNAV telemetry decoder in channel " << this->d_channel << " set to satellite " << d_satellite;
-    d_CNAV_Message.reset();
+    d_CNAV_Message = Gps_CNAV_Navigation_Message();
 }
 
 
 void gps_l5_telemetry_decoder_gs::set_channel(int32_t channel)
 {
     d_channel = channel;
-    d_CNAV_Message.reset();
+    d_CNAV_Message = Gps_CNAV_Navigation_Message();
     DLOG(INFO) << "GPS L5 CNAV channel set to " << channel;
     // ############# ENABLE DATA FILE LOG #################
     if (d_dump == true)
@@ -155,7 +156,7 @@ int gps_l5_telemetry_decoder_gs::general_work(int noutput_items __attribute__((u
         {
             if ((d_sample_counter - d_last_valid_preamble) > d_max_symbols_without_valid_frame)
                 {
-                    int message = 1;  // bad telemetry
+                    const int message = 1;  // bad telemetry
                     this->message_port_pub(pmt::mp("telemetry_to_trk"), pmt::make_any(message));
                     d_sent_tlm_failed_msg = true;
                 }
@@ -163,18 +164,18 @@ int gps_l5_telemetry_decoder_gs::general_work(int noutput_items __attribute__((u
 
     cnav_msg_t msg;
     uint32_t delay;
-    uint8_t symbol_clip = static_cast<uint8_t>(current_synchro_data.Prompt_Q > 0) * 255;
+    const auto symbol_clip = static_cast<uint8_t>(current_synchro_data.Prompt_Q > 0) * 255;
     // 2. Add the telemetry decoder information
     // check if new CNAV frame is available
     if (cnav_msg_decoder_add_symbol(&d_cnav_decoder, symbol_clip, &msg, &delay) == true)
         {
-            if (d_cnav_decoder.part1.invert == true or d_cnav_decoder.part1.invert == true)
+            if (d_cnav_decoder.part1.invert == true or d_cnav_decoder.part2.invert == true)
                 {
-                    flag_PLL_180_deg_phase_locked = true;
+                    d_flag_PLL_180_deg_phase_locked = true;
                 }
             else
                 {
-                    flag_PLL_180_deg_phase_locked = false;
+                    d_flag_PLL_180_deg_phase_locked = false;
                 }
             std::bitset<GPS_L5_CNAV_DATA_PAGE_BITS> raw_bits;
             // Expand packet bits to bitsets. Notice the reverse order of the bits sequence, required by the CNAV message decoder
@@ -189,21 +190,21 @@ int gps_l5_telemetry_decoder_gs::general_work(int noutput_items __attribute__((u
             if (d_CNAV_Message.have_new_ephemeris() == true)
                 {
                     // get ephemeris object for this SV
-                    std::shared_ptr<Gps_CNAV_Ephemeris> tmp_obj = std::make_shared<Gps_CNAV_Ephemeris>(d_CNAV_Message.get_ephemeris());
-                    std::cout << TEXT_MAGENTA << "New GPS L5 CNAV message received in channel " << d_channel << ": ephemeris from satellite " << d_satellite << TEXT_RESET << std::endl;
+                    const std::shared_ptr<Gps_CNAV_Ephemeris> tmp_obj = std::make_shared<Gps_CNAV_Ephemeris>(d_CNAV_Message.get_ephemeris());
+                    std::cout << TEXT_MAGENTA << "New GPS L5 CNAV message received in channel " << d_channel << ": ephemeris from satellite " << d_satellite << TEXT_RESET << '\n';
                     this->message_port_pub(pmt::mp("telemetry"), pmt::make_any(tmp_obj));
                 }
             if (d_CNAV_Message.have_new_iono() == true)
                 {
-                    std::shared_ptr<Gps_CNAV_Iono> tmp_obj = std::make_shared<Gps_CNAV_Iono>(d_CNAV_Message.get_iono());
-                    std::cout << TEXT_MAGENTA << "New GPS L5 CNAV message received in channel " << d_channel << ": iono model parameters from satellite " << d_satellite << TEXT_RESET << std::endl;
+                    const std::shared_ptr<Gps_CNAV_Iono> tmp_obj = std::make_shared<Gps_CNAV_Iono>(d_CNAV_Message.get_iono());
+                    std::cout << TEXT_MAGENTA << "New GPS L5 CNAV message received in channel " << d_channel << ": iono model parameters from satellite " << d_satellite << TEXT_RESET << '\n';
                     this->message_port_pub(pmt::mp("telemetry"), pmt::make_any(tmp_obj));
                 }
 
             if (d_CNAV_Message.have_new_utc_model() == true)
                 {
-                    std::shared_ptr<Gps_CNAV_Utc_Model> tmp_obj = std::make_shared<Gps_CNAV_Utc_Model>(d_CNAV_Message.get_utc_model());
-                    std::cout << TEXT_MAGENTA << "New GPS L5 CNAV message received in channel " << d_channel << ": UTC model parameters from satellite " << d_satellite << TEXT_RESET << std::endl;
+                    const std::shared_ptr<Gps_CNAV_Utc_Model> tmp_obj = std::make_shared<Gps_CNAV_Utc_Model>(d_CNAV_Message.get_utc_model());
+                    std::cout << TEXT_MAGENTA << "New GPS L5 CNAV message received in channel " << d_channel << ": UTC model parameters from satellite " << d_satellite << TEXT_RESET << '\n';
                     this->message_port_pub(pmt::mp("telemetry"), pmt::make_any(tmp_obj));
                 }
 
@@ -216,12 +217,12 @@ int gps_l5_telemetry_decoder_gs::general_work(int noutput_items __attribute__((u
             // symbolTime_ms = msg->tow * 6000 + *pdelay * 10 + (12 * 10); 12 symbols of the encoder's transitory
 
             // check TOW update consistency
-            uint32_t last_d_TOW_at_current_symbol_ms = d_TOW_at_current_symbol_ms;
+            const uint32_t last_d_TOW_at_current_symbol_ms = d_TOW_at_current_symbol_ms;
             d_TOW_at_current_symbol_ms = msg.tow * 6000 + (delay + 12) * GPS_L5I_SYMBOL_PERIOD_MS;
-            if (last_d_TOW_at_current_symbol_ms != 0 and abs(static_cast<int64_t>(d_TOW_at_current_symbol_ms) - int64_t(last_d_TOW_at_current_symbol_ms)) > GPS_L5I_SYMBOL_PERIOD_MS)
+            if (last_d_TOW_at_current_symbol_ms != 0 and std::llabs(static_cast<int64_t>(d_TOW_at_current_symbol_ms) - static_cast<int64_t>(last_d_TOW_at_current_symbol_ms)) > static_cast<int64_t>(GPS_L5I_SYMBOL_PERIOD_MS))
                 {
                     DLOG(INFO) << "Warning: GPS L5 TOW update in ch " << d_channel
-                               << " does not match the TLM TOW counter " << static_cast<int64_t>(d_TOW_at_current_symbol_ms) - int64_t(last_d_TOW_at_current_symbol_ms) << " ms "
+                               << " does not match the TLM TOW counter " << static_cast<int64_t>(d_TOW_at_current_symbol_ms) - static_cast<int64_t>(last_d_TOW_at_current_symbol_ms) << " ms "
                                << " with delay: " << delay << " msg tow: " << msg.tow * 6000 << " ms \n";
 
                     d_TOW_at_current_symbol_ms = 0;
@@ -247,10 +248,10 @@ int gps_l5_telemetry_decoder_gs::general_work(int noutput_items __attribute__((u
 
     if (d_flag_valid_word == true)
         {
-            if (flag_PLL_180_deg_phase_locked == true)
+            if (d_flag_PLL_180_deg_phase_locked == true)
                 {
                     // correct the accumulated phase for the Costas loop phase shift, if required
-                    current_synchro_data.Carrier_phase_rads += GPS_L5_PI;
+                    current_synchro_data.Carrier_phase_rads += GNSS_PI;
                 }
             current_synchro_data.TOW_at_current_symbol_ms = d_TOW_at_current_symbol_ms;
             current_synchro_data.Flag_valid_word = d_flag_valid_word;

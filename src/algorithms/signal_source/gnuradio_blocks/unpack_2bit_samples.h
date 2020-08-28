@@ -40,9 +40,9 @@
  *   Value_0, Value_1, Value_2, ..., Value_n, Value_n+1, Value_n+2, ...
  *
  * \author Cillian O'Driscoll cillian.odriscoll (at) gmail . com
- * -------------------------------------------------------------------------
+ * -----------------------------------------------------------------------------
  *
- * Copyright (C) 2010-2019  (see AUTHORS file for a list of contributors)
+ * Copyright (C) 2010-2020  (see AUTHORS file for a list of contributors)
  *
  * GNSS-SDR is a software defined Global Navigation
  *          Satellite Systems receiver
@@ -51,7 +51,7 @@
  *
  * SPDX-License-Identifier: GPL-3.0-or-later
  *
- * -------------------------------------------------------------------------
+ * -----------------------------------------------------------------------------
  */
 
 #ifndef GNSS_SDR_UNPACK_2BIT_SAMPLES_H
@@ -60,10 +60,19 @@
 #include <gnuradio/sync_interpolator.h>
 #include <cstdint>
 #include <vector>
+#if GNURADIO_USES_STD_POINTERS
+#include <memory>
+#else
+#include <boost/shared_ptr.hpp>
+#endif
 
 class unpack_2bit_samples;
 
+#if GNURADIO_USES_STD_POINTERS
+using unpack_2bit_samples_sptr = std::shared_ptr<unpack_2bit_samples>;
+#else
 using unpack_2bit_samples_sptr = boost::shared_ptr<unpack_2bit_samples>;
+#endif
 
 unpack_2bit_samples_sptr make_unpack_2bit_samples(
     bool big_endian_bytes,
@@ -97,13 +106,13 @@ private:
         bool big_endian_items,
         bool reverse_interleaving);
 
-    bool big_endian_bytes_;
+    std::vector<int8_t> work_buffer_;
     size_t item_size_;
+    bool big_endian_bytes_;
     bool big_endian_items_;
     bool swap_endian_items_;
     bool swap_endian_bytes_;
     bool reverse_interleaving_;
-    std::vector<int8_t> work_buffer_;
 };
 
 #endif  // GNSS_SDR_UNPACK_2BIT_SAMPLES_H

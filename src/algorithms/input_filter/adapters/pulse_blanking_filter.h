@@ -4,9 +4,9 @@
  * \author Javier Arribas 2017
  *         Antonio Ramos  2017
  *
- * -------------------------------------------------------------------------
+ * -----------------------------------------------------------------------------
  *
- * Copyright (C) 2010-2019  (see AUTHORS file for a list of contributors)
+ * Copyright (C) 2010-2020  (see AUTHORS file for a list of contributors)
  *
  * GNSS-SDR is a software defined Global Navigation
  *          Satellite Systems receiver
@@ -15,7 +15,7 @@
  *
  * SPDX-License-Identifier: GPL-3.0-or-later
  *
- * -------------------------------------------------------------------------
+ * -----------------------------------------------------------------------------
  */
 
 #ifndef GNSS_SDR_PULSE_BLANKING_FILTER_H
@@ -36,7 +36,7 @@ class ConfigurationInterface;
 class PulseBlankingFilter : public GNSSBlockInterface
 {
 public:
-    PulseBlankingFilter(ConfigurationInterface* configuration,
+    PulseBlankingFilter(const ConfigurationInterface* configuration,
         std::string role, unsigned int in_streams,
         unsigned int out_streams);
 
@@ -55,7 +55,7 @@ public:
 
     inline size_t item_size() override
     {
-        return 0;
+        return input_size_;
     }
 
     void connect(gr::top_block_sptr top_block) override;
@@ -64,19 +64,18 @@ public:
     gr::basic_block_sptr get_right_block() override;
 
 private:
-    ConfigurationInterface* config_;
-    bool dump_;
-    bool xlat_;
-    std::string dump_filename_;
-    std::string input_item_type_;
-    size_t input_size_;
-    std::string output_item_type_;
-    std::string role_;
-    unsigned int in_streams_;
-    unsigned int out_streams_;
-    gr::blocks::file_sink::sptr file_sink_;
     pulse_blanking_cc_sptr pulse_blanking_cc_;
     gr::filter::freq_xlating_fir_filter_ccf::sptr freq_xlating_;
+    gr::blocks::file_sink::sptr file_sink_;
+    std::string dump_filename_;
+    std::string input_item_type_;
+    std::string output_item_type_;
+    std::string role_;
+    size_t input_size_;
+    unsigned int in_streams_;
+    unsigned int out_streams_;
+    bool dump_;
+    bool xlat_;
 };
 
 #endif  // GNSS_SDR_PULSE_BLANKING_FILTER_H

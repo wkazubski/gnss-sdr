@@ -12,9 +12,9 @@
  * Carrier Synchronization", IEEE Aerospace and Electronic Systems Magazine,
  * Vol. 32, No. 7, pp. 28–45, July 2017. DOI: 10.1109/MAES.2017.150260
  *
- * -------------------------------------------------------------------------
+ * -----------------------------------------------------------------------------
  *
- * Copyright (C) 2010-2019  (see AUTHORS file for a list of contributors)
+ * Copyright (C) 2010-2020  (see AUTHORS file for a list of contributors)
  *
  * GNSS-SDR is a software defined Global Navigation
  *          Satellite Systems receiver
@@ -23,7 +23,7 @@
  *
  * SPDX-License-Identifier: GPL-3.0-or-later
  *
- * -------------------------------------------------------------------------
+ * -----------------------------------------------------------------------------
  */
 
 #ifndef GNSS_SDR_GPS_L1_CA_KF_TRACKING_H
@@ -41,7 +41,8 @@ class ConfigurationInterface;
 class GpsL1CaKfTracking : public TrackingInterface
 {
 public:
-    GpsL1CaKfTracking(ConfigurationInterface* configuration,
+    GpsL1CaKfTracking(
+        const ConfigurationInterface* configuration,
         const std::string& role,
         unsigned int in_streams,
         unsigned int out_streams);

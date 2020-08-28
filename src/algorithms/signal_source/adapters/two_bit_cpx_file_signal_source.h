@@ -6,9 +6,9 @@
  *
  * This class represents a file signal source.
  *
- * -------------------------------------------------------------------------
+ * -----------------------------------------------------------------------------
  *
- * Copyright (C) 2010-2019  (see AUTHORS file for a list of contributors)
+ * Copyright (C) 2010-2020  (see AUTHORS file for a list of contributors)
  *
  * GNSS-SDR is a software defined Global Navigation
  *          Satellite Systems receiver
@@ -17,7 +17,7 @@
  *
  * SPDX-License-Identifier: GPL-3.0-or-later
  *
- * -------------------------------------------------------------------------
+ * -----------------------------------------------------------------------------
  */
 
 #ifndef GNSS_SDR_TWO_BIT_CPX_FILE_SIGNAL_SOURCE_H
@@ -35,6 +35,10 @@
 #include <cstdint>
 #include <memory>
 #include <string>
+#if GNURADIO_USES_STD_POINTERS
+#else
+#include <boost/shared_ptr.hpp>
+#endif
 
 
 class ConfigurationInterface;
@@ -46,11 +50,11 @@ class ConfigurationInterface;
 class TwoBitCpxFileSignalSource : public GNSSBlockInterface
 {
 public:
-    TwoBitCpxFileSignalSource(ConfigurationInterface* configuration,
+    TwoBitCpxFileSignalSource(const ConfigurationInterface* configuration,
         const std::string& role,
         unsigned int in_streams,
         unsigned int out_streams,
-        const std::shared_ptr<Concurrent_Queue<pmt::pmt_t>>& queue);
+        Concurrent_Queue<pmt::pmt_t>* queue);
 
     ~TwoBitCpxFileSignalSource() = default;
     inline std::string role() override
@@ -102,24 +106,27 @@ public:
     }
 
 private:
-    uint64_t samples_;
-    int64_t sampling_frequency_;
-    std::string filename_;
-    std::string item_type_;
-    bool repeat_;
-    bool dump_;
-    std::string dump_filename_;
-    std::string role_;
-    unsigned int in_streams_;
-    unsigned int out_streams_;
     gr::blocks::file_source::sptr file_source_;
-    unpack_byte_2bit_cpx_samples_sptr unpack_byte_;
     gr::blocks::interleaved_short_to_complex::sptr inter_shorts_to_cpx_;
+    unpack_byte_2bit_cpx_samples_sptr unpack_byte_;
+#if GNURADIO_USES_STD_POINTERS
+    std::shared_ptr<gr::block> valve_;
+#else
     boost::shared_ptr<gr::block> valve_;
+#endif
     gr::blocks::file_sink::sptr sink_;
     gr::blocks::throttle::sptr throttle_;
-    std::shared_ptr<Concurrent_Queue<pmt::pmt_t>> queue_;
+    std::string filename_;
+    std::string item_type_;
+    std::string dump_filename_;
+    std::string role_;
     size_t item_size_;
+    uint64_t samples_;
+    int64_t sampling_frequency_;
+    unsigned int in_streams_;
+    unsigned int out_streams_;
+    bool repeat_;
+    bool dump_;
     // Throttle control
     bool enable_throttle_control_;
 };

@@ -3,9 +3,9 @@
  *
  * \brief Simple spatial filter using RAW array input and beamforming coefficients
  * \author Javier Arribas jarribas (at) cttc.es
- * -------------------------------------------------------------------------
+ * -----------------------------------------------------------------------------
  *
- * Copyright (C) 2010-2019  (see AUTHORS file for a list of contributors)
+ * Copyright (C) 2010-2020  (see AUTHORS file for a list of contributors)
  *
  * GNSS-SDR is a software defined Global Navigation
  *          Satellite Systems receiver
@@ -14,7 +14,7 @@
  *
  * SPDX-License-Identifier: GPL-3.0-or-later
  *
- * -------------------------------------------------------------------------
+ * -----------------------------------------------------------------------------
  */
 
 #ifndef GNSS_SDR_BEAMFORMER_H
@@ -22,10 +22,19 @@
 
 #include <gnuradio/sync_block.h>
 #include <vector>
+#if GNURADIO_USES_STD_POINTERS
+#include <memory>
+#else
+#include <boost/shared_ptr.hpp>
+#endif
 
 class beamformer;
 
+#if GNURADIO_USES_STD_POINTERS
+using beamformer_sptr = std::shared_ptr<beamformer>;
+#else
 using beamformer_sptr = boost::shared_ptr<beamformer>;
+#endif
 
 beamformer_sptr make_beamformer_sptr();
 

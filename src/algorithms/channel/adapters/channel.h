@@ -7,9 +7,9 @@
  * It holds blocks for acquisition, tracking,
  * navigation data extraction and pseudorange calculation.
  *
- * -------------------------------------------------------------------------
+ * -----------------------------------------------------------------------------
  *
- * Copyright (C) 2010-2019  (see AUTHORS file for a list of contributors)
+ * Copyright (C) 2010-2020  (see AUTHORS file for a list of contributors)
  *
  * GNSS-SDR is a software defined Global Navigation
  *          Satellite Systems receiver
@@ -18,7 +18,7 @@
  *
  * SPDX-License-Identifier: GPL-3.0-or-later
  *
- * -------------------------------------------------------------------------
+ * -----------------------------------------------------------------------------
  */
 
 #ifndef GNSS_SDR_CHANNEL_H
@@ -54,9 +54,9 @@ class Channel : public ChannelInterface
 {
 public:
     //! Constructor
-    Channel(ConfigurationInterface* configuration, uint32_t channel, const std::shared_ptr<AcquisitionInterface>& acq,
-        const std::shared_ptr<TrackingInterface>& trk, const std::shared_ptr<TelemetryDecoderInterface>& nav,
-        const std::string& role, const std::string& implementation, const std::shared_ptr<Concurrent_Queue<pmt::pmt_t>>& queue);
+    Channel(const ConfigurationInterface* configuration, uint32_t channel, std::shared_ptr<AcquisitionInterface> acq,
+        std::shared_ptr<TrackingInterface> trk, std::shared_ptr<TelemetryDecoderInterface> nav,
+        const std::string& role, const std::string& signal_str, Concurrent_Queue<pmt::pmt_t>* queue);
 
     ~Channel() = default;  //!< Destructor
 
@@ -69,7 +69,7 @@ public:
 
     inline std::string role() override { return role_; }
     //! Returns "Channel"
-    inline std::string implementation() override { return implementation_; }
+    inline std::string implementation() override { return std::string("Channel"); }
     inline size_t item_size() override { return 0; }
     inline Gnss_Signal get_signal() const override { return gnss_signal_; }
     void start_acquisition() override;                          //!< Start the State Machine
@@ -78,27 +78,25 @@ public:
 
     void assist_acquisition_doppler(double Carrier_Doppler_hz) override;
 
-    inline std::shared_ptr<AcquisitionInterface> acquisition() { return acq_; }
-    inline std::shared_ptr<TrackingInterface> tracking() { return trk_; }
-    inline std::shared_ptr<TelemetryDecoderInterface> telemetry() { return nav_; }
+    inline std::shared_ptr<AcquisitionInterface> acquisition() const { return acq_; }
+    inline std::shared_ptr<TrackingInterface> tracking() const { return trk_; }
+    inline std::shared_ptr<TelemetryDecoderInterface> telemetry() const { return nav_; }
     void msg_handler_events(pmt::pmt_t msg);
 
 private:
-    channel_msg_receiver_cc_sptr channel_msg_rx;
+    std::shared_ptr<ChannelFsm> channel_fsm_;
     std::shared_ptr<AcquisitionInterface> acq_;
     std::shared_ptr<TrackingInterface> trk_;
     std::shared_ptr<TelemetryDecoderInterface> nav_;
-    std::string role_;
-    std::string implementation_;
-    bool flag_enable_fpga;
-    uint32_t channel_;
+    channel_msg_receiver_cc_sptr channel_msg_rx_;
     Gnss_Synchro gnss_synchro_{};
     Gnss_Signal gnss_signal_;
+    std::string role_;
+    std::mutex mx_;
+    uint32_t channel_;
     bool connected_;
     bool repeat_;
-    std::shared_ptr<ChannelFsm> channel_fsm_;
-    std::shared_ptr<Concurrent_Queue<pmt::pmt_t>> queue_;
-    std::mutex mx;
+    bool flag_enable_fpga_;
 };
 
 #endif  // GNSS_SDR_CHANNEL_H

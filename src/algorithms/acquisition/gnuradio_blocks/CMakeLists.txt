@@ -43,9 +43,18 @@ endif()
 list(SORT ACQ_GR_BLOCKS_HEADERS)
 list(SORT ACQ_GR_BLOCKS_SOURCES)
 
-source_group(Headers FILES ${ACQ_GR_BLOCKS_HEADERS})
-
-add_library(acquisition_gr_blocks ${ACQ_GR_BLOCKS_SOURCES} ${ACQ_GR_BLOCKS_HEADERS})
+if(USE_CMAKE_TARGET_SOURCES)
+    add_library(acquisition_gr_blocks STATIC)
+    target_sources(acquisition_gr_blocks
+        PRIVATE
+            ${ACQ_GR_BLOCKS_SOURCES}
+        PUBLIC
+            ${ACQ_GR_BLOCKS_HEADERS}
+    )
+else()
+    source_group(Headers FILES ${ACQ_GR_BLOCKS_HEADERS})
+    add_library(acquisition_gr_blocks ${ACQ_GR_BLOCKS_SOURCES} ${ACQ_GR_BLOCKS_HEADERS})
+endif()
 
 if(${FILESYSTEM_FOUND})
     target_compile_definitions(acquisition_gr_blocks PRIVATE -DHAS_STD_FILESYSTEM=1)
@@ -81,9 +90,21 @@ target_include_directories(acquisition_gr_blocks
         ${CMAKE_SOURCE_DIR}/src/core/receiver
 )
 
+if(GNURADIO_USES_STD_POINTERS)
+    target_compile_definitions(acquisition_gr_blocks
+        PUBLIC -DGNURADIO_USES_STD_POINTERS=1
+    )
+endif()
+
 if(ENABLE_ARMA_NO_DEBUG)
     target_compile_definitions(acquisition_gr_blocks
         PUBLIC -DARMA_NO_BOUND_CHECKING=1
+    )
+endif()
+
+if(has_span)
+    target_compile_definitions(acquisition_gr_blocks
+        PRIVATE -DHAS_STD_SPAN=1
     )
 endif()
 

@@ -3,9 +3,9 @@
  * \brief Helper file for unit testing
  * \author Javier Arribas, 2017. jarribas(at)cttc.es
  *
- * -------------------------------------------------------------------------
+ * -----------------------------------------------------------------------------
  *
- * Copyright (C) 2010-2019  (see AUTHORS file for a list of contributors)
+ * Copyright (C) 2010-2020  (see AUTHORS file for a list of contributors)
  *
  * GNSS-SDR is a software defined Global Navigation
  *          Satellite Systems receiver
@@ -14,7 +14,7 @@
  *
  * SPDX-License-Identifier: GPL-3.0-or-later
  *
- * -------------------------------------------------------------------------
+ * -----------------------------------------------------------------------------
  */
 
 #include "spirent_motion_csv_dump_reader.h"
@@ -226,7 +226,7 @@ bool Spirent_Motion_Csv_Dump_Reader::open_obs_file(std::string out_file)
                 }
             catch (const std::ifstream::failure &e)
                 {
-                    std::cout << "Problem opening Spirent CSV dump Log file: " << d_dump_filename << std::endl;
+                    std::cout << "Problem opening Spirent CSV dump Log file: " << d_dump_filename << '\n';
                     return false;
                 }
         }

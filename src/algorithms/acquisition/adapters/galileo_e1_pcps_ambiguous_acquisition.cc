@@ -4,9 +4,9 @@
  *  Galileo E1 Signals
  * \author Luis Esteve, 2012. luis(at)epsilon-formacion.com
  *
- * -------------------------------------------------------------------------
+ * -----------------------------------------------------------------------------
  *
- * Copyright (C) 2010-2019  (see AUTHORS file for a list of contributors)
+ * Copyright (C) 2010-2020  (see AUTHORS file for a list of contributors)
  *
  * GNSS-SDR is a software defined Global Navigation
  *          Satellite Systems receiver
@@ -15,7 +15,7 @@
  *
  * SPDX-License-Identifier: GPL-3.0-or-later
  *
- * -------------------------------------------------------------------------
+ * -----------------------------------------------------------------------------
  */
 
 #include "galileo_e1_pcps_ambiguous_acquisition.h"
@@ -28,9 +28,16 @@
 #include <glog/logging.h>
 #include <algorithm>
 
+#if HAS_STD_SPAN
+#include <span>
+namespace own = std;
+#else
+#include <gsl/gsl>
+namespace own = gsl;
+#endif
 
 GalileoE1PcpsAmbiguousAcquisition::GalileoE1PcpsAmbiguousAcquisition(
-    ConfigurationInterface* configuration,
+    const ConfigurationInterface* configuration,
     const std::string& role,
     unsigned int in_streams,
     unsigned int out_streams) : role_(role),
@@ -48,14 +55,14 @@ GalileoE1PcpsAmbiguousAcquisition::GalileoE1PcpsAmbiguousAcquisition(
             acq_parameters_.doppler_max = FLAGS_doppler_max;
         }
     doppler_max_ = acq_parameters_.doppler_max;
-    doppler_step_ = acq_parameters_.doppler_step;
+    doppler_step_ = static_cast<unsigned int>(acq_parameters_.doppler_step);
     item_type_ = acq_parameters_.item_type;
     item_size_ = acq_parameters_.it_size;
     fs_in_ = acq_parameters_.fs_in;
     acquire_pilot_ = configuration->property(role + ".acquire_pilot", false);
 
     code_length_ = static_cast<unsigned int>(std::floor(static_cast<double>(acq_parameters_.resampled_fs) / (GALILEO_E1_CODE_CHIP_RATE_CPS / GALILEO_E1_B_CODE_LENGTH_CHIPS)));
-    vector_length_ = std::floor(acq_parameters_.sampled_ms * acq_parameters_.samples_per_ms) * (acq_parameters_.bit_transition_flag ? 2 : 1);
+    vector_length_ = static_cast<unsigned int>(std::floor(acq_parameters_.sampled_ms * acq_parameters_.samples_per_ms) * (acq_parameters_.bit_transition_flag ? 2.0 : 1.0));
     code_ = std::vector<std::complex<float>>(vector_length_);
 
     sampled_ms_ = acq_parameters_.sampled_ms;
@@ -87,6 +94,7 @@ GalileoE1PcpsAmbiguousAcquisition::GalileoE1PcpsAmbiguousAcquisition(
 
 void GalileoE1PcpsAmbiguousAcquisition::stop_acquisition()
 {
+    acquisition_->set_active(false);
 }
 
 
@@ -182,7 +190,7 @@ void GalileoE1PcpsAmbiguousAcquisition::set_local_code()
                 }
         }
 
-    gsl::span<gr_complex> code__span(code_.data(), vector_length_);
+    own::span<gr_complex> code__span(code_.data(), vector_length_);
     for (unsigned int i = 0; i < sampled_ms_ / 4; i++)
         {
             std::copy_n(code.data(), code_length_, code__span.subspan(i * code_length_, code_length_).data());
@@ -206,11 +214,7 @@ void GalileoE1PcpsAmbiguousAcquisition::set_state(int state)
 
 void GalileoE1PcpsAmbiguousAcquisition::connect(gr::top_block_sptr top_block)
 {
-    if (item_type_ == "gr_complex")
-        {
-            // nothing to connect
-        }
-    else if (item_type_ == "cshort")
+    if (item_type_ == "gr_complex" || item_type_ == "cshort")
         {
             // nothing to connect
         }
@@ -231,11 +235,7 @@ void GalileoE1PcpsAmbiguousAcquisition::connect(gr::top_block_sptr top_block)
 
 void GalileoE1PcpsAmbiguousAcquisition::disconnect(gr::top_block_sptr top_block)
 {
-    if (item_type_ == "gr_complex")
-        {
-            // nothing to disconnect
-        }
-    else if (item_type_ == "cshort")
+    if (item_type_ == "gr_complex" || item_type_ == "cshort")
         {
             // nothing to disconnect
         }
@@ -254,11 +254,7 @@ void GalileoE1PcpsAmbiguousAcquisition::disconnect(gr::top_block_sptr top_block)
 
 gr::basic_block_sptr GalileoE1PcpsAmbiguousAcquisition::get_left_block()
 {
-    if (item_type_ == "gr_complex")
-        {
-            return acquisition_;
-        }
-    if (item_type_ == "cshort")
+    if (item_type_ == "gr_complex" || item_type_ == "cshort")
         {
             return acquisition_;
         }

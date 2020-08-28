@@ -4,9 +4,9 @@
  * tracking block based on a DLL and a PLL.
  * \author Javier Arribas, 2018. jarribas(at)cttc.es
  *
- * -------------------------------------------------------------------------
+ * -----------------------------------------------------------------------------
  *
- * Copyright (C) 2010-2019  (see AUTHORS file for a list of contributors)
+ * Copyright (C) 2010-2020  (see AUTHORS file for a list of contributors)
  *
  * GNSS-SDR is a software defined Global Navigation
  *          Satellite Systems receiver
@@ -15,7 +15,7 @@
  *
  * SPDX-License-Identifier: GPL-3.0-or-later
  *
- * -------------------------------------------------------------------------
+ * -----------------------------------------------------------------------------
  */
 
 #include "dll_pll_conf.h"
@@ -76,7 +76,7 @@ Dll_Pll_Conf::Dll_Pll_Conf()
 }
 
 
-void Dll_Pll_Conf::SetFromConfiguration(ConfigurationInterface *configuration,
+void Dll_Pll_Conf::SetFromConfiguration(const ConfigurationInterface *configuration,
     const std::string &role)
 {
     item_type = configuration->property(role + ".item_type", item_type);
@@ -86,7 +86,7 @@ void Dll_Pll_Conf::SetFromConfiguration(ConfigurationInterface *configuration,
             item_type = "gr_complex";
         }
 
-    int fs_in_deprecated = configuration->property("GNSS-SDR.internal_fs_hz", fs_in);
+    double fs_in_deprecated = configuration->property("GNSS-SDR.internal_fs_hz", fs_in);
     fs_in = configuration->property("GNSS-SDR.internal_fs_sps", fs_in_deprecated);
     high_dyn = configuration->property(role + ".high_dyn", high_dyn);
     dump = configuration->property(role + ".dump", dump);

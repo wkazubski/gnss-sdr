@@ -6,9 +6,9 @@
  *
  * \author Álvaro Cebrián Juan, 2018. acebrianjuan(at)gmail.com
  *
- * -------------------------------------------------------------------------
+ * -----------------------------------------------------------------------------
  *
- * Copyright (C) 2010-2019  (see AUTHORS file for a list of contributors)
+ * Copyright (C) 2010-2020  (see AUTHORS file for a list of contributors)
  *
  * GNSS-SDR is a software defined Global Navigation
  *          Satellite Systems receiver
@@ -17,17 +17,18 @@
  *
  * SPDX-License-Identifier: GPL-3.0-or-later
  *
- * -------------------------------------------------------------------------
+ * -----------------------------------------------------------------------------
  */
 
 #include "gnss_synchro_monitor.h"
+#include "gnss_sdr_make_unique.h"
 #include "gnss_synchro.h"
 #include <algorithm>
 #include <iostream>
 #include <utility>
 
 
-gnss_synchro_monitor_sptr gnss_synchro_make_monitor(unsigned int n_channels,
+gnss_synchro_monitor_sptr gnss_synchro_make_monitor(int n_channels,
     int decimation_factor,
     int udp_port,
     const std::vector<std::string>& udp_addresses,
@@ -41,7 +42,7 @@ gnss_synchro_monitor_sptr gnss_synchro_make_monitor(unsigned int n_channels,
 }
 
 
-gnss_synchro_monitor::gnss_synchro_monitor(unsigned int n_channels,
+gnss_synchro_monitor::gnss_synchro_monitor(int n_channels,
     int decimation_factor,
     int udp_port,
     const std::vector<std::string>& udp_addresses,
@@ -52,7 +53,7 @@ gnss_synchro_monitor::gnss_synchro_monitor(unsigned int n_channels,
     d_decimation_factor = decimation_factor;
     d_nchannels = n_channels;
 
-    udp_sink_ptr = std::unique_ptr<Gnss_Synchro_Udp_Sink>(new Gnss_Synchro_Udp_Sink(udp_addresses, udp_port, enable_protobuf));
+    udp_sink_ptr = std::make_unique<Gnss_Synchro_Udp_Sink>(udp_addresses, udp_port, enable_protobuf);
 
     count = 0;
 }
@@ -67,7 +68,7 @@ int gnss_synchro_monitor::work(int noutput_items, gr_vector_const_void_star& inp
             count++;
             if (count >= d_decimation_factor)
                 {
-                    for (unsigned int i = 0; i < d_nchannels; i++)
+                    for (int i = 0; i < d_nchannels; i++)
                         {
                             std::vector<Gnss_Synchro> stocks;
                             stocks.push_back(in[i][epoch]);

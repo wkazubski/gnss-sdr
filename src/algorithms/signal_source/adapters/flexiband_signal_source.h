@@ -5,9 +5,9 @@
  * installed (not included with GNSS-SDR)
  * \author Javier Arribas, jarribas(at)cttc.es
  *
- * -------------------------------------------------------------------------
+ * -----------------------------------------------------------------------------
  *
- * Copyright (C) 2010-2019  (see AUTHORS file for a list of contributors)
+ * Copyright (C) 2010-2020  (see AUTHORS file for a list of contributors)
  *
  * GNSS-SDR is a software defined Global Navigation
  *          Satellite Systems receiver
@@ -16,7 +16,7 @@
  *
  * SPDX-License-Identifier: GPL-3.0-or-later
  *
- * -------------------------------------------------------------------------
+ * -----------------------------------------------------------------------------
  */
 
 
@@ -45,9 +45,9 @@ class ConfigurationInterface;
 class FlexibandSignalSource : public GNSSBlockInterface
 {
 public:
-    FlexibandSignalSource(ConfigurationInterface* configuration,
+    FlexibandSignalSource(const ConfigurationInterface* configuration,
         const std::string& role, unsigned int in_stream,
-        unsigned int out_stream, std::shared_ptr<Concurrent_Queue<pmt::pmt_t>> queue);
+        unsigned int out_stream, Concurrent_Queue<pmt::pmt_t>* queue);
 
     ~FlexibandSignalSource() = default;
 
@@ -76,31 +76,30 @@ public:
     gr::basic_block_sptr get_right_block(int RF_channel) override;
 
 private:
-    std::string role_;
-    unsigned int in_stream_;
-    unsigned int out_stream_;
-    std::string item_type_;
-    size_t item_size_;
-
-    std::string firmware_filename_;
-    int gain1_;
-    int gain2_;
-    int gain3_;
-    int usb_packet_buffer_size_;
-    bool AGC_;
-    std::string signal_file;
-    bool flag_read_file;
-
-    int n_channels_;
-    int sel_ch_;
-
-    gr::block_sptr flexiband_source_;
+    boost::shared_ptr<gr::block> flexiband_source_;
 
     std::vector<boost::shared_ptr<gr::block>> char_to_float;
     std::vector<boost::shared_ptr<gr::block>> float_to_complex_;
     std::vector<gr::blocks::null_sink::sptr> null_sinks_;
 
-    std::shared_ptr<Concurrent_Queue<pmt::pmt_t>> queue_;
+    std::string role_;
+    std::string item_type_;
+    std::string firmware_filename_;
+    std::string signal_file;
+
+    size_t item_size_;
+    unsigned int in_stream_;
+    unsigned int out_stream_;
+
+    int gain1_;
+    int gain2_;
+    int gain3_;
+    int usb_packet_buffer_size_;
+    int n_channels_;
+    int sel_ch_;
+
+    bool AGC_;
+    bool flag_read_file;
 };
 
 #endif  // GNSS_SDR_FLEXIBAND_SIGNAL_SOURCE_H

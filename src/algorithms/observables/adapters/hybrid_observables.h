@@ -5,9 +5,9 @@
  * \author Mara Branzanti 2013. mara.branzanti(at)gmail.com
  * \author Javier Arribas 2013. jarribas(at)cttc.es
  *
- * -------------------------------------------------------------------------
+ * -----------------------------------------------------------------------------
  *
- * Copyright (C) 2010-2019  (see AUTHORS file for a list of contributors)
+ * Copyright (C) 2010-2020  (see AUTHORS file for a list of contributors)
  *
  * GNSS-SDR is a software defined Global Navigation
  *          Satellite Systems receiver
@@ -16,13 +16,14 @@
  *
  * SPDX-License-Identifier: GPL-3.0-or-later
  *
- * -------------------------------------------------------------------------
+ * -----------------------------------------------------------------------------
  */
 
 
 #ifndef GNSS_SDR_HYBRID_OBSERVABLES_H
 #define GNSS_SDR_HYBRID_OBSERVABLES_H
 
+#include "gnss_synchro.h"
 #include "hybrid_observables_gs.h"
 #include "observables_interface.h"
 #include <gnuradio/gr_complex.h>     // for gr_complex
@@ -38,7 +39,7 @@ class ConfigurationInterface;
 class HybridObservables : public ObservablesInterface
 {
 public:
-    HybridObservables(ConfigurationInterface* configuration,
+    HybridObservables(const ConfigurationInterface* configuration,
         const std::string& role,
         unsigned int in_streams,
         unsigned int out_streams);
@@ -69,17 +70,17 @@ public:
     //! All blocks must have an item_size() function implementation
     inline size_t item_size() override
     {
-        return sizeof(gr_complex);
+        return sizeof(Gnss_Synchro);
     }
 
 private:
     hybrid_observables_gs_sptr observables_;
-    bool dump_;
-    bool dump_mat_;
     std::string dump_filename_;
     std::string role_;
     unsigned int in_streams_;
     unsigned int out_streams_;
+    bool dump_;
+    bool dump_mat_;
 };
 
 #endif

@@ -21,9 +21,9 @@
  *          <li> Luis Esteve, 2012. luis(at)epsilon-formacion.com
  *          </ul>
  *
- * -------------------------------------------------------------------------
+ * -----------------------------------------------------------------------------
  *
- * Copyright (C) 2010-2019  (see AUTHORS file for a list of contributors)
+ * Copyright (C) 2010-2020  (see AUTHORS file for a list of contributors)
  *
  * GNSS-SDR is a software defined Global Navigation
  *          Satellite Systems receiver
@@ -32,7 +32,7 @@
  *
  * SPDX-License-Identifier: GPL-3.0-or-later
  *
- * -------------------------------------------------------------------------
+ * -----------------------------------------------------------------------------
  */
 
 #include "lock_detectors.h"
@@ -69,7 +69,7 @@ float cn0_svn_estimator(const gr_complex* Prompt_buffer, int length, float coh_i
     Psig = Psig * Psig;
     Ptot /= static_cast<float>(length);
     SNR = Psig / (Ptot - Psig);
-    SNR_dB_Hz = 10.0 * std::log10(SNR) - 10.0 * std::log10(coh_integration_time_s);
+    SNR_dB_Hz = 10.0F * std::log10(SNR) - 10.0F * std::log10(coh_integration_time_s);
     return SNR_dB_Hz;
 }
 
@@ -98,7 +98,7 @@ float cn0_m2m4_estimator(const gr_complex* Prompt_buffer, int length, float coh_
     float m_2 = 0.0;
     float m_4 = 0.0;
     float aux;
-    auto n = static_cast<float>(length);
+    const auto n = static_cast<float>(length);
     for (int i = 0; i < length; i++)
         {
             Psig += std::abs(Prompt_buffer[i].real());
@@ -110,7 +110,7 @@ float cn0_m2m4_estimator(const gr_complex* Prompt_buffer, int length, float coh_
     Psig = Psig * Psig;
     m_2 /= n;
     m_4 /= n;
-    aux = std::sqrt(2.0 * m_2 * m_2 - m_4);
+    aux = std::sqrt(2.0F * m_2 * m_2 - m_4);
     if (std::isnan(aux))
         {
             SNR_aux = Psig / (m_2 - Psig);
@@ -119,7 +119,7 @@ float cn0_m2m4_estimator(const gr_complex* Prompt_buffer, int length, float coh_
         {
             SNR_aux = aux / (m_2 - aux);
         }
-    SNR_dB_Hz = 10.0 * std::log10(SNR_aux) - 10.0 * std::log10(coh_integration_time_s);
+    SNR_dB_Hz = 10.0F * std::log10(SNR_aux) - 10.0F * std::log10(coh_integration_time_s);
 
     return SNR_dB_Hz;
 }

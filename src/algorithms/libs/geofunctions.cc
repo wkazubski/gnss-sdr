@@ -4,9 +4,10 @@
  * some of them migrated from MATLAB, for geographic information systems.
  * \author Javier Arribas, 2018. jarribas(at)cttc.es
  *
- * -------------------------------------------------------------------------
  *
- * Copyright (C) 2010-2019  (see AUTHORS file for a list of contributors)
+ * -----------------------------------------------------------------------------
+ *
+ * Copyright (C) 2010-2020  (see AUTHORS file for a list of contributors)
  *
  * GNSS-SDR is a software defined Global Navigation
  *          Satellite Systems receiver
@@ -15,7 +16,7 @@
  *
  * SPDX-License-Identifier: GPL-3.0-or-later
  *
- * -------------------------------------------------------------------------
+ * -----------------------------------------------------------------------------
  */
 
 #include "geofunctions.h"
@@ -547,7 +548,7 @@ void cart2utm(const arma::vec &r_eb_e, int zone, arma::vec &r_enu)
             iterations = iterations + 1;
             if (iterations > 100)
                 {
-                    std::cout << "Failed to approximate U with desired precision. U-oldU:" << U - oldU << std::endl;
+                    std::cout << "Failed to approximate U with desired precision. U - oldU: " << U - oldU << '\n';
                     break;
                 }
         }
@@ -748,7 +749,7 @@ int findUtmZone(double latitude_deg, double longitude_deg)
     //
 
     // Start at 180 deg west = -180 deg
-    int utmZone = floor((180 + longitude_deg) / 6) + 1;
+    auto utmZone = static_cast<int>(floor((180 + longitude_deg) / 6) + 1);
 
     // Correct zone numbers for particular areas
     if (latitude_deg > 72.0)

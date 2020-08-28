@@ -6,9 +6,9 @@
  *          <li> Javier Arribas, 2011. jarribas(at)cttc.es
  *          </ul> *
  *
- * -------------------------------------------------------------------------
+ * -----------------------------------------------------------------------------
  *
- * Copyright (C) 2010-2019  (see AUTHORS file for a list of contributors)
+ * Copyright (C) 2010-2020  (see AUTHORS file for a list of contributors)
  *
  * GNSS-SDR is a software defined Global Navigation
  *          Satellite Systems receiver
@@ -17,7 +17,7 @@
  *
  * SPDX-License-Identifier: GPL-3.0-or-later
  *
- * -------------------------------------------------------------------------
+ * -----------------------------------------------------------------------------
  */
 
 #ifndef GNSS_SDR_GPS_L1_CA_PCPS_ASSISTED_ACQUISITION_H
@@ -39,7 +39,8 @@ class ConfigurationInterface;
 class GpsL1CaPcpsAssistedAcquisition : public AcquisitionInterface
 {
 public:
-    GpsL1CaPcpsAssistedAcquisition(ConfigurationInterface* configuration,
+    GpsL1CaPcpsAssistedAcquisition(
+        const ConfigurationInterface* configuration,
         const std::string& role,
         unsigned int in_streams,
         unsigned int out_streams);
@@ -136,25 +137,30 @@ public:
 
 private:
     pcps_assisted_acquisition_cc_sptr acquisition_cc_;
-    size_t item_size_;
-    std::string item_type_;
-    unsigned int vector_length_;
-    unsigned int channel_;
     std::weak_ptr<ChannelFsm> channel_fsm_;
+    std::vector<std::complex<float>> code_;
+
+    std::string item_type_;
+    std::string dump_filename_;
+    std::string role_;
+
+    Gnss_Synchro* gnss_synchro_;
+
+    size_t item_size_;
+    int64_t fs_in_;
+
     float threshold_;
     int doppler_max_;
-    unsigned int doppler_step_;
     int doppler_min_;
-    unsigned int sampled_ms_;
     int max_dwells_;
-    int64_t fs_in_;
-    bool dump_;
-    std::string dump_filename_;
-    std::shared_ptr<std::complex<float>> code_;
-    Gnss_Synchro* gnss_synchro_;
-    std::string role_;
+    unsigned int vector_length_;
+    unsigned int channel_;
+    unsigned int doppler_step_;
+    unsigned int sampled_ms_;
     unsigned int in_streams_;
     unsigned int out_streams_;
+
+    bool dump_;
 };
 
 #endif  // GNSS_SDR_GPS_L1_CA_PCPS_ASSISTED_ACQUISITION_H

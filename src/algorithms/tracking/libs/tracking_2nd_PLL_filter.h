@@ -9,9 +9,9 @@
  * A Software-Defined GPS and Galileo Receiver. A Single-Frequency Approach,
  * Birkhauser, 2007, Applied and Numerical Harmonic Analysis.
  *
- * -------------------------------------------------------------------------
+ * -----------------------------------------------------------------------------
  *
- * Copyright (C) 2010-2019  (see AUTHORS file for a list of contributors)
+ * Copyright (C) 2010-2020  (see AUTHORS file for a list of contributors)
  *
  * GNSS-SDR is a software defined Global Navigation
  *          Satellite Systems receiver
@@ -20,7 +20,7 @@
  *
  * SPDX-License-Identifier: GPL-3.0-or-later
  *
- * -------------------------------------------------------------------------
+ * -----------------------------------------------------------------------------
  */
 
 #ifndef GNSS_SDR_TRACKING_2ND_PLL_FILTER_H
@@ -36,15 +36,17 @@
 class Tracking_2nd_PLL_filter
 {
 public:
+    Tracking_2nd_PLL_filter();
+    ~Tracking_2nd_PLL_filter() = default;
+    explicit Tracking_2nd_PLL_filter(float pdi_carr);
+
     void set_PLL_BW(float pll_bw_hz);  //!< Set PLL loop bandwidth [Hz]
     void set_pdi(float pdi_carr);      //!< Set Summation interval for code [s]
     void initialize();
     float get_carrier_nco(float PLL_discriminator);
-    explicit Tracking_2nd_PLL_filter(float pdi_carr);
-    Tracking_2nd_PLL_filter();
-    ~Tracking_2nd_PLL_filter() = default;
 
 private:
+    void calculate_lopp_coef(float* tau1, float* tau2, float lbw, float zeta, float k);
     // PLL filter parameters
     float d_tau1_carr = 0.0;
     float d_tau2_carr = 0.0;
@@ -53,7 +55,6 @@ private:
     float d_plldampingratio = 0.0;
     float d_old_carr_error = 0.0;
     float d_old_carr_nco = 0.0;
-    void calculate_lopp_coef(float* tau1, float* tau2, float lbw, float zeta, float k);
 };
 
 #endif

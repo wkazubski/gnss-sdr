@@ -43,18 +43,26 @@ set(SIGNAL_SOURCE_GR_BLOCKS_HEADERS
 list(SORT SIGNAL_SOURCE_GR_BLOCKS_HEADERS)
 list(SORT SIGNAL_SOURCE_GR_BLOCKS_SOURCES)
 
-source_group(Headers FILES ${SIGNAL_SOURCE_GR_BLOCKS_HEADERS})
-
-add_library(signal_source_gr_blocks
-    ${SIGNAL_SOURCE_GR_BLOCKS_SOURCES}
-    ${SIGNAL_SOURCE_GR_BLOCKS_HEADERS}
-)
+if(USE_CMAKE_TARGET_SOURCES)
+    add_library(signal_source_gr_blocks STATIC)
+    target_sources(signal_source_gr_blocks
+        PRIVATE
+            ${SIGNAL_SOURCE_GR_BLOCKS_SOURCES}
+        PUBLIC
+            ${SIGNAL_SOURCE_GR_BLOCKS_HEADERS}
+    )
+else()
+    source_group(Headers FILES ${SIGNAL_SOURCE_GR_BLOCKS_HEADERS})
+    add_library(signal_source_gr_blocks
+        ${SIGNAL_SOURCE_GR_BLOCKS_SOURCES}
+        ${SIGNAL_SOURCE_GR_BLOCKS_HEADERS}
+    )
+endif()
 
 target_link_libraries(signal_source_gr_blocks
     PUBLIC
         signal_source_libs
         Boost::thread
-        Gnuradio::runtime
     PRIVATE
         core_libs
         Gflags::gflags
@@ -65,6 +73,12 @@ target_include_directories(signal_source_gr_blocks
     PUBLIC
         ${CMAKE_SOURCE_DIR}/src/core/receiver
 )
+
+if(GNURADIO_USES_STD_POINTERS)
+    target_compile_definitions(signal_source_gr_blocks
+        PUBLIC -DGNURADIO_USES_STD_POINTERS=1
+    )
+endif()
 
 if(ENABLE_RAW_UDP AND PCAP_FOUND)
     target_link_libraries(signal_source_gr_blocks
@@ -90,10 +104,32 @@ if(${CMAKE_SYSTEM_NAME} MATCHES "Darwin")
     endif()
 endif()
 
-if(Boost_VERSION_STRING VERSION_GREATER 1.65.99)
+if(USE_BOOST_ASIO_IO_CONTEXT)
     target_compile_definitions(signal_source_gr_blocks
         PUBLIC
-            -DBOOST_GREATER_1_65
+            -DUSE_BOOST_ASIO_IO_CONTEXT=1
+    )
+endif()
+
+if(USE_BOOST_BIND_PLACEHOLDERS)
+    target_compile_definitions(signal_source_gr_blocks
+        PRIVATE
+            -DUSE_BOOST_BIND_PLACEHOLDERS=1
+    )
+endif()
+
+if(USE_GENERIC_LAMBDAS)
+    set(has_generic_lambdas HAS_GENERIC_LAMBDA=1)
+    set(no_has_generic_lambdas HAS_GENERIC_LAMBDA=0)
+    target_compile_definitions(signal_source_gr_blocks
+        PRIVATE
+            "$<$<COMPILE_FEATURES:cxx_generic_lambdas>:${has_generic_lambdas}>"
+            "$<$<NOT:$<COMPILE_FEATURES:cxx_generic_lambdas>>:${no_has_generic_lambdas}>"
+    )
+else()
+    target_compile_definitions(signal_source_gr_blocks
+        PRIVATE
+            -DHAS_GENERIC_LAMBDA=0
     )
 endif()
 

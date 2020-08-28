@@ -8,9 +8,9 @@
  *          <li> Marc Molina, 2013. marc.molina.pena(at)gmail.com
  *          </ul>
  *
- * -------------------------------------------------------------------------
+ * -----------------------------------------------------------------------------
  *
- * Copyright (C) 2010-2019  (see AUTHORS file for a list of contributors)
+ * Copyright (C) 2010-2020  (see AUTHORS file for a list of contributors)
  *
  * GNSS-SDR is a software defined Global Navigation
  *          Satellite Systems receiver
@@ -19,7 +19,7 @@
  *
  * SPDX-License-Identifier: GPL-3.0-or-later
  *
- * -------------------------------------------------------------------------
+ * -----------------------------------------------------------------------------
  */
 
 #include "gps_l1_ca_pcps_acquisition.h"
@@ -29,21 +29,26 @@
 #include "gnss_sdr_flags.h"
 #include "gps_sdr_signal_processing.h"
 #include <glog/logging.h>
-#include <gsl/gsl>
 #include <algorithm>
 
+#if HAS_STD_SPAN
+#include <span>
+namespace own = std;
+#else
+#include <gsl/gsl>
+namespace own = gsl;
+#endif
 
 GpsL1CaPcpsAcquisition::GpsL1CaPcpsAcquisition(
-    ConfigurationInterface* configuration,
+    const ConfigurationInterface* configuration,
     const std::string& role,
     unsigned int in_streams,
     unsigned int out_streams) : role_(role),
                                 in_streams_(in_streams),
                                 out_streams_(out_streams)
 {
-    configuration_ = configuration;
     acq_parameters_.ms_per_code = 1;
-    acq_parameters_.SetFromConfiguration(configuration_, role, GPS_L1_CA_CODE_RATE_CPS, GPS_L1_CA_OPT_ACQ_FS_SPS);
+    acq_parameters_.SetFromConfiguration(configuration, role, GPS_L1_CA_CODE_RATE_CPS, GPS_L1_CA_OPT_ACQ_FS_SPS);
 
     DLOG(INFO) << "role " << role;
 
@@ -53,12 +58,12 @@ GpsL1CaPcpsAcquisition::GpsL1CaPcpsAcquisition(
         }
 
     doppler_max_ = acq_parameters_.doppler_max;
-    doppler_step_ = acq_parameters_.doppler_step;
+    doppler_step_ = static_cast<unsigned int>(acq_parameters_.doppler_step);
     item_type_ = acq_parameters_.item_type;
     item_size_ = acq_parameters_.it_size;
 
     code_length_ = static_cast<unsigned int>(std::floor(static_cast<double>(acq_parameters_.resampled_fs) / (GPS_L1_CA_CODE_RATE_CPS / GPS_L1_CA_CODE_LENGTH_CHIPS)));
-    vector_length_ = std::floor(acq_parameters_.sampled_ms * acq_parameters_.samples_per_ms) * (acq_parameters_.bit_transition_flag ? 2 : 1);
+    vector_length_ = static_cast<unsigned int>(std::floor(acq_parameters_.sampled_ms * acq_parameters_.samples_per_ms) * (acq_parameters_.bit_transition_flag ? 2.0 : 1.0));
     code_ = std::vector<std::complex<float>>(vector_length_);
 
     sampled_ms_ = acq_parameters_.sampled_ms;
@@ -90,6 +95,7 @@ GpsL1CaPcpsAcquisition::GpsL1CaPcpsAcquisition(
 
 void GpsL1CaPcpsAcquisition::stop_acquisition()
 {
+    acquisition_->set_active(false);
 }
 
 
@@ -157,7 +163,7 @@ void GpsL1CaPcpsAcquisition::set_local_code()
         {
             gps_l1_ca_code_gen_complex_sampled(code, gnss_synchro_->PRN, acq_parameters_.fs_in, 0);
         }
-    gsl::span<gr_complex> code_span(code_.data(), vector_length_);
+    own::span<gr_complex> code_span(code_.data(), vector_length_);
     for (unsigned int i = 0; i < sampled_ms_; i++)
         {
             std::copy_n(code.data(), code_length_, code_span.subspan(i * code_length_, code_length_).data());
@@ -181,11 +187,7 @@ void GpsL1CaPcpsAcquisition::set_state(int state)
 
 void GpsL1CaPcpsAcquisition::connect(gr::top_block_sptr top_block)
 {
-    if (item_type_ == "gr_complex")
-        {
-            // nothing to connect
-        }
-    else if (item_type_ == "cshort")
+    if (item_type_ == "gr_complex" || item_type_ == "cshort")
         {
             // nothing to connect
         }
@@ -206,11 +208,7 @@ void GpsL1CaPcpsAcquisition::connect(gr::top_block_sptr top_block)
 
 void GpsL1CaPcpsAcquisition::disconnect(gr::top_block_sptr top_block)
 {
-    if (item_type_ == "gr_complex")
-        {
-            // nothing to disconnect
-        }
-    else if (item_type_ == "cshort")
+    if (item_type_ == "gr_complex" || item_type_ == "cshort")
         {
             // nothing to disconnect
         }
@@ -229,11 +227,7 @@ void GpsL1CaPcpsAcquisition::disconnect(gr::top_block_sptr top_block)
 
 gr::basic_block_sptr GpsL1CaPcpsAcquisition::get_left_block()
 {
-    if (item_type_ == "gr_complex")
-        {
-            return acquisition_;
-        }
-    if (item_type_ == "cshort")
+    if (item_type_ == "gr_complex" || item_type_ == "cshort")
         {
             return acquisition_;
         }

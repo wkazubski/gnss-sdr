@@ -3,9 +3,9 @@
  * \brief  Interface of a GPS IONOSPHERIC MODEL storage
  * \author Javier Arribas, 2013. jarribas(at)cttc.es
  *
- * -------------------------------------------------------------------------
+ * -----------------------------------------------------------------------------
  *
- * Copyright (C) 2010-2019  (see AUTHORS file for a list of contributors)
+ * Copyright (C) 2010-2020  (see AUTHORS file for a list of contributors)
  *
  * GNSS-SDR is a software defined Global Navigation
  *          Satellite Systems receiver
@@ -14,7 +14,7 @@
  *
  * SPDX-License-Identifier: GPL-3.0-or-later
  *
- * -------------------------------------------------------------------------
+ * -----------------------------------------------------------------------------
  */
 
 
@@ -33,18 +33,18 @@
 class Gps_Iono
 {
 public:
-    bool valid;  //!< Valid flag
+    bool valid{};  //!< Valid flag
     // Ionospheric parameters
-    double d_alpha0;  //!< Coefficient 0 of a cubic equation representing the amplitude of the vertical delay [s]
-    double d_alpha1;  //!< Coefficient 1 of a cubic equation representing the amplitude of the vertical delay [s/semi-circle]
-    double d_alpha2;  //!< Coefficient 2 of a cubic equation representing the amplitude of the vertical delay [s(semi-circle)^2]
-    double d_alpha3;  //!< Coefficient 3 of a cubic equation representing the amplitude of the vertical delay [s(semi-circle)^3]
-    double d_beta0;   //!< Coefficient 0 of a cubic equation representing the period of the model [s]
-    double d_beta1;   //!< Coefficient 1 of a cubic equation representing the period of the model [s/semi-circle]
-    double d_beta2;   //!< Coefficient 2 of a cubic equation representing the period of the model [s(semi-circle)^2]
-    double d_beta3;   //!< Coefficient 3 of a cubic equation representing the period of the model [s(semi-circle)^3]
+    double d_alpha0{};  //!< Coefficient 0 of a cubic equation representing the amplitude of the vertical delay [s]
+    double d_alpha1{};  //!< Coefficient 1 of a cubic equation representing the amplitude of the vertical delay [s/semi-circle]
+    double d_alpha2{};  //!< Coefficient 2 of a cubic equation representing the amplitude of the vertical delay [s(semi-circle)^2]
+    double d_alpha3{};  //!< Coefficient 3 of a cubic equation representing the amplitude of the vertical delay [s(semi-circle)^3]
+    double d_beta0{};   //!< Coefficient 0 of a cubic equation representing the period of the model [s]
+    double d_beta1{};   //!< Coefficient 1 of a cubic equation representing the period of the model [s/semi-circle]
+    double d_beta2{};   //!< Coefficient 2 of a cubic equation representing the period of the model [s(semi-circle)^2]
+    double d_beta3{};   //!< Coefficient 3 of a cubic equation representing the period of the model [s(semi-circle)^3]
 
-    Gps_Iono();  //!< Default constructor
+    Gps_Iono() = default;  //!< Default constructor
 
     template <class Archive>
 

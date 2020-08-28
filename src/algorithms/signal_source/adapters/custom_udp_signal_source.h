@@ -3,9 +3,9 @@
  * \brief Receives ip frames containing samples in UDP frame encapsulation
  * using a high performance packet capture library (libpcap)
  * \author Javier Arribas jarribas (at) cttc.es
- * -------------------------------------------------------------------------
+ * -----------------------------------------------------------------------------
  *
- * Copyright (C) 2010-2019  (see AUTHORS file for a list of contributors)
+ * Copyright (C) 2010-2020  (see AUTHORS file for a list of contributors)
  *
  * GNSS-SDR is a software defined Global Navigation
  *          Satellite Systems receiver
@@ -14,7 +14,7 @@
  *
  * SPDX-License-Identifier: GPL-3.0-or-later
  *
- * -------------------------------------------------------------------------
+ * -----------------------------------------------------------------------------
  */
 
 
@@ -24,7 +24,6 @@
 #include "concurrent_queue.h"
 #include "gnss_block_interface.h"
 #include "gr_complex_ip_packet_source.h"
-#include <boost/shared_ptr.hpp>
 #include <gnuradio/blocks/file_sink.h>
 #include <gnuradio/blocks/null_sink.h>
 #include <pmt/pmt.h>
@@ -32,6 +31,10 @@
 #include <stdexcept>
 #include <string>
 #include <vector>
+#if GNURADIO_USES_STD_POINTERS
+#else
+#include <boost/shared_ptr.hpp>
+#endif
 
 
 class ConfigurationInterface;
@@ -43,9 +46,9 @@ class ConfigurationInterface;
 class CustomUDPSignalSource : public GNSSBlockInterface
 {
 public:
-    CustomUDPSignalSource(ConfigurationInterface* configuration,
+    CustomUDPSignalSource(const ConfigurationInterface* configuration,
         const std::string& role, unsigned int in_stream,
-        unsigned int out_stream, std::shared_ptr<Concurrent_Queue<pmt::pmt_t>> queue);
+        unsigned int out_stream, Concurrent_Queue<pmt::pmt_t>* queue);
 
     ~CustomUDPSignalSource() = default;
 
@@ -74,22 +77,28 @@ public:
     gr::basic_block_sptr get_right_block(int RF_channel) override;
 
 private:
-    std::string role_;
+    Gr_Complex_Ip_Packet_Source::sptr udp_gnss_rx_source_;
+#if GNURADIO_USES_STD_POINTERS
+    std::vector<std::shared_ptr<gr::block>> null_sinks_;
+    std::vector<std::shared_ptr<gr::block>> file_sink_;
+#else
+    std::vector<boost::shared_ptr<gr::block>> null_sinks_;
+    std::vector<boost::shared_ptr<gr::block>> file_sink_;
+#endif
 
-    bool IQ_swap_;
+    std::string role_;
+    std::string item_type_;
+    std::string dump_filename_;
+
+    size_t item_size_;
+
     int RF_channels_;
     int channels_in_udp_;
     unsigned int in_stream_;
     unsigned int out_stream_;
 
-    std::string item_type_;
-    size_t item_size_;
     bool dump_;
-    std::string dump_filename_;
-    std::vector<boost::shared_ptr<gr::block>> null_sinks_;
-    Gr_Complex_Ip_Packet_Source::sptr udp_gnss_rx_source_;
-    std::vector<boost::shared_ptr<gr::block>> file_sink_;
-    std::shared_ptr<Concurrent_Queue<pmt::pmt_t>> queue_;
+    bool IQ_swap_;
 };
 
 #endif  // GNSS_SDR_CUSTOM_UDP_SIGNAL_SOURCE_H

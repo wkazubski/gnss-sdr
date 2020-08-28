@@ -3,9 +3,9 @@
  * \brief GN3S USB dongle GPS RF front-end signal sampler driver
  * \author Javier Arribas, jarribas(at)cttc.es
  *
- * -------------------------------------------------------------------------
+ * -----------------------------------------------------------------------------
  *
- * Copyright (C) 2010-2019  (see AUTHORS file for a list of contributors)
+ * Copyright (C) 2010-2020  (see AUTHORS file for a list of contributors)
  *
  * GNSS-SDR is a software defined Global Navigation
  *          Satellite Systems receiver
@@ -14,7 +14,7 @@
  *
  * SPDX-License-Identifier: GPL-3.0-or-later
  *
- * -------------------------------------------------------------------------
+ * -----------------------------------------------------------------------------
  */
 
 #include "gn3s_signal_source.h"
@@ -24,11 +24,14 @@
 #include <gn3s/gn3s_source_cc.h>
 
 
-Gn3sSignalSource::Gn3sSignalSource(ConfigurationInterface* configuration,
-    std::string role, unsigned int in_stream, unsigned int out_stream, std::shared_ptr<Concurrent_Queue<pmt::pmt_t>> queue) : role_(role), in_stream_(in_stream), out_stream_(out_stream), queue_(queue)
+Gn3sSignalSource::Gn3sSignalSource(const ConfigurationInterface* configuration,
+    std::string role,
+    unsigned int in_stream,
+    unsigned int out_stream,
+    Concurrent_Queue<pmt::pmt_t>* queue) : role_(role), in_stream_(in_stream), out_stream_(out_stream)
 {
-    std::string default_item_type = "short";
-    std::string default_dump_file = "./data/gn3s_source.dat";
+    const std::string default_item_type("short");
+    const std::string default_dump_file("./data/gn3s_source.dat");
     item_type_ = configuration->property(role + ".item_type", default_item_type);
     dump_ = configuration->property(role + ".dump", false);
     dump_filename_ = configuration->property(role + ".dump_filename", default_dump_file);

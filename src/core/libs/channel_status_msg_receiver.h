@@ -3,9 +3,9 @@
  * \brief GNU Radio block that receives asynchronous channel messages from acquisition and tracking blocks
  * \author Javier Arribas, 2019. jarribas(at)cttc.es
  *
- * -------------------------------------------------------------------------
+ * -----------------------------------------------------------------------------
  *
- * Copyright (C) 2010-2019  (see AUTHORS file for a list of contributors)
+ * Copyright (C) 2010-2020  (see AUTHORS file for a list of contributors)
  *
  * GNSS-SDR is a software defined Global Navigation
  *          Satellite Systems receiver
@@ -14,7 +14,7 @@
  *
  * SPDX-License-Identifier: GPL-3.0-or-later
  *
- * -------------------------------------------------------------------------
+ * -----------------------------------------------------------------------------
  */
 
 #ifndef GNSS_SDR_CHANNEL_STATUS_MSG_RECEIVER_CC_H
@@ -26,10 +26,18 @@
 #include <pmt/pmt.h>
 #include <map>
 #include <memory>
+#if GNURADIO_USES_STD_POINTERS
+#else
+#include <boost/shared_ptr.hpp>
+#endif
 
 class channel_status_msg_receiver;
 
+#if GNURADIO_USES_STD_POINTERS
+using channel_status_msg_receiver_sptr = std::shared_ptr<channel_status_msg_receiver>;
+#else
 using channel_status_msg_receiver_sptr = boost::shared_ptr<channel_status_msg_receiver>;
+#endif
 
 channel_status_msg_receiver_sptr channel_status_msg_receiver_make();
 
@@ -54,9 +62,9 @@ public:
 private:
     friend channel_status_msg_receiver_sptr channel_status_msg_receiver_make();
     channel_status_msg_receiver();
-    std::map<int, std::shared_ptr<Gnss_Synchro>> d_channel_status_map;
-    Monitor_Pvt d_pvt_status{};
     void msg_handler_events(const pmt::pmt_t& msg);
+    Monitor_Pvt d_pvt_status{};
+    std::map<int, std::shared_ptr<Gnss_Synchro>> d_channel_status_map;
 };
 
 #endif  // GNSS_SDR_CHANNEL_STATUS_MSG_RECEIVER_CC_H

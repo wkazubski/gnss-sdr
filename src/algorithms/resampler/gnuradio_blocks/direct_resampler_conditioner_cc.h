@@ -11,9 +11,9 @@
  * the following book.
  *
  *
- * -------------------------------------------------------------------------
+ * -----------------------------------------------------------------------------
  *
- * Copyright (C) 2010-2019  (see AUTHORS file for a list of contributors)
+ * Copyright (C) 2010-2020  (see AUTHORS file for a list of contributors)
  *
  * GNSS-SDR is a software defined Global Navigation
  *          Satellite Systems receiver
@@ -22,19 +22,27 @@
  *
  * SPDX-License-Identifier: GPL-3.0-or-later
  *
- * -------------------------------------------------------------------------
+ * -----------------------------------------------------------------------------
  */
 
 #ifndef GNSS_SDR_DIRECT_RESAMPLER_CONDITIONER_CC_H
 #define GNSS_SDR_DIRECT_RESAMPLER_CONDITIONER_CC_H
 
-#include <boost/shared_ptr.hpp>
 #include <gnuradio/block.h>
 #include <cstdint>
+#if GNURADIO_USES_STD_POINTERS
+#include <memory>
+#else
+#include <boost/shared_ptr.hpp>
+#endif
 
 class direct_resampler_conditioner_cc;
 
+#if GNURADIO_USES_STD_POINTERS
+using direct_resampler_conditioner_cc_sptr = std::shared_ptr<direct_resampler_conditioner_cc>;
+#else
 using direct_resampler_conditioner_cc_sptr = boost::shared_ptr<direct_resampler_conditioner_cc>;
+#endif
 
 direct_resampler_conditioner_cc_sptr direct_resampler_make_conditioner_cc(
     double sample_freq_in,

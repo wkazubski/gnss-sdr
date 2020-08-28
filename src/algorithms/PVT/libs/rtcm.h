@@ -3,9 +3,9 @@
  * \brief  Interface for the RTCM 3.2 Standard
  * \author Carles Fernandez-Prades, 2015. cfernandez(at)cttc.es
  *
- * -------------------------------------------------------------------------
+ * -----------------------------------------------------------------------------
  *
- * Copyright (C) 2010-2019  (see AUTHORS file for a list of contributors)
+ * Copyright (C) 2010-2020  (see AUTHORS file for a list of contributors)
  *
  * GNSS-SDR is a software defined Global Navigation
  *          Satellite Systems receiver
@@ -14,7 +14,7 @@
  *
  * SPDX-License-Identifier: GPL-3.0-or-later
  *
- * -------------------------------------------------------------------------
+ * -----------------------------------------------------------------------------
  */
 
 
@@ -32,8 +32,8 @@
 #include <boost/asio.hpp>
 #include <boost/date_time/posix_time/posix_time.hpp>
 #include <glog/logging.h>
-#include <pmt/pmt.h>
 #include <algorithm>  // for min
+#include <array>
 #include <bitset>
 #include <cstddef>  // for size_t
 #include <cstdint>
@@ -48,7 +48,7 @@
 #include <utility>
 #include <vector>
 
-#if BOOST_GREATER_1_65
+#if USE_BOOST_ASIO_IO_CONTEXT
 using b_io_context = boost::asio::io_context;
 #else
 using b_io_context = boost::asio::io_service;
@@ -502,14 +502,8 @@ private:
     class Rtcm_Message
     {
     public:
-        enum
-        {
-            header_length = 6
-        };
-        enum
-        {
-            max_body_length = 1029
-        };
+        static const std::size_t header_length = 6;
+        static const std::size_t max_body_length = 1029;
 
         Rtcm_Message()
             : body_length_(0)
@@ -518,12 +512,12 @@ private:
 
         const char* data() const
         {
-            return data_;
+            return data_.data();
         }
 
         char* data()
         {
-            return data_;
+            return data_.data();
         }
 
         inline std::size_t length() const
@@ -533,12 +527,12 @@ private:
 
         const char* body() const
         {
-            return data_ + header_length;
+            return data_.data() + header_length;
         }
 
         char* body()
         {
-            return data_ + header_length;
+            return data_.data() + header_length;
         }
 
         std::size_t body_length() const
@@ -558,14 +552,14 @@ private:
         inline bool decode_header()
         {
             char header[header_length + 1] = "";
-            std::strncat(header, data_, header_length);
+            std::strncat(header, data_.data(), header_length);
             if (header[0] != 'G' || header[1] != 'S')
                 {
                     return false;
                 }
 
             char header2_[header_length - 1] = "";
-            std::strncat(header2_, data_ + 2, header_length - 2);
+            std::strncat(header2_, data_.data() + 2, header_length - 2);
             body_length_ = std::atoi(header2_);
             if (body_length_ == 0)
                 {
@@ -584,11 +578,11 @@ private:
         {
             char header[header_length + 1] = "";
             std::snprintf(header, header_length + 1, "GS%4d", std::max(std::min(static_cast<int>(body_length_), static_cast<int>(max_body_length)), 0));
-            std::memcpy(data_, header, header_length);
+            std::memcpy(data_.data(), header, header_length);
         }
 
     private:
-        char data_[header_length + max_body_length];
+        std::array<char, header_length + max_body_length> data_{};
         std::size_t body_length_;
     };
 
@@ -693,7 +687,7 @@ private:
                         }
                     else
                         {
-                            std::cout << "Closing connection with RTCM client" << std::endl;
+                            std::cout << "Closing connection with RTCM client\n";
                             room_.leave(shared_from_this());
                         }
                 });
@@ -710,12 +704,12 @@ private:
                             room_.deliver(read_msg_);
                             // std::cout << "Delivered message (session): ";
                             // std::cout.write(read_msg_.body(), read_msg_.body_length());
-                            // std::cout << std::endl;
+                            // std::cout << '\n';
                             do_read_message_header();
                         }
                     else
                         {
-                            std::cout << "Closing connection with RTCM client" << std::endl;
+                            std::cout << "Closing connection with RTCM client\n";
                             room_.leave(shared_from_this());
                         }
                 });
@@ -737,7 +731,7 @@ private:
                         }
                     else
                         {
-                            std::cout << "Closing connection with RTCM client" << std::endl;
+                            std::cout << "Closing connection with RTCM client\n";
                             room_.leave(shared_from_this());
                         }
                 });
@@ -791,7 +785,7 @@ private:
                         }
                     else
                         {
-                            std::cout << "Server is down." << std::endl;
+                            std::cout << "Server is down.\n";
                         }
                 });
         }
@@ -807,7 +801,7 @@ private:
                         }
                     else
                         {
-                            std::cout << "Error in client" << std::endl;
+                            std::cout << "Error in client\n";
                             socket_.close();
                         }
                 });
@@ -905,25 +899,25 @@ private:
                     {
                         if (first_client)
                             {
-                                std::cout << "The TCP/IP server of RTCM messages is up and running. Accepting connections ..." << std::endl;
+                                std::cout << "The TCP/IP server of RTCM messages is up and running. Accepting connections ...\n";
                                 first_client = false;
                             }
                         else
                             {
-                                std::cout << "Starting RTCM TCP/IP server session..." << std::endl;
+                                std::cout << "Starting RTCM TCP/IP server session...\n";
                                 boost::system::error_code ec2;
                                 boost::asio::ip::tcp::endpoint endpoint = socket_.remote_endpoint(ec2);
                                 if (ec2)
                                     {
                                         // Error creating remote_endpoint
-                                        std::cout << "Error getting remote IP address, closing session." << std::endl;
+                                        std::cout << "Error getting remote IP address, closing session.\n";
                                         LOG(INFO) << "Error getting remote IP address";
                                         start_session = false;
                                     }
                                 else
                                     {
                                         std::string remote_addr = endpoint.address().to_string();
-                                        std::cout << "Serving client from " << remote_addr << std::endl;
+                                        std::cout << "Serving client from " << remote_addr << '\n';
                                         LOG(INFO) << "Serving client from " << remote_addr;
                                     }
                             }
@@ -934,7 +928,7 @@ private:
                     }
                 else
                     {
-                        std::cout << "Error when invoking a RTCM session. " << ec << std::endl;
+                        std::cout << "Error when invoking a RTCM session. " << ec << '\n';
                     }
                 start_session = true;
                 do_accept();

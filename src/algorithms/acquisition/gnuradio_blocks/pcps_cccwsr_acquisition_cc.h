@@ -9,9 +9,9 @@
  * New Composite GNSS Signals", IEEE Transactions On Aerospace and
  * Electronic Systems vol. 45 no. 3, July 2009, section IV
  *
- * -------------------------------------------------------------------------
+ * -----------------------------------------------------------------------------
  *
- * Copyright (C) 2010-2019  (see AUTHORS file for a list of contributors)
+ * Copyright (C) 2010-2020  (see AUTHORS file for a list of contributors)
  *
  * GNSS-SDR is a software defined Global Navigation
  *          Satellite Systems receiver
@@ -20,7 +20,7 @@
  *
  * SPDX-License-Identifier: GPL-3.0-or-later
  *
- * -------------------------------------------------------------------------
+ * -----------------------------------------------------------------------------
  */
 
 #ifndef GNSS_SDR_PCPS_CCCWSR_ACQUISITION_CC_H
@@ -36,11 +36,19 @@
 #include <string>
 #include <utility>
 #include <vector>
+#if GNURADIO_USES_STD_POINTERS
+#else
+#include <boost/shared_ptr.hpp>
+#endif
 
 
 class pcps_cccwsr_acquisition_cc;
 
+#if GNURADIO_USES_STD_POINTERS
+using pcps_cccwsr_acquisition_cc_sptr = std::shared_ptr<pcps_cccwsr_acquisition_cc>;
+#else
 using pcps_cccwsr_acquisition_cc_sptr = boost::shared_ptr<pcps_cccwsr_acquisition_cc>;
+#endif
 
 pcps_cccwsr_acquisition_cc_sptr pcps_cccwsr_make_acquisition_cc(
     uint32_t sampled_ms,
@@ -178,43 +186,51 @@ private:
     void calculate_magnitudes(gr_complex* fft_begin, int32_t doppler_shift,
         int32_t doppler_offset);
 
+    std::weak_ptr<ChannelFsm> d_channel_fsm;
+
+    std::unique_ptr<gr::fft::fft_complex> d_fft_if;
+    std::unique_ptr<gr::fft::fft_complex> d_ifft;
+
+    std::vector<std::vector<gr_complex>> d_grid_doppler_wipeoffs;
+    std::vector<gr_complex> d_fft_code_data;
+    std::vector<gr_complex> d_fft_code_pilot;
+    std::vector<gr_complex> d_data_correlation;
+    std::vector<gr_complex> d_pilot_correlation;
+    std::vector<gr_complex> d_correlation_plus;
+    std::vector<gr_complex> d_correlation_minus;
+    std::vector<float> d_magnitude;
+
+    std::ofstream d_dump_file;
+    std::string d_satellite_str;
+    std::string d_dump_filename;
+
+    Gnss_Synchro* d_gnss_synchro;
+
     int64_t d_fs_in;
+    uint64_t d_sample_counter;
+
+    float d_threshold;
+    float d_doppler_freq;
+    float d_mag;
+    float d_input_power;
+    float d_test_statistics;
+
+    int32_t d_state;
     int32_t d_samples_per_ms;
     int32_t d_samples_per_code;
     uint32_t d_doppler_resolution;
-    float d_threshold;
-    std::string d_satellite_str;
     uint32_t d_doppler_max;
     uint32_t d_doppler_step;
     uint32_t d_sampled_ms;
     uint32_t d_max_dwells;
     uint32_t d_well_count;
     uint32_t d_fft_size;
-    uint64_t d_sample_counter;
-    std::vector<std::vector<gr_complex>> d_grid_doppler_wipeoffs;
     uint32_t d_num_doppler_bins;
-    std::vector<gr_complex> d_fft_code_data;
-    std::vector<gr_complex> d_fft_code_pilot;
-    std::shared_ptr<gr::fft::fft_complex> d_fft_if;
-    std::shared_ptr<gr::fft::fft_complex> d_ifft;
-    Gnss_Synchro* d_gnss_synchro;
     uint32_t d_code_phase;
-    float d_doppler_freq;
-    float d_mag;
-    std::vector<float> d_magnitude;
-    std::vector<gr_complex> d_data_correlation;
-    std::vector<gr_complex> d_pilot_correlation;
-    std::vector<gr_complex> d_correlation_plus;
-    std::vector<gr_complex> d_correlation_minus;
-    float d_input_power;
-    float d_test_statistics;
-    std::ofstream d_dump_file;
-    bool d_active;
-    int32_t d_state;
-    bool d_dump;
     uint32_t d_channel;
-    std::weak_ptr<ChannelFsm> d_channel_fsm;
-    std::string d_dump_filename;
+
+    bool d_active;
+    bool d_dump;
 };
 
 #endif  // GNSS_SDR_PCPS_CCCWSR_ACQUISITION_CC_H

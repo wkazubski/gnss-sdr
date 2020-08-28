@@ -138,12 +138,21 @@ set(SIGNAL_SOURCE_ADAPTER_HEADERS
 list(SORT SIGNAL_SOURCE_ADAPTER_HEADERS)
 list(SORT SIGNAL_SOURCE_ADAPTER_SOURCES)
 
-source_group(Headers FILES ${SIGNAL_SOURCE_ADAPTER_HEADERS})
-
-add_library(signal_source_adapters
-    ${SIGNAL_SOURCE_ADAPTER_SOURCES}
-    ${SIGNAL_SOURCE_ADAPTER_HEADERS}
-)
+if(USE_CMAKE_TARGET_SOURCES)
+    add_library(signal_source_adapters STATIC)
+    target_sources(signal_source_adapters
+        PRIVATE
+            ${SIGNAL_SOURCE_ADAPTER_SOURCES}
+        PUBLIC
+            ${SIGNAL_SOURCE_ADAPTER_HEADERS}
+    )
+else()
+    source_group(Headers FILES ${SIGNAL_SOURCE_ADAPTER_HEADERS})
+    add_library(signal_source_adapters
+        ${SIGNAL_SOURCE_ADAPTER_SOURCES}
+        ${SIGNAL_SOURCE_ADAPTER_HEADERS}
+    )
+endif()
 
 target_include_directories(signal_source_adapters
     PUBLIC
@@ -153,17 +162,20 @@ target_include_directories(signal_source_adapters
 target_link_libraries(signal_source_adapters
     PUBLIC
         Boost::headers
-        Gnuradio::runtime
         Gnuradio::blocks
         signal_source_gr_blocks
-        signal_source_libs
     PRIVATE
         gnss_sdr_flags
         core_system_parameters
-        Gflags::gflags
         Glog::glog
         Volk::volk
 )
+
+if(GNURADIO_USES_STD_POINTERS)
+    target_compile_definitions(signal_source_adapters
+        PUBLIC -DGNURADIO_USES_STD_POINTERS=1
+    )
+endif()
 
 if(ENABLE_RAW_UDP AND PCAP_FOUND)
     target_link_libraries(signal_source_adapters

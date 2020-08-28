@@ -4,9 +4,9 @@
  *  Galileo E5a data and pilot Signals for the FPGA
  * \author Marc Majoral, 2019. mmajoral(at)cttc.es
  *
- * -------------------------------------------------------------------------
+ * -----------------------------------------------------------------------------
  *
- * Copyright (C) 2010-2019  (see AUTHORS file for a list of contributors)
+ * Copyright (C) 2010-2020  (see AUTHORS file for a list of contributors)
  *
  * GNSS-SDR is a software defined Global Navigation
  *          Satellite Systems receiver
@@ -15,7 +15,7 @@
  *
  * SPDX-License-Identifier: GPL-3.0-or-later
  *
- * -------------------------------------------------------------------------
+ * -----------------------------------------------------------------------------
  */
 
 #ifndef GNSS_SDR_GALILEO_E5A_PCPS_ACQUISITION_FPGA_H
@@ -42,7 +42,8 @@ public:
     /*!
      * \brief Constructor
      */
-    GalileoE5aPcpsAcquisitionFpga(ConfigurationInterface* configuration,
+    GalileoE5aPcpsAcquisitionFpga(
+        const ConfigurationInterface* configuration,
         const std::string& role,
         unsigned int in_streams,
         unsigned int out_streams);
@@ -192,22 +193,21 @@ private:
     static const uint32_t select_all_code_bits = 0xFFFFFFFF;  // Select a 20 bit word
     static const uint32_t shl_code_bits = 65536;              // shift left by 10 bits
 
-    ConfigurationInterface* configuration_;
     pcps_acquisition_fpga_sptr acquisition_fpga_;
+    std::weak_ptr<ChannelFsm> channel_fsm_;
+    std::vector<uint32_t> d_all_fft_codes_;  // memory that contains all the code ffts
+    Gnss_Synchro* gnss_synchro_;
+    std::string role_;
     std::string item_type_;
     std::string dump_filename_;
-    std::string role_;
-    bool acq_pilot_;
-    bool acq_iq_;
+    int32_t doppler_center_;
     uint32_t channel_;
-    std::weak_ptr<ChannelFsm> channel_fsm_;
     uint32_t doppler_max_;
     uint32_t doppler_step_;
-    int32_t doppler_center_;
     unsigned int in_streams_;
     unsigned int out_streams_;
-    Gnss_Synchro* gnss_synchro_;
-    std::vector<uint32_t> d_all_fft_codes_;  // memory that contains all the code ffts
+    bool acq_pilot_;
+    bool acq_iq_;
 };
 
 #endif  // GNSS_SDR_GALILEO_E5A_PCPS_ACQUISITION_FPGA_H

@@ -4,9 +4,9 @@
  * Coded Modulation Library by Matthew C. Valenti
  * \author Daniel Fehr 2013. daniel.co(at)bluewin.ch
  *
- * -------------------------------------------------------------------------
+ * -----------------------------------------------------------------------------
  *
- * Copyright (C) 2010-2019  (see AUTHORS file for a list of contributors)
+ * Copyright (C) 2010-2020  (see AUTHORS file for a list of contributors)
  *
  * GNSS-SDR is a software defined Global Navigation
  *          Satellite Systems receiver
@@ -15,7 +15,7 @@
  *
  * SPDX-License-Identifier: GPL-3.0-or-later
  *
- * -------------------------------------------------------------------------
+ * -----------------------------------------------------------------------------
  */
 
 #ifndef GNSS_SDR_VITERBI_DECODER_H
@@ -58,46 +58,21 @@ private:
         Prev& operator=(const Prev& other);
         ~Prev();
 
-        int get_anchestor_state_of_current_state(int current_state);
-        int get_bit_of_current_state(int current_state);
-        float get_metric_of_current_state(int current_state);
-        int get_t();
+        int get_anchestor_state_of_current_state(int current_state) const;
+        int get_bit_of_current_state(int current_state) const;
+        float get_metric_of_current_state(int current_state) const;
+        int get_t() const;
         void set_current_state_as_ancestor_of_next_state(int next_state, int current_state);
         void set_decoded_bit_for_next_state(int next_state, int bit);
         void set_survivor_branch_metric_of_next_state(int next_state, float metric);
 
     private:
-        int t;
+        std::vector<float> v_metric;
         std::vector<int> state;
         std::vector<int> v_bit;
-        std::vector<float> v_metric;
+        int t;
         int refcount;
     };
-
-    // code properties
-    int d_KK;
-    int d_nn;
-
-    // derived code properties
-    int d_mm;
-    int d_states;
-    int d_number_symbols;
-
-    // trellis definition
-    std::vector<int> d_out0;
-    std::vector<int> d_state0;
-    std::vector<int> d_out1;
-    std::vector<int> d_state1;
-
-    // trellis state
-    std::vector<float> d_pm_t;
-    std::deque<Prev> d_trellis_paths;
-    std::vector<float> d_metric_c;  /* Set of all possible branch metrics */
-    std::vector<float> d_rec_array; /* Received values for one trellis section */
-    bool d_trellis_state_is_initialised;
-
-    // measures
-    float d_indicator_metric;
 
     // operations on the trellis (change decoder state)
     void init_trellis_state();
@@ -112,6 +87,31 @@ private:
     void nsc_transit(int output_p[], int trans_p[], int input, const int g[], int KK, int nn);
     int nsc_enc_bit(int state_out_p[], int input, int state_in, const int g[], int KK, int nn);
     int parity_counter(int symbol, int length);
+
+    // trellis state
+    std::deque<Prev> d_trellis_paths;
+    std::vector<float> d_pm_t;
+    std::vector<float> d_metric_c;  /* Set of all possible branch metrics */
+    std::vector<float> d_rec_array; /* Received values for one trellis section */
+
+    // trellis definition
+    std::vector<int> d_out0;
+    std::vector<int> d_state0;
+    std::vector<int> d_out1;
+    std::vector<int> d_state1;
+
+    // measures
+    float d_indicator_metric;
+
+    // code properties
+    int d_KK;
+    int d_nn;
+
+    // derived code properties
+    int d_mm;
+    int d_states;
+    int d_number_symbols;
+    bool d_trellis_state_is_initialised;
 };
 
 #endif  // GNSS_SDR_VITERBI_DECODER_H

@@ -3,9 +3,9 @@
  * \brief Adapts a PCPS acquisition block to an AcquisitionInterface for
  *  Galileo E5a data and pilot Signals
  * \author Antonio Ramos, 2018. antonio.ramos(at)cttc.es
- * -------------------------------------------------------------------------
+ * -----------------------------------------------------------------------------
  *
- * Copyright (C) 2010-2019  (see AUTHORS file for a list of contributors)
+ * Copyright (C) 2010-2020  (see AUTHORS file for a list of contributors)
  *
  * GNSS-SDR is a software defined Global Navigation
  *          Satellite Systems receiver
@@ -14,7 +14,7 @@
  *
  * SPDX-License-Identifier: GPL-3.0-or-later
  *
- * -------------------------------------------------------------------------
+ * -----------------------------------------------------------------------------
  */
 
 #include "galileo_e5a_pcps_acquisition.h"
@@ -27,17 +27,24 @@
 #include <volk_gnsssdr/volk_gnsssdr_complex.h>
 #include <algorithm>
 
+#if HAS_STD_SPAN
+#include <span>
+namespace own = std;
+#else
+#include <gsl/gsl>
+namespace own = gsl;
+#endif
 
-GalileoE5aPcpsAcquisition::GalileoE5aPcpsAcquisition(ConfigurationInterface* configuration,
+GalileoE5aPcpsAcquisition::GalileoE5aPcpsAcquisition(
+    const ConfigurationInterface* configuration,
     const std::string& role,
     unsigned int in_streams,
     unsigned int out_streams) : role_(role),
                                 in_streams_(in_streams),
                                 out_streams_(out_streams)
 {
-    configuration_ = configuration;
     acq_parameters_.ms_per_code = 1;
-    acq_parameters_.SetFromConfiguration(configuration_, role, GALILEO_E5A_CODE_CHIP_RATE_CPS, GALILEO_E5A_OPT_ACQ_FS_SPS);
+    acq_parameters_.SetFromConfiguration(configuration, role, GALILEO_E5A_CODE_CHIP_RATE_CPS, GALILEO_E5A_OPT_ACQ_FS_SPS);
 
     DLOG(INFO) << "Role " << role;
 
@@ -46,27 +53,26 @@ GalileoE5aPcpsAcquisition::GalileoE5aPcpsAcquisition(ConfigurationInterface* con
             acq_parameters_.doppler_max = FLAGS_doppler_max;
         }
     doppler_max_ = acq_parameters_.doppler_max;
-    doppler_step_ = acq_parameters_.doppler_step;
+    doppler_step_ = static_cast<unsigned int>(acq_parameters_.doppler_step);
     item_type_ = acq_parameters_.item_type;
     item_size_ = acq_parameters_.it_size;
     fs_in_ = acq_parameters_.fs_in;
 
-    acq_pilot_ = configuration_->property(role + ".acquire_pilot", false);
-    acq_iq_ = configuration_->property(role + ".acquire_iq", false);
+    acq_pilot_ = configuration->property(role + ".acquire_pilot", false);
+    acq_iq_ = configuration->property(role + ".acquire_iq", false);
     if (acq_iq_)
         {
             acq_pilot_ = false;
         }
 
     code_length_ = static_cast<unsigned int>(std::floor(static_cast<double>(acq_parameters_.resampled_fs) / (GALILEO_E5A_CODE_CHIP_RATE_CPS / GALILEO_E5A_CODE_LENGTH_CHIPS)));
-    vector_length_ = std::floor(acq_parameters_.sampled_ms * acq_parameters_.samples_per_ms) * (acq_parameters_.bit_transition_flag ? 2 : 1);
+    vector_length_ = static_cast<unsigned int>(std::floor(acq_parameters_.sampled_ms * acq_parameters_.samples_per_ms) * (acq_parameters_.bit_transition_flag ? 2.0 : 1.0));
     code_ = std::vector<std::complex<float>>(vector_length_);
 
     sampled_ms_ = acq_parameters_.sampled_ms;
 
     acquisition_ = pcps_make_acquisition(acq_parameters_);
     DLOG(INFO) << "acquisition(" << acquisition_->unique_id() << ")";
-
 
     channel_ = 0;
     threshold_ = 0.0;
@@ -86,6 +92,7 @@ GalileoE5aPcpsAcquisition::GalileoE5aPcpsAcquisition(ConfigurationInterface* con
 
 void GalileoE5aPcpsAcquisition::stop_acquisition()
 {
+    acquisition_->set_active(false);
 }
 
 
@@ -160,13 +167,13 @@ void GalileoE5aPcpsAcquisition::set_local_code()
 
     if (acq_parameters_.use_automatic_resampler)
         {
-            galileo_e5_a_code_gen_complex_sampled(code, signal_, gnss_synchro_->PRN, acq_parameters_.resampled_fs, 0);
+            galileo_e5_a_code_gen_complex_sampled(code, gnss_synchro_->PRN, signal_, acq_parameters_.resampled_fs, 0);
         }
     else
         {
-            galileo_e5_a_code_gen_complex_sampled(code, signal_, gnss_synchro_->PRN, fs_in_, 0);
+            galileo_e5_a_code_gen_complex_sampled(code, gnss_synchro_->PRN, signal_, fs_in_, 0);
         }
-    gsl::span<gr_complex> code_span(code_.data(), vector_length_);
+    own::span<gr_complex> code_span(code_.data(), vector_length_);
     for (unsigned int i = 0; i < sampled_ms_; i++)
         {
             std::copy_n(code.data(), code_length_, code_span.subspan(i * code_length_, code_length_).data());
@@ -190,11 +197,7 @@ void GalileoE5aPcpsAcquisition::set_state(int state)
 
 void GalileoE5aPcpsAcquisition::connect(gr::top_block_sptr top_block __attribute__((unused)))
 {
-    if (item_type_ == "gr_complex")
-        {
-            // nothing to connect
-        }
-    else if (item_type_ == "cshort")
+    if (item_type_ == "gr_complex" || item_type_ == "cshort")
         {
             // nothing to connect
         }
@@ -207,11 +210,7 @@ void GalileoE5aPcpsAcquisition::connect(gr::top_block_sptr top_block __attribute
 
 void GalileoE5aPcpsAcquisition::disconnect(gr::top_block_sptr top_block __attribute__((unused)))
 {
-    if (item_type_ == "gr_complex")
-        {
-            // nothing to disconnect
-        }
-    else if (item_type_ == "cshort")
+    if (item_type_ == "gr_complex" || item_type_ == "cshort")
         {
             // nothing to disconnect
         }

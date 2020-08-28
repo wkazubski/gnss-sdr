@@ -3,9 +3,9 @@
  * \brief Helper file for unit testing
  * \author Javier Arribas, 2017. jarribas(at)cttc.es
  *
- * -------------------------------------------------------------------------
+ * -----------------------------------------------------------------------------
  *
- * Copyright (C) 2010-2019  (see AUTHORS file for a list of contributors)
+ * Copyright (C) 2010-2020  (see AUTHORS file for a list of contributors)
  *
  * GNSS-SDR is a software defined Global Navigation
  *          Satellite Systems receiver
@@ -14,7 +14,7 @@
  *
  * SPDX-License-Identifier: GPL-3.0-or-later
  *
- * -------------------------------------------------------------------------
+ * -----------------------------------------------------------------------------
  */
 
 #include "tracking_true_obs_reader.h"
@@ -82,7 +82,7 @@ bool Tracking_True_Obs_Reader::open_obs_file(std::string out_file)
                 }
             catch (const std::ifstream::failure &e)
                 {
-                    std::cout << "Problem opening Tracking dump Log file: " << d_dump_filename << std::endl;
+                    std::cout << "Problem opening Tracking dump Log file: " << d_dump_filename << '\n';
                     return false;
                 }
         }

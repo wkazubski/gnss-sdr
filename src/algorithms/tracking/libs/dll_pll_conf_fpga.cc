@@ -5,9 +5,9 @@
  * \author Marc Majoral, 2019. mmajoral(at)cttc.cat
  * \author Javier Arribas, 2018. jarribas(at)cttc.es
  *
- * -------------------------------------------------------------------------
+ * -----------------------------------------------------------------------------
  *
- * Copyright (C) 2010-2019  (see AUTHORS file for a list of contributors)
+ * Copyright (C) 2010-2020  (see AUTHORS file for a list of contributors)
  *
  * GNSS-SDR is a software defined Global Navigation
  *          Satellite Systems receiver
@@ -16,7 +16,7 @@
  *
  * SPDX-License-Identifier: GPL-3.0-or-later
  *
- * -------------------------------------------------------------------------
+ * -----------------------------------------------------------------------------
  */
 
 
@@ -87,10 +87,10 @@ Dll_Pll_Conf_Fpga::Dll_Pll_Conf_Fpga()
 }
 
 
-void Dll_Pll_Conf_Fpga::SetFromConfiguration(ConfigurationInterface *configuration,
+void Dll_Pll_Conf_Fpga::SetFromConfiguration(const ConfigurationInterface *configuration,
     const std::string &role)
 {
-    int32_t fs_in_deprecated = configuration->property("GNSS-SDR.internal_fs_hz", fs_in);
+    double fs_in_deprecated = configuration->property("GNSS-SDR.internal_fs_hz", fs_in);
     fs_in = configuration->property("GNSS-SDR.internal_fs_sps", fs_in_deprecated);
     high_dyn = configuration->property(role + ".high_dyn", high_dyn);
     smoother_length = configuration->property(role + ".smoother_length", smoother_length);

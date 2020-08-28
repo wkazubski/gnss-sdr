@@ -7,9 +7,9 @@
  *          <li> Luis Esteve, 2012. luis(at)epsilon-formacion.com
  *          </ul>
  *
- * -------------------------------------------------------------------------
+ * -----------------------------------------------------------------------------
  *
- * Copyright (C) 2010-2019  (see AUTHORS file for a list of contributors)
+ * Copyright (C) 2010-2020  (see AUTHORS file for a list of contributors)
  *
  * GNSS-SDR is a software defined Global Navigation
  *          Satellite Systems receiver
@@ -18,7 +18,7 @@
  *
  * SPDX-License-Identifier: GPL-3.0-or-later
  *
- * -------------------------------------------------------------------------
+ * -----------------------------------------------------------------------------
  */
 
 #include "gps_l1_ca_pcps_acquisition_fine_doppler.h"
@@ -31,14 +31,14 @@
 
 
 GpsL1CaPcpsAcquisitionFineDoppler::GpsL1CaPcpsAcquisitionFineDoppler(
-    ConfigurationInterface* configuration,
+    const ConfigurationInterface* configuration,
     const std::string& role,
     unsigned int in_streams,
     unsigned int out_streams) : role_(role),
                                 in_streams_(in_streams),
                                 out_streams_(out_streams)
 {
-    std::string default_item_type = "gr_complex";
+    const std::string default_item_type("gr_complex");
     std::string default_dump_filename = "./acquisition.mat";
 
     DLOG(INFO) << "role " << role;
@@ -67,8 +67,8 @@ GpsL1CaPcpsAcquisitionFineDoppler::GpsL1CaPcpsAcquisitionFineDoppler(
     acq_parameters.blocking_on_standby = configuration->property(role + ".blocking_on_standby", false);
 
     // -- Find number of samples per spreading code -------------------------
-    vector_length_ = round(fs_in_ / (GPS_L1_CA_CODE_RATE_CPS / GPS_L1_CA_CODE_LENGTH_CHIPS));
-    acq_parameters.samples_per_ms = vector_length_;
+    vector_length_ = static_cast<unsigned int>(round(fs_in_ / (GPS_L1_CA_CODE_RATE_CPS / GPS_L1_CA_CODE_LENGTH_CHIPS)));
+    acq_parameters.samples_per_ms = static_cast<float>(vector_length_);
     code_ = std::vector<std::complex<float>>(vector_length_);
 
     if (item_type_ == "gr_complex")
@@ -100,6 +100,8 @@ GpsL1CaPcpsAcquisitionFineDoppler::GpsL1CaPcpsAcquisitionFineDoppler(
 
 void GpsL1CaPcpsAcquisitionFineDoppler::stop_acquisition()
 {
+    acquisition_cc_->set_state(0);
+    acquisition_cc_->set_active(false);
 }
 
 
@@ -112,7 +114,7 @@ void GpsL1CaPcpsAcquisitionFineDoppler::set_threshold(float threshold)
 
 void GpsL1CaPcpsAcquisitionFineDoppler::set_doppler_max(unsigned int doppler_max)
 {
-    doppler_max_ = doppler_max;
+    doppler_max_ = static_cast<int>(doppler_max);
     acquisition_cc_->set_doppler_max(doppler_max_);
 }
 
@@ -133,7 +135,7 @@ void GpsL1CaPcpsAcquisitionFineDoppler::set_gnss_synchro(Gnss_Synchro* gnss_sync
 
 signed int GpsL1CaPcpsAcquisitionFineDoppler::mag()
 {
-    return acquisition_cc_->mag();
+    return static_cast<signed int>(acquisition_cc_->mag());
 }
 
 
@@ -161,7 +163,35 @@ void GpsL1CaPcpsAcquisitionFineDoppler::set_state(int state)
     acquisition_cc_->set_state(state);
 }
 
+#if GNURADIO_USES_STD_POINTERS
+void GpsL1CaPcpsAcquisitionFineDoppler::connect(std::shared_ptr<gr::top_block> top_block)
+{
+    if (top_block)
+        { /* top_block is not null */
+        };
+    // nothing to disconnect, now the tracking uses gr_sync_decimator
+}
 
+
+void GpsL1CaPcpsAcquisitionFineDoppler::disconnect(std::shared_ptr<gr::top_block> top_block)
+{
+    if (top_block)
+        { /* top_block is not null */
+        };
+    // nothing to disconnect, now the tracking uses gr_sync_decimator
+}
+
+std::shared_ptr<gr::basic_block> GpsL1CaPcpsAcquisitionFineDoppler::get_left_block()
+{
+    return acquisition_cc_;
+}
+
+
+std::shared_ptr<gr::basic_block> GpsL1CaPcpsAcquisitionFineDoppler::get_right_block()
+{
+    return acquisition_cc_;
+}
+#else
 void GpsL1CaPcpsAcquisitionFineDoppler::connect(boost::shared_ptr<gr::top_block> top_block)
 {
     if (top_block)
@@ -179,7 +209,6 @@ void GpsL1CaPcpsAcquisitionFineDoppler::disconnect(boost::shared_ptr<gr::top_blo
     // nothing to disconnect, now the tracking uses gr_sync_decimator
 }
 
-
 boost::shared_ptr<gr::basic_block> GpsL1CaPcpsAcquisitionFineDoppler::get_left_block()
 {
     return acquisition_cc_;
@@ -190,3 +219,4 @@ boost::shared_ptr<gr::basic_block> GpsL1CaPcpsAcquisitionFineDoppler::get_right_
 {
     return acquisition_cc_;
 }
+#endif
