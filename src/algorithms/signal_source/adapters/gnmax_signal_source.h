@@ -4,9 +4,9 @@
  * \author Wojciech Kazubski, wk(at)ire.pw.edu.pl
  * \author Javier Arribas, jarribas(at)cttc.es
  *
- * -------------------------------------------------------------------------
+ * -----------------------------------------------------------------------------
  *
- * Copyright (C) 2010-2019  (see AUTHORS file for a list of contributors)
+ * Copyright (C) 2010-2020  (see AUTHORS file for a list of contributors)
  *
  * GNSS-SDR is a software defined Global Navigation
  *          Satellite Systems receiver
@@ -15,7 +15,7 @@
  *
  * SPDX-License-Identifier: GPL-3.0-or-later
  *
- * -------------------------------------------------------------------------
+ * -----------------------------------------------------------------------------
  */
 
 
@@ -38,9 +38,9 @@ class ConfigurationInterface;
 class GnMaxSignalSource : public GNSSBlockInterface
 {
 public:
-    GnMaxSignalSource(ConfigurationInterface* configuration,
+    GnMaxSignalSource(const ConfigurationInterface* configuration,
         std::string role, unsigned int in_stream,
-        unsigned int out_stream, std::shared_ptr<Concurrent_Queue<pmt::pmt_t>> queue);
+        unsigned int out_stream, Concurrent_Queue<pmt::pmt_t>* queue);
 
     virtual ~GnMaxSignalSource();
 
@@ -87,7 +87,6 @@ private:
     std::string dump_filename_;
     gr::block_sptr gnmax_source_;
     gr::blocks::file_sink::sptr file_sink_;
-    std::shared_ptr<Concurrent_Queue<pmt::pmt_t>> queue_;
 };
 
 #endif /*GNSS_SDR_GNMAX_SIGNAL_SOURCE_H_*/

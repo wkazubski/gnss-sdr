@@ -4,9 +4,9 @@
  * \author Wojciech Kazubski, wk(at)ire.pw.edu.pl
  * \author Javier Arribas, jarribas(at)cttc.es
  *
- * -------------------------------------------------------------------------
+ * -----------------------------------------------------------------------------
  *
- * Copyright (C) 2010-2019  (see AUTHORS file for a list of contributors)
+ * Copyright (C) 2010-2020  (see AUTHORS file for a list of contributors)
  *
  * GNSS-SDR is a software defined Global Navigation
  *          Satellite Systems receiver
@@ -15,7 +15,7 @@
  *
  * SPDX-License-Identifier: GPL-3.0-or-later
  *
- * -------------------------------------------------------------------------
+ * -----------------------------------------------------------------------------
  */
 
 #include "gnmax_signal_source.h"
@@ -26,11 +26,14 @@
 #include <gnMAX2769/gnmax_source_cc.h>
 
 
-GnMaxSignalSource::GnMaxSignalSource(ConfigurationInterface* configuration,
-    std::string role, unsigned int in_stream, unsigned int out_stream, std::shared_ptr<Concurrent_Queue<pmt::pmt_t>> queue) : role_(role), in_stream_(in_stream), out_stream_(out_stream), queue_(queue)
+GnMaxSignalSource::GnMaxSignalSource(const ConfigurationInterface* configuration,
+    std::string role,
+    unsigned int in_stream,
+    unsigned int out_stream,
+    Concurrent_Queue<pmt::pmt_t>* queue) : role_(role), in_stream_(in_stream), out_stream_(out_stream)
 {
-    std::string default_item_type = "short";
-    std::string default_dump_file = "./data/gnmax_source.dat";
+    const std::string default_item_type("short");
+    const std::string default_dump_file("./data/gnmax_source.dat");
     item_type_ = configuration->property(role + ".item_type", default_item_type);
     bias_ = configuration->property(role + ".antenna_bias", true);
     ant_ = configuration->property(role + ".antenna", 3);
