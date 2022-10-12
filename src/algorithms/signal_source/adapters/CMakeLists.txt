@@ -42,6 +42,19 @@ if(ENABLE_AD9361)
 endif()
 
 
+if(ENABLE_GNMAX)
+    ##############################################
+    # gnMAX2769 (USB dongle)
+    ##############################################
+    if(NOT GRGNMAX_FOUND)
+        message(" gr-gnMAX2769 not found, install it from https://github.com/wkazubski/gr-gnMAX2769 ")
+        message(FATAL_ERROR "gr-gnMAX2769 required for building gnss-sdr with this option enabled")
+    endif()
+    set(OPT_DRIVER_SOURCES ${OPT_DRIVER_SOURCES} gnmax_signal_source.cc)
+    set(OPT_DRIVER_HEADERS ${OPT_DRIVER_HEADERS} gnmax_signal_source.h)
+endif()
+
+
 if(ENABLE_FLEXIBAND AND TELEORBIT_FOUND)
     set(OPT_DRIVER_SOURCES ${OPT_DRIVER_SOURCES} flexiband_signal_source.cc)
     set(OPT_DRIVER_HEADERS ${OPT_DRIVER_HEADERS} flexiband_signal_source.h)
@@ -240,6 +253,13 @@ if(ENABLE_FLEXIBAND AND TELEORBIT_FOUND)
     target_link_libraries(signal_source_adapters
         PRIVATE
             Gnuradio::teleorbit
+    )
+endif()
+
+if(ENABLE_GNMAX AND GRGNMAX_FOUND)
+    target_link_libraries(signal_source_adapters
+        PRIVATE
+            Gnuradio::gnmax
     )
 endif()
 
