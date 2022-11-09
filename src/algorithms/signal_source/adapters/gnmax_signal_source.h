@@ -61,12 +61,7 @@ public:
     {
         return item_size_;
     }
-/*
-    inline size_t getRfChannels() const final
-    {
-        return 0;
-    }
-*/
+
     void connect(gr::top_block_sptr top_block) override;
     void disconnect(gr::top_block_sptr top_block) override;
     gr::basic_block_sptr get_left_block() override;
@@ -91,6 +86,7 @@ private:
     bool dump_;
     std::string dump_filename_;
     gr::block_sptr gnmax_source_;
+    gnss_shared_ptr<gr::block> valve_;
     gr::blocks::file_sink::sptr file_sink_;
 };
 

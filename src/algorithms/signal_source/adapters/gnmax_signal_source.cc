@@ -19,13 +19,13 @@
  */
 
 #include "gnmax_signal_source.h"
-#include "GPS_L1_CA.h"
 #include "configuration_interface.h"
-#include "gnss_sdr_string_literals.h"
-#include <boost/exception/diagnostic_information.hpp>
+#include "gnss_sdr_valve.h"
 #include <glog/logging.h>
 #include <gnuradio/blocks/file_sink.h>
+#include "GPS_L1_CA.h"
 #include <gnMAX2769/gnmax_source_cc.h>
+
 
 GnMaxSignalSource::GnMaxSignalSource(const ConfigurationInterface* configuration,
     std::string role,
@@ -49,6 +49,7 @@ GnMaxSignalSource::GnMaxSignalSource(const ConfigurationInterface* configuration
     else
         bias__ = 0;
     freq__ = static_cast<float>(freq_);
+
     if (bw_ <= 2.501E6)
         bw__ = 0;
     else
@@ -63,6 +64,7 @@ GnMaxSignalSource::GnMaxSignalSource(const ConfigurationInterface* configuration
                 bw__ = 3;
         }
     }
+
     if (zeroif_)
         zeroif__ = 1;
     else
@@ -87,14 +89,28 @@ GnMaxSignalSource::GnMaxSignalSource(const ConfigurationInterface* configuration
                          << " unrecognized item type for resampler";
             item_size_ = sizeof(short);
         }
+
+    if (samples_ != 0)
+        {
+            DLOG(INFO) << "Send STOP signal after " << samples_ << " samples";
+            valve_ = gnss_sdr_make_valve(item_size_, samples_, queue);
+            DLOG(INFO) << "valve(" << valve_->unique_id() << ")";
+        }
+
     if (dump_)
         {
             DLOG(INFO) << "Dumping output into file " << dump_filename_;
             file_sink_ = gr::blocks::file_sink::make(item_size_, dump_filename_.c_str());
-        }
-    if (dump_)
-        {
             DLOG(INFO) << "file_sink(" << file_sink_->unique_id() << ")";
+        }
+
+    if (in_stream_ > 0)
+        {
+            LOG(ERROR) << "A signal source does not have an input stream";
+        }
+    if (out_stream_ > 1)
+        {
+            LOG(ERROR) << "This implementation only supports one output stream";
         }
 }
 
@@ -106,23 +122,43 @@ GnMaxSignalSource::~GnMaxSignalSource()
 
 void GnMaxSignalSource::connect(gr::top_block_sptr top_block)
 {
-    if (dump_)
+    if (samples_ != 0)
         {
-            top_block->connect(gnmax_source_, 0, file_sink_, 0);
-            DLOG(INFO) << "connected gnmax_source to file sink";
+            top_block->connect(gnmax_source_, 0, valve_, 0);
+            DLOG(INFO) << "connected limesdr source to valve";
+            if (dump_)
+                {
+                    top_block->connect(valve_, 0, file_sink_, 0);
+                    DLOG(INFO) << "connected valve to file sink";
+                }
         }
     else
         {
-            DLOG(INFO) << "nothing to connect internally";
+            if (dump_)
+                {
+                    top_block->connect(gnmax_source_, 0, file_sink_, 0);
+                    DLOG(INFO) << "connected limesdr source to file sink";
+                }
         }
 }
 
 
 void GnMaxSignalSource::disconnect(gr::top_block_sptr top_block)
 {
-    if (dump_)
+    if (samples_ != 0)
         {
-            top_block->disconnect(gnmax_source_, 0, file_sink_, 0);
+            top_block->disconnect(gnmax_source_, 0, valve_, 0);
+            if (dump_)
+                {
+                    top_block->disconnect(valve_, 0, file_sink_, 0);
+                }
+        }
+    else
+        {
+            if (dump_)
+                {
+                    top_block->disconnect(gnmax_source_, 0, file_sink_, 0);
+                }
         }
 }
 
@@ -136,5 +172,12 @@ gr::basic_block_sptr GnMaxSignalSource::get_left_block()
 
 gr::basic_block_sptr GnMaxSignalSource::get_right_block()
 {
-    return gnmax_source_;
+    if (samples_ != 0)
+        {
+            return valve_;
+        }
+    else
+        {
+            return gnmax_source_;
+        }
 }
