@@ -53,17 +53,17 @@ GnMaxSignalSource::GnMaxSignalSource(const ConfigurationInterface* configuration
     if (bw_ <= 2.501E6)
         bw__ = 0;
     else
-    {
-        if (bw_ <= 4.201E6)
-            bw__ = 1;
-        else
         {
-            if (bw_ <= 8.001E6)
-                bw__ = 2;
+            if (bw_ <= 4.201E6)
+                bw__ = 1;
             else
-                bw__ = 3;
+                {
+                    if (bw_ <= 8.001E6)
+                        bw__ = 2;
+                    else
+                        bw__ = 3;
+                }
         }
-    }
 
     if (zeroif_)
         zeroif__ = 1;
