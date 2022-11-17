@@ -19,35 +19,41 @@
  */
 
 #include "gnmax_signal_source.h"
+#include "GPS_L1_CA.h"
 #include "configuration_interface.h"
+#include "gnss_sdr_string_literals.h"
 #include "gnss_sdr_valve.h"
 #include <glog/logging.h>
 #include <gnuradio/blocks/file_sink.h>
-#include "GPS_L1_CA.h"
 #include <gnMAX2769/gnmax_source_cc.h>
 
 
+using namespace std::string_literals;
+
+
 GnMaxSignalSource::GnMaxSignalSource(const ConfigurationInterface* configuration,
-    std::string role,
+    const std::string& role,
     unsigned int in_stream,
     unsigned int out_stream,
-    Concurrent_Queue<pmt::pmt_t>* queue) : role_(role), in_stream_(in_stream), out_stream_(out_stream)
+    Concurrent_Queue<pmt::pmt_t>* queue)
+    : SignalSourceBase(configuration, role, "GnMax_Signal_Source"s),
+      item_type_(configuration->property(role + ".item_type", std::string("gr_complex"))),
+      dump_filename_(configuration->property(role + ".dump_filename", std::string("./data/signal_source.dat"))),
+      bias_(configuration->property(role + ".antenna_bias", true)),
+      ant_(configuration->property(role + ".antenna", 3)),
+      freq_(configuration->property(role + ".freq", GPS_L1_FREQ_HZ)),
+      bw_(configuration->property(role + ".if_bandwidth", 1)),
+      zeroif_(configuration->property(role + ".zero_if", false)),
+      in_stream_(in_stream),
+      out_stream_(out_stream),
+      dump_(configuration->property(role + ".dump", false))
 {
-    const std::string default_item_type("short");
-    const std::string default_dump_file("./data/gnmax_source.dat");
-    item_type_ = configuration->property(role + ".item_type", default_item_type);
-    bias_ = configuration->property(role + ".antenna_bias", true);
-    ant_ = configuration->property(role + ".antenna", 3);
-    freq_ = configuration->property(role + ".freq", GPS_L1_FREQ_HZ);
-    bw_ = configuration->property(role + ".if_bandwidth", 1);
-    zeroif_ = configuration->property(role + ".zero_if", false);
-    dump_ = configuration->property(role + ".dump", false);
-    dump_filename_ = configuration->property(role + ".dump_filename", default_dump_file);
 
     if (bias_)
         bias__ = 1;
     else
         bias__ = 0;
+
     freq__ = static_cast<float>(freq_);
 
     if (bw_ <= 2.501E6)
