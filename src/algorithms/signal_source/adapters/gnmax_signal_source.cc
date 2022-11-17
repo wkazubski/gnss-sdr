@@ -48,7 +48,6 @@ GnMaxSignalSource::GnMaxSignalSource(const ConfigurationInterface* configuration
       out_stream_(out_stream),
       dump_(configuration->property(role + ".dump", false))
 {
-
     if (bias_)
         bias__ = 1;
     else

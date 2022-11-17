@@ -61,7 +61,6 @@ public:
     gr::basic_block_sptr get_right_block() override;
 
 private:
-
     gr::block_sptr gnmax_source_;
     gnss_shared_ptr<gr::block> valve_;
     gr::blocks::file_sink::sptr file_sink_;
