@@ -16,7 +16,7 @@ endif()
 # Build type can still be overridden by setting -DCMAKE_BUILD_TYPE=
 set(CMAKE_BUILD_TYPE "Release" CACHE STRING "")
 
-cmake_minimum_required(VERSION 2.8.12...3.24)
+cmake_minimum_required(VERSION 2.8.12...3.25)
 project(gnss-sdr CXX C)
 
 set(GNSSSDR_SOURCE_DIR ${CMAKE_CURRENT_SOURCE_DIR}) # Allows to be a sub-project
@@ -134,7 +134,7 @@ if(ENABLE_FPGA)
 endif()
 
 option(ENABLE_BENCHMARKS "Build code snippets benchmarks" OFF)
-if(CMAKE_VERSION VERSION_LESS 3.5.1)
+if(CMAKE_VERSION VERSION_LESS 3.16.3)
     set(ENABLE_BENCHMARKS OFF)
 endif()
 
@@ -345,11 +345,11 @@ else()
     set(GNSSSDR_GTEST_LOCAL_VERSION "1.12.1")
 endif()
 set(GNSSSDR_GNSS_SIM_LOCAL_VERSION "master")
-set(GNSSSDR_GNSSTK_LOCAL_VERSION "13.4.0")
+set(GNSSSDR_GNSSTK_LOCAL_VERSION "13.7.0")
 set(GNSSSDR_MATIO_LOCAL_VERSION "1.5.23")
-set(GNSSSDR_PUGIXML_LOCAL_VERSION "1.12")
-set(GNSSSDR_PROTOCOLBUFFERS_LOCAL_VERSION "21.5")
-set(GNSSSDR_BENCHMARK_LOCAL_VERSION "1.7.0")
+set(GNSSSDR_PUGIXML_LOCAL_VERSION "1.13")
+set(GNSSSDR_PROTOCOLBUFFERS_LOCAL_VERSION "21.9")
+set(GNSSSDR_BENCHMARK_LOCAL_VERSION "1.7.1")
 set(GNSSSDR_MATHJAX_EXTERNAL_VERSION "2.7.7")
 
 if(CMAKE_VERSION VERSION_LESS "3.16")
@@ -1121,7 +1121,7 @@ if(NOT VOLKGNSSSDR_FOUND)
         if(CMAKE_GENERATOR STREQUAL Xcode)
             set(VOLK_GNSSSDR_BUILD_COMMAND "xcodebuild"
                 "-configuration" $<$<CONFIG:Debug>:Debug>$<$<CONFIG:Release>:Release>$<$<CONFIG:RelWithDebInfo>:RelWithDebInfo>$<$<CONFIG:MinSizeRel>:MinSizeRel>
-                "-target"
+                "-alltargets"
             )
         endif()
     endif()
@@ -1189,7 +1189,7 @@ if(NOT VOLKGNSSSDR_FOUND)
     include(GNUInstallDirs)
     set(SUPPORTED_CPU_FEATURES_ARCH FALSE)
     if(CMAKE_SYSTEM_PROCESSOR MATCHES
-        "(^mips)|(^arm)|(^aarch64)|(x86_64)|(AMD64|amd64)|(^i.86$)|(^powerpc)|(^ppc)")
+        "(^mips)|(^arm)|(^aarch64)|(x86_64)|(AMD64|amd64)|(^i.86$)|(^powerpc)|(^ppc)|(^s390x)")
         set(SUPPORTED_CPU_FEATURES_ARCH TRUE)
     endif()
     if(${CMAKE_INSTALL_LIBDIR} MATCHES lib64)
@@ -1206,7 +1206,7 @@ if(NOT VOLKGNSSSDR_FOUND)
             DOWNLOAD_COMMAND ""
             UPDATE_COMMAND ""
             PATCH_COMMAND ""
-            BUILD_COMMAND ${VOLK_GNSSSDR_BUILD_COMMAND} volk_gnsssdr_profile
+            BUILD_COMMAND ${VOLK_GNSSSDR_BUILD_COMMAND}
             INSTALL_DIR ${GNSSSDR_BINARY_DIR}/volk_gnsssdr_module/install
         )
     else()
@@ -1257,7 +1257,7 @@ if(NOT VOLKGNSSSDR_FOUND)
                 DOWNLOAD_COMMAND ""
                 UPDATE_COMMAND ""
                 PATCH_COMMAND ""
-                BUILD_COMMAND ${VOLK_GNSSSDR_BUILD_COMMAND} volk_gnsssdr_profile
+                BUILD_COMMAND ${VOLK_GNSSSDR_BUILD_COMMAND}
                 BUILD_BYPRODUCTS ${VOLK_GNSSSDR_BUILD_BYPRODUCTS}
                 INSTALL_DIR ${GNSSSDR_BINARY_DIR}/volk_gnsssdr_module/install
             )
@@ -1276,9 +1276,10 @@ if(NOT VOLKGNSSSDR_FOUND)
                 DOWNLOAD_COMMAND ""
                 UPDATE_COMMAND ""
                 PATCH_COMMAND ""
-                BUILD_COMMAND ${VOLK_GNSSSDR_BUILD_COMMAND} volk_gnsssdr_profile
+                BUILD_COMMAND ${VOLK_GNSSSDR_BUILD_COMMAND}
                 BUILD_BYPRODUCTS ${GNSSSDR_BINARY_DIR}/volk_gnsssdr_module/install/lib${VOLK_GNSSSDR_LIB_SUFFIX}/${CMAKE_FIND_LIBRARY_PREFIXES}volk_gnsssdr${CMAKE_STATIC_LIBRARY_SUFFIX}
                     ${GNSSSDR_BINARY_DIR}/volk_gnsssdr_module/install/bin/volk_gnsssdr_profile
+                    ${GNSSSDR_BINARY_DIR}/volk_gnsssdr_module/install/bin/volk_gnsssdr-config-info
                 INSTALL_DIR ${GNSSSDR_BINARY_DIR}/volk_gnsssdr_module/install
             )
         endif()

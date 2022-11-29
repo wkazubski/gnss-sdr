@@ -8,7 +8,7 @@
 ########################################################################
 # Project setup
 ########################################################################
-cmake_minimum_required(VERSION 2.8.12...3.24)
+cmake_minimum_required(VERSION 2.8.12...3.25)
 if(NOT CMAKE_BUILD_TYPE)
     set(CMAKE_BUILD_TYPE "Release")
 endif()
@@ -257,7 +257,7 @@ endif()
 
 # cpu_features - sensible defaults, user settable option
 if(CMAKE_SYSTEM_PROCESSOR MATCHES
-    "(^mips)|(^arm)|(^aarch64)|(x86_64)|(AMD64|amd64)|(^i.86$)|(^powerpc)|(^ppc)")
+    "(^mips)|(^arm)|(^aarch64)|(x86_64)|(AMD64|amd64)|(^i.86$)|(^powerpc)|(^ppc)|(^s390x)")
     option(VOLK_CPU_FEATURES "volk-gnsssdr uses cpu_features" ON)
 else()
     option(VOLK_CPU_FEATURES "volk-gnsssdr uses cpu_features" OFF)
