@@ -50,7 +50,7 @@ option(ENABLE_GNMAX "Enable the use of the gnMAX2769 dongle as signal source (ex
 
 option(ENABLE_ARRAY "Enable the use of CTTC's antenna array front-end as signal source (experimental)" OFF)
 
-option(ENABLE_ZMQ "Enable GNU Radio ZeroMQ Messaging, requires gr-zeromq" OFF)
+option(ENABLE_ZMQ "Enable GNU Radio ZeroMQ Messaging, requires gr-zeromq" ON)
 
 # Performance analysis tools
 option(ENABLE_GPERFTOOLS "Enable linking to Gperftools libraries (tcmalloc and profiler)" OFF)
@@ -615,8 +615,17 @@ if(ENABLE_UHD)
     endif()
 endif()
 
+find_package(ZEROMQ)
+set_package_properties(ZEROMQ PROPERTIES
+    PURPOSE "Used by the ZMQ_Signal_Source."
+    TYPE OPTIONAL
+)
 if(ENABLE_ZMQ)
-    list(APPEND GR_REQUIRED_COMPONENTS ZEROMQ)
+    if(NOT ZEROMQ_FOUND)
+        set(ENABLE_ZMQ OFF)
+    else()
+        list(APPEND GR_REQUIRED_COMPONENTS ZEROMQ)
+    endif()
 endif()
 
 find_package(GNURADIO)
