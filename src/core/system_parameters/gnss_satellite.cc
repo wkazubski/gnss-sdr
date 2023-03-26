@@ -73,13 +73,16 @@ bool operator==(const Gnss_Satellite& sat1, const Gnss_Satellite& sat2)
 
 // Copy constructor
 Gnss_Satellite::Gnss_Satellite(const Gnss_Satellite& other) noexcept
+    : system(other.system),
+      block(other.block),
+      PRN(other.PRN),
+      rf_link(other.rf_link)
 {
-    *this = other;
 }
 
 
 // Copy assignment operator
-Gnss_Satellite& Gnss_Satellite::operator=(const Gnss_Satellite& rhs)
+Gnss_Satellite& Gnss_Satellite::operator=(const Gnss_Satellite& rhs) noexcept
 {
     // Only do assignment if RHS is a different object from this.
     if (this != &rhs)
@@ -95,8 +98,12 @@ Gnss_Satellite& Gnss_Satellite::operator=(const Gnss_Satellite& rhs)
 
 // Move constructor
 Gnss_Satellite::Gnss_Satellite(Gnss_Satellite&& other) noexcept
+    : system(std::move(other.system)),
+      block(std::move(other.block)),
+      PRN(other.PRN),
+      rf_link(other.rf_link)
 {
-    *this = std::move(other);
+    other.reset();
 }
 
 
@@ -105,10 +112,11 @@ Gnss_Satellite& Gnss_Satellite::operator=(Gnss_Satellite&& other) noexcept
 {
     if (this != &other)
         {
-            this->system = other.get_system();
-            this->block = other.get_block();
-            this->PRN = other.get_PRN();
-            this->rf_link = other.get_rf_link();
+            system = std::move(other.system);
+            block = std::move(other.block);
+            PRN = other.PRN;
+            rf_link = other.rf_link;
+            other.reset();
         }
     return *this;
 }
