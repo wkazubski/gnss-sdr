@@ -4,7 +4,7 @@ SPDX-License-Identifier: GPL-3.0-or-later
 )
 
 [comment]: # (
-SPDX-FileCopyrightText: 2011-2022 Carles Fernandez-Prades <carles.fernandez@cttc.es>
+SPDX-FileCopyrightText: 2011-2023 Carles Fernandez-Prades <carles.fernandez@cttc.es>
 )
 <!-- prettier-ignore-end -->
 
@@ -30,6 +30,11 @@ All notable changes to GNSS-SDR will be documented in this file.
 - Improved non-coherent acquisition when `Acquisition_XX.blocking=false`.
 - Implemented processing of BeiDou PRN 34 up to PRN 63 signals.
 - Implemented Hamming code correction for Glonass navigation message.
+- Now the first iteration of the PVT computation is initialized by the Bancroft
+  method. This allows to get PVT fixes in some unusual geometries (_e.g._,
+  GNSS-like signals transmitted by LEO satellites). This initialization is
+  performed by default. You can opt-out by setting `PVT.bancroft_init=false` in
+  your configuration file.
 
 ### Improvements in Interoperability:
 
@@ -87,6 +92,14 @@ All notable changes to GNSS-SDR will be documented in this file.
   to CMake deactivates file downloading.
 - The `ENABLE_GENERIC_ARCH` building option was removed, simplifying the process
   of buiding the software in non-x86 processor architectures.
+- If the Protocol Buffers dependency is not found, it is downloaded, built and
+  statically linked at buiding time. If CMake >= 3.13 and the
+  [Abseil C++ libraries](https://github.com/abseil/abseil-cpp) >= 20230117 are
+  installed on your system, Protocol Buffers v22.2 will be used. If those
+  requirements are not met, Protocol Buffers v21.4 will be used instead
+  (requires autotools).
+- Since Debian 8 "Jessie", which enjoyed Long Term Support until the end of June
+  2020, is not anymore in the Debian official repositories, we drop its support.
 
 ### Improvements in Usability:
 
