@@ -113,7 +113,11 @@ public:
         monitor_.set_vdop(monitor->vdop);
         monitor_.set_user_clk_drift_ppm(monitor->user_clk_drift_ppm);
         monitor_.set_utc_time(monitor->utc_time);
-
+        monitor_.set_vel_e(monitor->vel_e);
+        monitor_.set_vel_n(monitor->vel_n);
+        monitor_.set_vel_u(monitor->vel_u);
+        monitor_.set_cog(monitor->cog);
+        monitor_.set_galhas_status(monitor->galhas_status);
         monitor_.SerializeToString(&data);
         return data;
     }
@@ -152,6 +156,11 @@ public:
         monitor.vdop = mon.vdop();
         monitor.user_clk_drift_ppm = mon.user_clk_drift_ppm();
         monitor.utc_time = mon.utc_time();
+        monitor.vel_e = mon.vel_e();
+        monitor.vel_n = mon.vel_n();
+        monitor.vel_u = mon.vel_u();
+        monitor.cog = mon.cog();
+        monitor.galhas_status = mon.galhas_status();
 
         return monitor;
     }

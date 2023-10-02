@@ -64,6 +64,16 @@ public:
     double longitude;
     // GEO user position Height [m]
     double height;
+    // East, Nord, Up (ENU) Velocity [m/s]
+    double vel_e;
+    double vel_n;
+    double vel_u;
+
+    // Course Over Ground (COG) [deg]
+    double cog;
+
+    // Galileo HAS status: 1- HAS messages decoded and applied, 0 - HAS not avaliable
+    uint32_t galhas_status;
 
     // NUMBER OF VALID SATS
     uint8_t valid_sats;
@@ -137,6 +147,12 @@ public:
 
         ar& BOOST_SERIALIZATION_NVP(user_clk_drift_ppm);
         ar& BOOST_SERIALIZATION_NVP(utc_time);
+
+        ar& BOOST_SERIALIZATION_NVP(vel_e);
+        ar& BOOST_SERIALIZATION_NVP(vel_n);
+        ar& BOOST_SERIALIZATION_NVP(vel_u);
+
+        ar& BOOST_SERIALIZATION_NVP(cog);
     }
 };
 
