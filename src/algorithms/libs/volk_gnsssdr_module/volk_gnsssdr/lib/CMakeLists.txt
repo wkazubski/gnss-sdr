@@ -113,7 +113,7 @@ macro(check_arch arch_name)
             set(have_flag have${flag})
             # make the have_flag have nice alphanum chars (just for looks/not necessary)
             execute_process(
-                COMMAND ${PYTHON_EXECUTABLE} -c "import re; print(re.sub('\\W', '_', '${have_flag}'))"
+                COMMAND ${PYTHON_EXECUTABLE} -c "import re; print(re.sub(r'\\W', '_', '${have_flag}'))"
                 OUTPUT_VARIABLE have_flag OUTPUT_STRIP_TRAILING_WHITESPACE
             )
             if(VOLK_FLAG_CHECK_FLAGS)
@@ -544,7 +544,6 @@ if(NOT (CMAKE_GENERATOR STREQUAL Xcode))
                 PRIVATE
                     $<TARGET_PROPERTY:cpu_features,INTERFACE_INCLUDE_DIRECTORIES>
             )
-            add_dependencies(volk_gnsssdr_obj list_cpu_features)
         endif()
     endif()
     # Configure object target properties

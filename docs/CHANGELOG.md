@@ -31,6 +31,12 @@ All notable changes to GNSS-SDR will be documented in this file.
   - `geohash`, an
     [encoded geographic location](https://en.wikipedia.org/wiki/Geohash).
 
+### Improvements in Portability:
+
+- Updated local `cpu_features` library to v0.9.0.
+- `volk_gnsssdr`: fix syntax for Python 3.12 without breaking backward
+  compatibility with Python 2.7.
+
 ### Improvements in Repeatability:
 
 - A Kalman filter is now available in the PVT block, smoothing the outputs of a
