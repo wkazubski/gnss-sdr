@@ -31,6 +31,11 @@ All notable changes to GNSS-SDR will be documented in this file.
   - `geohash`, an
     [encoded geographic location](https://en.wikipedia.org/wiki/Geohash).
 
+### Improvements in Maintainability
+
+- Removed useless casts and shadowed variables, improving source code
+  readability.
+
 ### Improvements in Portability:
 
 - Updated local `cpu_features` library to v0.9.0.
@@ -65,6 +70,7 @@ All notable changes to GNSS-SDR will be documented in this file.
   signal).
 - The estimated CN0 value is now printed in the terminal when navigation data is
   succesfully decoded.
+- Fixed GPS navigation message satellite validation.
 
 ## [GNSS-SDR v0.0.18](https://github.com/gnss-sdr/gnss-sdr/releases/tag/v0.0.18) - 2023-04-06
 
