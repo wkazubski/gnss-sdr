@@ -27,7 +27,14 @@
 #include <sys/mman.h>  // for mmap
 
 Fpga_dynamic_bit_selection::Fpga_dynamic_bit_selection(bool enable_rx1_band, bool enable_rx2_band)
-    : d_enable_rx1_band(enable_rx1_band), d_enable_rx2_band(enable_rx2_band)
+    : d_map_base_freq_band_1(nullptr),
+      d_map_base_freq_band_2(nullptr),
+      d_dev_descr_freq_band_1(0),
+      d_dev_descr_freq_band_2(0),
+      d_shift_out_bits_freq_band_1(0),
+      d_shift_out_bits_freq_band_2(0),
+      d_enable_rx1_band(enable_rx1_band),
+      d_enable_rx2_band(enable_rx2_band)
 {
     if (d_enable_rx1_band)
         {
@@ -41,7 +48,7 @@ Fpga_dynamic_bit_selection::Fpga_dynamic_bit_selection(bool enable_rx1_band, boo
         {
             open_device(&d_map_base_freq_band_2, d_dev_descr_freq_band_2, 1);
 
-            // init bit selection corresponding to frequency band 1
+            // init bit selection corresponding to frequency band 2
             d_shift_out_bits_freq_band_2 = shift_out_bits_default;
             d_map_base_freq_band_2[0] = d_shift_out_bits_freq_band_2;
         }
@@ -75,6 +82,7 @@ void Fpga_dynamic_bit_selection::bit_selection()
         }
 }
 
+
 void Fpga_dynamic_bit_selection::open_device(volatile unsigned **d_map_base, int &d_dev_descr, int freq_band)
 {
     // find the uio device file corresponding to the dynamic bit selector 0 module.
@@ -101,6 +109,7 @@ void Fpga_dynamic_bit_selection::open_device(volatile unsigned **d_map_base, int
         }
 }
 
+
 void Fpga_dynamic_bit_selection::bit_selection_per_rf_band(volatile unsigned *d_map_base, uint32_t shift_out_bits)
 {
     // estimated signal power
@@ -125,6 +134,7 @@ void Fpga_dynamic_bit_selection::bit_selection_per_rf_band(volatile unsigned *d_
     // update bit selection corresopnding to frequency band 1
     d_map_base[0] = shift_out_bits;
 }
+
 
 void Fpga_dynamic_bit_selection::close_device(volatile unsigned *d_map_base, int &d_dev_descr)
 {
