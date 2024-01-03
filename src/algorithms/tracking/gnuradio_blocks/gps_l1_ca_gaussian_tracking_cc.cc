@@ -235,6 +235,7 @@ Gps_L1_Ca_Gaussian_Tracking_cc::Gps_L1_Ca_Gaussian_Tracking_cc(
 
 void Gps_L1_Ca_Gaussian_Tracking_cc::start_tracking()
 {
+    gr::thread::scoped_lock l(d_setlock);
     /*
      *  correct the code phase according to the delay between acq and trk
      */
@@ -316,7 +317,6 @@ void Gps_L1_Ca_Gaussian_Tracking_cc::start_tracking()
               << " Code Phase correction [samples]=" << delay_correction_samples
               << " PULL-IN Code Phase [samples]=" << d_acq_code_phase_samples;
 
-    gr::thread::scoped_lock l(d_setlock);
     std::cout << "Tracking of GPS L1 C/A signal started on channel " << d_channel << " for satellite " << Gnss_Satellite(systemName[sys], d_acquisition_gnss_synchro->PRN) << '\n';
     LOG(INFO) << "Starting tracking of satellite " << Gnss_Satellite(systemName[sys], d_acquisition_gnss_synchro->PRN) << " on channel " << d_channel;
 }
@@ -609,7 +609,7 @@ int Gps_L1_Ca_Gaussian_Tracking_cc::general_work(int noutput_items __attribute__
 
     // GNSS_SYNCHRO OBJECT to interchange data between tracking->telemetry_decoder
     Gnss_Synchro current_synchro_data = Gnss_Synchro();
-
+    gr::thread::scoped_lock l(d_setlock);
     if (d_enable_tracking == true)
         {
             // Fill the acquisition data
@@ -746,7 +746,6 @@ int Gps_L1_Ca_Gaussian_Tracking_cc::general_work(int noutput_items __attribute__
             d_rem_code_phase_chips = d_code_freq_chips * (d_rem_code_phase_samples / static_cast<double>(d_fs_in));
 
             // ####### CN0 ESTIMATION AND LOCK DETECTORS ######
-            gr::thread::scoped_lock l(d_setlock);
             if (d_cn0_estimation_counter < FLAGS_cn0_samples)
                 {
                     // fill buffer with prompt correlator output values
