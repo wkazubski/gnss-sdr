@@ -339,17 +339,20 @@ set(GNSSSDR_PYTHON3_MIN_VERSION "3.4")
 ################################################################################
 set(GNSSSDR_ARMADILLO_LOCAL_VERSION "12.6.x")
 set(GNSSSDR_GFLAGS_LOCAL_VERSION "2.2.2")
-set(GNSSSDR_GLOG_LOCAL_VERSION "0.6.0")
+set(GNSSSDR_GLOG_LOCAL_VERSION "0.7.0")
 set(GNSSSDR_MATIO_LOCAL_VERSION "1.5.26")
 set(GNSSSDR_PROTOCOLBUFFERS_LOCAL_VERSION "25.0")
 set(GNSSSDR_PUGIXML_LOCAL_VERSION "1.14")
-set(GNSSSDR_GTEST_LOCAL_VERSION "1.13.0")
+set(GNSSSDR_GTEST_LOCAL_VERSION "1.14.0")
 set(GNSSSDR_GNSS_SIM_LOCAL_VERSION "master")
 set(GNSSSDR_GNSSTK_LOCAL_VERSION "14.0.0")
 set(GNSSSDR_BENCHMARK_LOCAL_VERSION "1.8.3")
 set(GNSSSDR_MATHJAX_EXTERNAL_VERSION "2.7.7")
 
 # Downgrade versions if requirements are not met
+if(CMAKE_VERSION VERSION_LESS "3.22")
+    set(GNSSSDR_GLOG_LOCAL_VERSION "0.6.0")
+endif()
 if(CMAKE_VERSION VERSION_LESS "3.16")
     set(GNSSSDR_GLOG_LOCAL_VERSION "0.5.0")
 endif()
@@ -372,6 +375,12 @@ endif()
 
 if(CMAKE_CROSSCOMPILING OR CMAKE_VERSION VERSION_LESS "3.13")
     set(GNSSSDR_PROTOCOLBUFFERS_LOCAL_VERSION "21.12")
+endif()
+
+if(CMAKE_VERSION VERSION_LESS "3.13" OR
+  (CMAKE_CXX_COMPILER_ID STREQUAL "GNU" AND CMAKE_CXX_COMPILER_VERSION VERSION_LESS 7.3.1) OR
+  (CMAKE_CXX_COMPILER_ID STREQUAL "Clang" AND CMAKE_CXX_COMPILER_VERSION VERSION_LESS 7.0.0))
+    set(GNSSSDR_GTEST_LOCAL_VERSION "1.13.0")
 endif()
 
 if((CMAKE_CXX_COMPILER_ID STREQUAL "GNU" AND CMAKE_CXX_COMPILER_VERSION VERSION_LESS 5.0) OR
@@ -1731,6 +1740,9 @@ ${GNSSSDR_BINARY_DIR}/thirdparty/glog/glog-${GNSSSDR_GLOG_LOCAL_VERSION}/configu
         if(GNSSSDR_GLOG_LOCAL_VERSION VERSION_GREATER 0.5.0)
             set(GLOG_GTEST -DWITH_GTEST=FALSE)
         endif()
+        if(NOT (CMAKE_VERSION VERSION_LESS "3.22"))
+            set(GNSSSDR_GLOG_LOCAL_GFLAGS -DCMAKE_REQUIRED_INCLUDES=${GFlags_INCLUDE_DIRS})
+        endif()
         ExternalProject_Add(glog-${GNSSSDR_GLOG_LOCAL_VERSION}
             DEPENDS ${TARGET_GFLAGS}
             PREFIX ${GNSSSDR_BINARY_DIR}/glog-${GNSSSDR_GLOG_LOCAL_VERSION}
@@ -1745,6 +1757,7 @@ ${GNSSSDR_BINARY_DIR}/thirdparty/glog/glog-${GNSSSDR_GLOG_LOCAL_VERSION}/configu
                 -DBUILD_SHARED_LIBS=OFF
                 ${GLOG_GTEST}
                 -DBUILD_TESTING=OFF
+                "${GNSSSDR_GLOG_LOCAL_GFLAGS}"
             BUILD_COMMAND "${GLOG_MAKE_PROGRAM} ${PARALLEL_BUILD}"
             BUILD_BYPRODUCTS ${GLOG_BUILD_BYPRODUCTS}
             UPDATE_COMMAND ""
@@ -1801,6 +1814,11 @@ ${GNSSSDR_BINARY_DIR}/thirdparty/glog/glog-${GNSSSDR_GLOG_LOCAL_VERSION}/configu
                 )
             endif()
         endif()
+    endif()
+    if(NOT (CMAKE_VERSION VERSION_LESS "3.22"))
+        set_target_properties(Glog::glog PROPERTIES
+            INTERFACE_COMPILE_DEFINITIONS "GLOG_USE_GLOG_EXPORT;GLOG_USE_GFLAGS"
+            INTERFACE_COMPILE_FEATURES "cxx_std_14")
     endif()
 
     if(LIBUNWIND_FOUND)
@@ -2152,6 +2170,7 @@ find_library(GNUTLS_OPENSSL_LIBRARY
         /usr/lib/sparc64-linux-gnu
         /usr/lib/x86_64-linux-gnux32
         /usr/lib/sh4-linux-gnu
+        /usr/lib/loongarch64-linux-gnu
         /usr/local/lib
         /usr/local/lib64
         /opt/local/lib
