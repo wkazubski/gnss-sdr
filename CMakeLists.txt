@@ -16,7 +16,7 @@ endif()
 # Build type can still be overridden by setting -DCMAKE_BUILD_TYPE=
 set(CMAKE_BUILD_TYPE "Release" CACHE STRING "")
 
-cmake_minimum_required(VERSION 2.8.12...3.28)
+cmake_minimum_required(VERSION 2.8.12...3.29)
 project(gnss-sdr CXX C)
 
 set(GNSSSDR_SOURCE_DIR ${CMAKE_CURRENT_SOURCE_DIR}) # Allows to be a sub-project
@@ -337,15 +337,15 @@ set(GNSSSDR_PYTHON3_MIN_VERSION "3.4")
 ################################################################################
 # Versions to download and build (but not to install system-wide) if not found
 ################################################################################
-set(GNSSSDR_ARMADILLO_LOCAL_VERSION "12.6.x")
+set(GNSSSDR_ARMADILLO_LOCAL_VERSION "12.8.x")
 set(GNSSSDR_GFLAGS_LOCAL_VERSION "2.2.2")
 set(GNSSSDR_GLOG_LOCAL_VERSION "0.7.0")
 set(GNSSSDR_MATIO_LOCAL_VERSION "1.5.26")
-set(GNSSSDR_PROTOCOLBUFFERS_LOCAL_VERSION "25.0")
+set(GNSSSDR_PROTOCOLBUFFERS_LOCAL_VERSION "26.1")
 set(GNSSSDR_PUGIXML_LOCAL_VERSION "1.14")
 set(GNSSSDR_GTEST_LOCAL_VERSION "1.14.0")
 set(GNSSSDR_GNSS_SIM_LOCAL_VERSION "master")
-set(GNSSSDR_GNSSTK_LOCAL_VERSION "14.0.0")
+set(GNSSSDR_GNSSTK_LOCAL_VERSION "14.3.0")
 set(GNSSSDR_BENCHMARK_LOCAL_VERSION "1.8.3")
 set(GNSSSDR_MATHJAX_EXTERNAL_VERSION "2.7.7")
 
@@ -373,7 +373,10 @@ if(CMAKE_VERSION VERSION_LESS "3.4")
     set(GNSSSDR_PUGIXML_LOCAL_VERSION "1.10")
 endif()
 
-if(CMAKE_CROSSCOMPILING OR CMAKE_VERSION VERSION_LESS "3.13")
+if(CMAKE_CROSSCOMPILING OR CMAKE_VERSION VERSION_LESS "3.13" OR
+  ((CMAKE_CXX_COMPILER_ID STREQUAL "GNU" AND CMAKE_CXX_COMPILER_VERSION VERSION_LESS 8.0.0)) OR
+  ((CMAKE_CXX_COMPILER_ID STREQUAL "Clang") AND (CMAKE_CXX_COMPILER_VERSION VERSION_LESS "9.0")) OR
+  ((CMAKE_CXX_COMPILER_ID STREQUAL "AppleClang") AND (CMAKE_CXX_COMPILER_VERSION VERSION_LESS "11")))
     set(GNSSSDR_PROTOCOLBUFFERS_LOCAL_VERSION "21.12")
 endif()
 
@@ -1929,7 +1932,7 @@ endif()
 
 
 ################################################################################
-# Armadillo - http://arma.sourceforge.net/
+# Armadillo - https://arma.sourceforge.net/
 ################################################################################
 if(ENABLE_OWN_ARMADILLO)
     unset(Armadillo::armadillo CACHE)
@@ -1941,7 +1944,7 @@ else()
 endif()
 
 set_package_properties(Armadillo PROPERTIES
-    URL "http://arma.sourceforge.net/"
+    URL "https://arma.sourceforge.net/"
     PURPOSE "Used for matrix computations."
     TYPE REQUIRED
 )
@@ -2538,9 +2541,19 @@ endif()
 ################################################################################
 # Protocol Buffers https://github.com/protocolbuffers/protobuf
 ################################################################################
-find_package(Protobuf)
+if(((CMAKE_CXX_COMPILER_ID STREQUAL "GNU") AND (CMAKE_CXX_COMPILER_VERSION VERSION_LESS "8.0.0")) OR
+  ((CMAKE_CXX_COMPILER_ID STREQUAL "Clang") AND (CMAKE_CXX_COMPILER_VERSION VERSION_LESS "9.0")) OR
+  ((CMAKE_CXX_COMPILER_ID STREQUAL "AppleClang") AND (CMAKE_CXX_COMPILER_VERSION VERSION_LESS "11")))
+    if(CMAKE_VERSION VERSION_LESS 3.19)
+        find_package(Protobuf)
+    else()
+        find_package(Protobuf 3.0...21.12)
+    endif()
+else()
+    find_package(Protobuf)
+endif()
 set_package_properties(Protobuf PROPERTIES
-    URL "https://developers.google.com/protocol-buffers/"
+    URL "https://protobuf.dev/"
     PURPOSE "Used to serialize output data in a way that can be read by other applications."
     TYPE REQUIRED
 )
@@ -2662,6 +2675,10 @@ if((NOT Protobuf_FOUND) OR (NOT Protobuf_PROTOC_EXECUTABLE) OR (${Protobuf_VERSI
                     set(absl_FOUND OFF)
                 endif()
             endif()
+            if((CMAKE_CXX_COMPILER_ID STREQUAL "GNU") AND (CMAKE_CXX_COMPILER_VERSION VERSION_LESS "8.0.0"))
+                unset(absl_FOUND CACHE)
+                set(absl_FOUND OFF)
+            endif()
             if(absl_FOUND)
                 set_package_properties(absl PROPERTIES
                     DESCRIPTION "An open-source collection of C++ code designed to augment the C++ standard library (found: v${absl_VERSION})"
@@ -2676,7 +2693,9 @@ if((NOT Protobuf_FOUND) OR (NOT Protobuf_PROTOC_EXECUTABLE) OR (${Protobuf_VERSI
                         DESCRIPTION "An open-source collection of C++ code designed to augment the C++ standard library"
                     )
                 endif()
-                message(STATUS "The Abseil library (https://github.com/abseil/abseil-cpp) >= v20230117 is required to be installed before building Protocol Buffers >22.x on the fly.")
+                if(NOT (CMAKE_CXX_COMPILER_ID STREQUAL "GNU") AND (CMAKE_CXX_COMPILER_VERSION VERSION_LESS "8.0.0"))
+                    message(STATUS "The Abseil library (https://github.com/abseil/abseil-cpp) >= v20230117 is required to be installed before building Protocol Buffers >22.x on the fly.")
+                endif()
                 message(STATUS " Instead, Protocol Buffers v21.12 will be built, which does not require Abseil.")
                 set(GNSSSDR_PROTOCOLBUFFERS_LOCAL_VERSION "21.12")
             endif()
@@ -2789,8 +2808,8 @@ if((NOT Protobuf_FOUND) OR (NOT Protobuf_PROTOC_EXECUTABLE) OR (${Protobuf_VERSI
 
             if(NOT TARGET protobuf::protoc)
                 add_executable(protobuf::protoc IMPORTED)
-                add_dependencies(protobuf::protoc protobuf-${GNSSSDR_PROTOCOLBUFFERS_LOCAL_VERSION})
             endif()
+            add_dependencies(protobuf::protoc protobuf-${GNSSSDR_PROTOCOLBUFFERS_LOCAL_VERSION})
             unset(Protobuf_PROTOC_EXECUTABLE)
             set(PROTOBUF_PROTOC_EXECUTABLE "${GNSSSDR_BINARY_DIR}/protobuf-${GNSSSDR_PROTOCOLBUFFERS_LOCAL_VERSION}/bin/protoc")
             set_target_properties(protobuf::protoc PROPERTIES
@@ -3515,7 +3534,7 @@ message(STATUS "*           SUMMARY REPORT            *")
 message(STATUS "***************************************")
 message(STATUS "")
 if(CMAKE_CROSSCOMPILING)
-    message(STATUS "Cross-compiling on ${LINUX_DISTRIBUTION} ${LINUX_VER} (${CMAKE_HOST_SYSTEM_PROCESSOR}) for ${CMAKE_SYSTEM_PROCESSOR} ${ARCHITECTURE_STRING}")
+    message(STATUS "Cross-compiling on ${LINUX_DISTRIBUTION} ${LINUX_VER} (${CMAKE_HOST_SYSTEM_PROCESSOR}) for ${CMAKE_SYSTEM_PROCESSOR}")
 else()
     if(${CMAKE_SYSTEM_NAME} MATCHES "Linux|kFreeBSD|GNU")
         message(STATUS "Building on GNU/Linux ${LINUX_DISTRIBUTION} ${LINUX_VER} ${ARCHITECTURE_STRING}")
@@ -3538,7 +3557,7 @@ file(APPEND ${GNSSSDR_BINARY_DIR}/features.log "********************************
 file(APPEND ${GNSSSDR_BINARY_DIR}/features.log "GNSS-SDR version: ${VERSION}\n")
 if(${CMAKE_SYSTEM_NAME} MATCHES "Linux|kFreeBSD|GNU")
     if(CMAKE_CROSSCOMPILING)
-        file(APPEND ${GNSSSDR_BINARY_DIR}/features.log "Cross-compiling on ${LINUX_DISTRIBUTION} ${LINUX_VER} (${CMAKE_HOST_SYSTEM_PROCESSOR}) for ${CMAKE_SYSTEM_PROCESSOR} ${ARCHITECTURE_STRING}\n")
+        file(APPEND ${GNSSSDR_BINARY_DIR}/features.log "Cross-compiling on ${LINUX_DISTRIBUTION} ${LINUX_VER} (${CMAKE_HOST_SYSTEM_PROCESSOR}) for ${CMAKE_SYSTEM_PROCESSOR}\n")
     else()
         file(APPEND ${GNSSSDR_BINARY_DIR}/features.log "Building on GNU/Linux ${LINUX_DISTRIBUTION} ${LINUX_VER} ${ARCHITECTURE_STRING}\n")
     endif()
