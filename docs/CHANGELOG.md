@@ -14,6 +14,14 @@ All notable changes to GNSS-SDR will be documented in this file.
 
 ## [Unreleased](https://github.com/gnss-sdr/gnss-sdr/tree/next)
 
+### Improvements in Interoperability:
+
+- Improved error handling in UDP connections.
+- Make it possible to receive multiple constellations using a single channel
+  wideband device (HackRF/LimeSDR/USRP). Demonstration:
+  https://www.youtube.com/watch?v=ZQs2sFchJ6w
+  https://www.youtube.com/watch?v=HnZkKj9a-QM
+
 ### Improvements in Portability:
 
 - Fix building against google-glog 0.7.0.

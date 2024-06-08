@@ -224,7 +224,7 @@ endif()
 if(${CMAKE_SYSTEM_NAME} MATCHES "Linux|kFreeBSD|GNU")
     include(DetectLinuxDistro)
     if(CMAKE_CROSSCOMPILING)
-        message(STATUS "Configuring GNSS-SDR v${VERSION} to be cross-compiled on ${LINUX_DISTRIBUTION} ${LINUX_VER} (${CMAKE_HOST_SYSTEM_PROCESSOR}) for ${CMAKE_SYSTEM_PROCESSOR} ${ARCHITECTURE_STRING}")
+        message(STATUS "Configuring GNSS-SDR v${VERSION} to be cross-compiled on ${LINUX_DISTRIBUTION} ${LINUX_VER} (${CMAKE_HOST_SYSTEM_PROCESSOR}) for ${CMAKE_SYSTEM_PROCESSOR}")
     else()
         message(STATUS "Configuring GNSS-SDR v${VERSION} to be built on GNU/Linux ${LINUX_DISTRIBUTION} ${LINUX_VER} ${ARCHITECTURE_STRING}")
     endif()
@@ -352,14 +352,15 @@ set(GNSSSDR_ABSEIL_MIN_VERSION "20240116")
 set(GNSSSDR_ARMADILLO_LOCAL_VERSION "12.8.x")
 set(GNSSSDR_GFLAGS_LOCAL_VERSION "2.2.2")
 set(GNSSSDR_GLOG_LOCAL_VERSION "0.7.0")
-set(GNSSSDR_MATIO_LOCAL_VERSION "1.5.26")
-set(GNSSSDR_PROTOCOLBUFFERS_LOCAL_VERSION "26.1")
+set(GNSSSDR_MATIO_LOCAL_VERSION "1.5.27")
+set(GNSSSDR_PROTOCOLBUFFERS_LOCAL_VERSION "27.0")
 set(GNSSSDR_PUGIXML_LOCAL_VERSION "1.14")
 set(GNSSSDR_GTEST_LOCAL_VERSION "1.14.0")
-set(GNSSSDR_GNSS_SIM_LOCAL_VERSION "master")
+set(GNSSSDR_GNSS_SIM_LOCAL_VERSION "origin/master")
 set(GNSSSDR_GNSSTK_LOCAL_VERSION "14.3.0")
-set(GNSSSDR_BENCHMARK_LOCAL_VERSION "1.8.3")
+set(GNSSSDR_BENCHMARK_LOCAL_VERSION "1.8.4")
 set(GNSSSDR_MATHJAX_EXTERNAL_VERSION "2.7.7")
+set(GNSSSDR_ABSL_LOCAL_VERSION "origin/master") # live at head (see https://abseil.io/about/releases)
 
 # Downgrade versions if requirements are not met
 if(CMAKE_VERSION VERSION_LESS "3.22")
@@ -1434,7 +1435,7 @@ if(NOT CMAKE_VERSION VERSION_LESS 3.24
         FetchContent_Declare(
             absl
             GIT_REPOSITORY https://github.com/abseil/abseil-cpp
-            GIT_TAG master # live at head
+            GIT_TAG ${GNSSSDR_ABSL_LOCAL_VERSION}
             SOURCE_DIR ${GNSSSDR_BINARY_DIR}/thirdparty/abseil-cpp
             CMAKE_ARGS -DABSL_PROPAGATE_CXX_STD=ON -ABSL_BUILD_TESTING=OFF -DCMAKE_INSTALL_PREFIX=${GNSSSDR_BINARY_DIR}/abseil-cpp ${ABSEIL_TOOLCHAIN_FILE}
             BINARY_DIR ${GNSSSDR_BINARY_DIR}/abseil-cpp
@@ -2622,6 +2623,16 @@ if(((CMAKE_CXX_COMPILER_ID STREQUAL "GNU") AND (CMAKE_CXX_COMPILER_VERSION VERSI
     endif()
 else()
     find_package(Protobuf)
+
+    if((CMAKE_BUILD_TYPE STREQUAL "Debug") AND Protobuf_FOUND AND absl_FOUND)
+        # This Regular Expression is used to convert the version string provided by `find_package(Protobuf)` into the
+        # appropriate binary version string. So, for instance, "4.25.3" becomes "25.3.0".
+        string(REGEX REPLACE "^[0-9]+\.([0-9]+\.[0-9]+)$" "\\1.0" PROTOBUF_LIBRARY_VERSION "${Protobuf_VERSION}")
+        if((PROTOBUF_LIBRARY_VERSION VERSION_GREATER_EQUAL "22") AND (PROTOBUF_LIBRARY_VERSION VERSION_LESS "26"))
+            pkg_check_modules(protobuf REQUIRED IMPORTED_TARGET protobuf=${PROTOBUF_LIBRARY_VERSION})
+            target_link_libraries(protobuf::libprotobuf INTERFACE PkgConfig::protobuf)
+        endif()
+    endif()
 endif()
 set_package_properties(Protobuf PROPERTIES
     URL "https://protobuf.dev/"
