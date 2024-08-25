@@ -115,6 +115,11 @@ if(ENABLE_ZMQ)
     list(APPEND OPT_DRIVER_HEADERS zmq_signal_source.h)
 endif()
 
+if(ENABLE_ION)
+    list(APPEND OPT_DRIVER_SOURCES ion_gsms_signal_source.cc)
+    list(APPEND OPT_DRIVER_HEADERS ion_gsms_signal_source.h)
+endif()
+
 set(SIGNAL_SOURCE_ADAPTER_SOURCES
     signal_source_base.cc
     file_source_base.cc
@@ -181,7 +186,7 @@ target_include_directories(signal_source_adapters
         ${GNSSSDR_SOURCE_DIR}/src/core/interfaces
 )
 
-if(ENABLE_FPGA OR ENABLE_AD9361)
+if(ENABLE_FPGA OR ENABLE_AD9361 OR ENABLE_ION)
     target_link_libraries(signal_source_adapters
         PUBLIC
             signal_source_libs
@@ -251,7 +256,7 @@ if(ENABLE_LIMESDR AND GRLIMESDR_FOUND)
     )
 endif()
 
-if(ENABLE_AD9361 AND LIBIIO_FOUND)
+if(LIBIIO_FOUND)
     target_link_libraries(signal_source_adapters
         PRIVATE
             Iio::iio
