@@ -146,6 +146,10 @@
 #include "gps_l1_ca_pcps_opencl_acquisition.h"
 #endif
 
+#if GNMAX_DRIVER
+#include "gnmax_signal_source.h"
+#endif
+
 #if RAW_ARRAY_DRIVER
 #include "raw_array_signal_source.h"
 #endif
@@ -772,6 +776,16 @@ std::unique_ptr<GNSSBlockInterface> GNSSBlockFactory::GetBlock(
                     block = std::move(block_);
                 }
 #endif
+
+#if GNMAX_DRIVER
+            else if (implementation == "GNMAX_Signal_Source")
+                {
+                    std::unique_ptr<GNSSBlockInterface> block_ = std::make_unique<GnMaxSignalSource>(configuration, role, in_streams,
+                        out_streams, queue);
+                    block = std::move(block_);
+                }
+#endif
+
 #if RAW_ARRAY_DRIVER
             else if (implementation == "Raw_Array_Signal_Source")
                 {

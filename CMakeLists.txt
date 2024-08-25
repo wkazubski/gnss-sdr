@@ -53,6 +53,8 @@ option(ENABLE_RAW_UDP "Enable the use of high-optimized custom UDP packet sample
 
 option(ENABLE_FLEXIBAND "Enable the use of the signal source adater for the Teleorbit Flexiband GNU Radio driver" OFF)
 
+option(ENABLE_GNMAX "Enable the use of the gnMAX2769 dongle as signal source (experimental)" OFF)
+
 option(ENABLE_ARRAY "Enable the use of CTTC's antenna array front-end as signal source (experimental)" OFF)
 
 option(ENABLE_ZMQ "Enable GNU Radio ZeroMQ Messaging, requires gr-zeromq" ON)
@@ -3545,6 +3547,33 @@ if(ENABLE_FLEXIBAND)
 endif()
 
 
+######################
+# GNMAX - OPTIONAL
+######################
+if(DEFINED ENV{GNMAX_DRIVER})
+    message(STATUS "GNMAX_DRIVER environment variable found.")
+    set(ENABLE_GNMAX ON)
+endif()
+
+if(GNMAX_DRIVER)
+    set(ENABLE_GNMAX ON)
+endif()
+
+find_package(GRGNMAX)
+set_package_properties(GRGNMAX PROPERTIES
+    URL "https://github.com/wkazubski/gr-gnMAX2769"
+    DESCRIPTION "The MAX2769 front-end GNU Radio block."
+    PURPOSE "Used for communication with the gnMAX2769 front-end."
+    TYPE OPTIONAL
+)
+if(ENABLE_GNMAX)
+    message(STATUS "The gnMAX2769 driver will be compiled.")
+    message(STATUS " You can disable it with 'cmake -DENABLE_GNMAX=OFF ..'")
+else()
+    message(STATUS "The (optional and experimental) gnMAX2769 driver is not enabled.")
+    message(STATUS " Enable it with 'cmake -DENABLE_GNMAX=ON ..' to add support for the gnMAX2769 dongle.")
+endif()
+
 
 #######################################################
 # CTTC's digital array beamformer prototype - OPTIONAL
@@ -3723,6 +3752,7 @@ add_feature_info(ENABLE_DMA_PROXY ENABLE_DMA_PROXY "Enables DMA Signal_Source. R
 add_feature_info(ENABLE_AD936X_SDR ENABLE_AD936X_SDR "Enables Ad936x_Iio_Signal_Source to access AD936X front-ends using libiio. Requires libiio and libad9361-dev.")
 add_feature_info(ENABLE_RAW_UDP ENABLE_RAW_UDP "Enables Custom_UDP_Signal_Source for custom UDP packet sample source. Requires libpcap.")
 add_feature_info(ENABLE_FLEXIBAND ENABLE_FLEXIBAND "Enables Flexiband_Signal_Source for using Teleorbit's Flexiband RF front-end. Requires gr-teleorbit.")
+add_feature_info(ENABLE_GNMAX ENABLE_GNMAX "Enables GNMAX_Signal_Source for using the gnMAX2769 dongle. Requires gr-gnMAX2769.")
 add_feature_info(ENABLE_ARRAY ENABLE_ARRAY "Enables Raw_Array_Signal_Source and Array_Signal_Conditioner for using CTTC's antenna array. Requires gr-dbfcttc.")
 add_feature_info(ENABLE_ZMQ ENABLE_ZMQ "Enables ZMQ_Signal_Source for GNU Radio ZeroMQ messages. Requires gr-zeromq.")
 add_feature_info(ENABLE_ION ENABLE_ION "Enables ION_GSMS_Signal_Source for the ION Metadata Standard.")
