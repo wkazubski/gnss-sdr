@@ -16,7 +16,7 @@ endif()
 # Build type can still be overridden by setting -DCMAKE_BUILD_TYPE=
 set(CMAKE_BUILD_TYPE "Release" CACHE STRING "")
 
-cmake_minimum_required(VERSION 2.8.12...3.30)
+cmake_minimum_required(VERSION 2.8.12...3.31)
 project(gnss-sdr CXX C)
 
 set(GNSSSDR_SOURCE_DIR ${CMAKE_CURRENT_SOURCE_DIR}) # Allows to be a sub-project
@@ -1479,6 +1479,9 @@ if(NOT CMAKE_VERSION VERSION_LESS 3.24
             set_package_properties(absl PROPERTIES
                 DESCRIPTION "A collection of C++ library code designed to augment the C++ standard library (found: v${absl_VERSION})"
             )
+            get_target_property(ABSL_BASE_LIBRARY absl::base INTERFACE_INCLUDE_DIRECTORIES)
+            get_filename_component(ABSL_ROOT_PATH "${ABSL_BASE_LIBRARY}" DIRECTORY)
+            message(STATUS "Found Abseil C++ libraries installed at ${ABSL_ROOT_PATH} (found version: v${absl_VERSION})")
         else()
             set_package_properties(absl PROPERTIES
                 DESCRIPTION "A collection of C++ library code designed to augment the C++ standard library"
