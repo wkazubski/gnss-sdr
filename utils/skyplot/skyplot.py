@@ -373,11 +373,10 @@ def plot_satellite_tracks(satellites, obs_lat, obs_lon, obs_alt,
 
 def main():
     """Generate the skyplot"""
-
-# Set up argument parser
+    # Set up argument parser
     parser = argparse.ArgumentParser(
         description='Generate GNSS skyplot from RINEX navigation file',
-        add_help=False  # We'll handle help manually to preserve your current style
+        add_help=False
     )
 
     # Add only the no-show flag
