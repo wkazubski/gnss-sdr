@@ -20,10 +20,11 @@
 import argparse
 import re
 import sys
-from math import sin, cos, sqrt, atan2
 from datetime import datetime, timedelta
-import numpy as np
+from math import atan2, cos, sin, sqrt
+
 import matplotlib.pyplot as plt
+import numpy as np
 
 
 def parse_rinex_float(s):
