@@ -383,6 +383,20 @@ def plot_satellite_tracks(satellites, obs_lat, obs_lon, obs_alt,
             # Plot trajectory
             ax.plot(theta, r, '-', color=color, alpha=0.7, linewidth=2.5)
 
+            # Add arrow at last point
+            if len(theta) >= 2:  # Need at least 2 points for direction
+                ax.annotate('',
+                           xytext=(theta[-2], r[-2]),
+                           xy=(theta[-1], r[-1]),
+                           arrowprops={
+                            'arrowstyle': '->',
+                            'color': color,
+                            'alpha': 0.7,
+                            'linewidth': 1.5,
+                            'shrinkA': 0,
+                            'shrinkB': 0
+                          })
+
             # Label at midpoint
             mid_idx = len(theta)//2
             ax.text(theta[mid_idx], r[mid_idx], prn,
