@@ -192,10 +192,10 @@ def calculate_satellite_position(ephemeris, transmit_time):
 
     if system == 'R':  # GLONASS - use position + velocity * time
         dt = transmit_time
-        # Convert km to meters and add velocity component
-        xk = ephemeris['x'] * 1000 + ephemeris['x_vel'] * 1000 * dt
-        yk = ephemeris['y'] * 1000 + ephemeris['y_vel'] * 1000 * dt
-        zk = ephemeris['z'] * 1000 + ephemeris['z_vel'] * 1000 * dt
+        # Convert km to meters
+        xk = (ephemeris['x'] + ephemeris['x_vel'] * dt + 0.5 * ephemeris['x_acc'] * dt**2) * 1000
+        yk = (ephemeris['y'] + ephemeris['y_vel'] * dt + 0.5 * ephemeris['y_acc'] * dt**2) * 1000
+        zk = (ephemeris['z'] + ephemeris['z_vel'] * dt + 0.5 * ephemeris['z_acc'] * dt**2) * 1000
     else:
         # Constants
         mu = 3.986005e14  # Earth's gravitational constant (m^3/s^2)
@@ -257,17 +257,18 @@ def calculate_satellite_position(ephemeris, transmit_time):
     return xk, yk, zk
 
 
-def calculate_satellite_positions(ephemeris, start_time, end_time, step_min=15):
+def calculate_satellite_positions(ephemeris, start_time, end_time, step_min=5):
     """Generate multiple positions over time for a single satellite
     between start_time and end_time.
     """
     positions = []
     current_time = start_time
-
+    system = ephemeris['prn'][0]
+    max_valid_time = 1800 if system == 'R' else 14400
     while current_time <= end_time:
         transmit_time = (current_time - ephemeris['epoch']).total_seconds()
 
-        if abs(transmit_time) <= 14400:  # 4 hours
+        if abs(transmit_time) <= max_valid_time:
             x, y, z = calculate_satellite_position(ephemeris, transmit_time)
             positions.append((current_time, x, y, z))
 
@@ -371,7 +372,7 @@ def plot_satellite_tracks(satellites, obs_lat, obs_lon, obs_alt,
         el = []
         for _, x, y, z in positions:
             azimuth, elevation = ecef_to_az_el(x, y, z, obs_lat, obs_lon, obs_alt)
-            if elevation > 0:  # Above horizon
+            if elevation > 5:  # Above horizon
                 az.append(azimuth)
                 el.append(elevation)
 
