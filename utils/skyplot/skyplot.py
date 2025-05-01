@@ -56,10 +56,12 @@ def parse_rinex_float(s):
 def read_rinex_nav(filename):
     """Read RINEX v3.0 navigation file"""
     satellites = {}
+    line_number = 0
     with open(filename, 'r', encoding='utf-8') as f:
         # Skip header
         while True:
             line = f.readline()
+            line_number += 1
             if not line:
                 return satellites  # Empty file
             if "END OF HEADER" in line:
@@ -67,15 +69,18 @@ def read_rinex_nav(filename):
 
         # Read ephemeris data
         current_line = f.readline()
+        line_number += 1
         while current_line:
             if len(current_line) < 23:
                 current_line = f.readline()
+                line_number += 1
                 continue
 
             prn = current_line[:3].strip()
+            system = prn[0]  # G, R, E, etc.
 
             try:
-                # Parse epoch fields with careful position handling
+                # Parse epoch fields
                 year = int(current_line[4:8])
                 month = int(current_line[9:11])
                 day = int(current_line[12:14])
@@ -86,128 +91,168 @@ def read_rinex_nav(filename):
                 year += 2000 if year < 80 else 0
                 epoch = datetime(year, month, day, hour, minute, second)
 
-                # Read the next 7 lines
+                # Read the next lines
                 lines = [current_line]
-                for _ in range(7):
+                line_count = 4 if system == 'R' else 7
+                for _ in range(line_count):
                     next_line = f.readline()
+                    line_number += 1
                     if not next_line:
                         break
                     lines.append(next_line)
 
-                if len(lines) < 8:
+                if len(lines) < line_count + 1:
                     current_line = f.readline()
+                    line_number += 1
                     continue
 
-                # Parse all ephemeris parameters with robust float handling
-                ephemeris = {
-                    'prn': prn,
-                    'epoch': epoch,
-                    'sv_clock_bias': parse_rinex_float(lines[0][23:42]),
-                    'sv_clock_drift': parse_rinex_float(lines[0][42:61]),
-                    'sv_clock_drift_rate': parse_rinex_float(lines[0][61:80]),
-                    'iode': parse_rinex_float(lines[1][4:23]),
-                    'crs': parse_rinex_float(lines[1][23:42]),
-                    'delta_n': parse_rinex_float(lines[1][42:61]),
-                    'm0': parse_rinex_float(lines[1][61:80]),
-                    'cuc': parse_rinex_float(lines[2][4:23]),
-                    'ecc': parse_rinex_float(lines[2][23:42]),
-                    'cus': parse_rinex_float(lines[2][42:61]),
-                    'sqrt_a': parse_rinex_float(lines[2][61:80]),
-                    'toe': parse_rinex_float(lines[3][4:23]),
-                    'cic': parse_rinex_float(lines[3][23:42]),
-                    'omega0': parse_rinex_float(lines[3][42:61]),
-                    'cis': parse_rinex_float(lines[3][61:80]),
-                    'i0': parse_rinex_float(lines[4][4:23]),
-                    'crc': parse_rinex_float(lines[4][23:42]),
-                    'omega': parse_rinex_float(lines[4][42:61]),
-                    'omega_dot': parse_rinex_float(lines[4][61:80]),
-                    'idot': parse_rinex_float(lines[5][4:23]),
-                    'codes_l2': parse_rinex_float(lines[5][23:42]),
-                    'gps_week': parse_rinex_float(lines[5][42:61]),
-                    'l2p_flag': parse_rinex_float(lines[5][61:80]),
-                    'sv_accuracy': parse_rinex_float(lines[6][4:23]),
-                    'sv_health': parse_rinex_float(lines[6][23:42]),
-                    'tgd': parse_rinex_float(lines[6][42:61]),
-                    'iodc': parse_rinex_float(lines[6][61:80]),
-                    'transmission_time': parse_rinex_float(lines[7][4:23]),
-                    'fit_interval': (
-                        parse_rinex_float(lines[7][23:42])) if len(lines[7]) > 23 else 0.0
-                }
+                if system == 'R':  # GLONASS specific parsing
+                    ephemeris = {
+                        'prn': prn,
+                        'epoch': epoch,
+                        'sv_clock_bias': parse_rinex_float(lines[0][23:42]),
+                        'sv_relative_freq_bias': parse_rinex_float(lines[0][42:61]),
+                        'message_frame_time': parse_rinex_float(lines[0][61:80]),
+                        'x': parse_rinex_float(lines[1][4:23]),  # Position (km)
+                        'x_vel': parse_rinex_float(lines[1][23:42]),  # Velocity (km/s)
+                        'x_acc': parse_rinex_float(lines[1][42:61]),
+                        'health': parse_rinex_float(lines[1][61:80]),
+                        'y': parse_rinex_float(lines[2][4:23]),
+                        'y_vel': parse_rinex_float(lines[2][23:42]),
+                        'y_acc': parse_rinex_float(lines[2][42:61]),
+                        'freq_num': parse_rinex_float(lines[2][61:80]),
+                        'z': parse_rinex_float(lines[3][4:23]),
+                        'z_vel': parse_rinex_float(lines[3][23:42]),
+                        'z_acc': parse_rinex_float(lines[3][42:61]),
+                        'age': parse_rinex_float(lines[3][61:80])
+                    }
+                else:
+                    # Parse all ephemeris parameters
+                    ephemeris = {
+                        'prn': prn,
+                        'epoch': epoch,
+                        'sv_clock_bias': parse_rinex_float(lines[0][23:42]),
+                        'sv_clock_drift': parse_rinex_float(lines[0][42:61]),
+                        'sv_clock_drift_rate': parse_rinex_float(lines[0][61:80]),
+                        'iode': parse_rinex_float(lines[1][4:23]),
+                        'crs': parse_rinex_float(lines[1][23:42]),
+                        'delta_n': parse_rinex_float(lines[1][42:61]),
+                        'm0': parse_rinex_float(lines[1][61:80]),
+                        'cuc': parse_rinex_float(lines[2][4:23]),
+                        'ecc': parse_rinex_float(lines[2][23:42]),
+                        'cus': parse_rinex_float(lines[2][42:61]),
+                        'sqrt_a': parse_rinex_float(lines[2][61:80]),
+                        'toe': parse_rinex_float(lines[3][4:23]),
+                        'cic': parse_rinex_float(lines[3][23:42]),
+                        'omega0': parse_rinex_float(lines[3][42:61]),
+                        'cis': parse_rinex_float(lines[3][61:80]),
+                        'i0': parse_rinex_float(lines[4][4:23]),
+                        'crc': parse_rinex_float(lines[4][23:42]),
+                        'omega': parse_rinex_float(lines[4][42:61]),
+                        'omega_dot': parse_rinex_float(lines[4][61:80]),
+                        'idot': parse_rinex_float(lines[5][4:23]),
+                        'codes_l2': parse_rinex_float(lines[5][23:42]),
+                        'gps_week': parse_rinex_float(lines[5][42:61]),
+                        'l2p_flag': parse_rinex_float(lines[5][61:80]),
+                        'sv_accuracy': parse_rinex_float(lines[6][4:23]),
+                        'sv_health': parse_rinex_float(lines[6][23:42]),
+                        'tgd': parse_rinex_float(lines[6][42:61]),
+                        'iodc': parse_rinex_float(lines[6][61:80]),
+                        'transmission_time': parse_rinex_float(lines[7][4:23]),
+                        'fit_interval': (
+                            parse_rinex_float(lines[7][23:42])) if len(lines[7]) > 23 else 0.0
+                    }
 
                 if prn not in satellites:
                     satellites[prn] = []
                 satellites[prn].append(ephemeris)
 
             except (ValueError, IndexError) as e:
-                print(f"Error parsing PRN {prn} at {epoch}: {e}")
+                print(f"\nError in file {filename} at line {line_number}:")
+                print(f"  PRN: {prn}")
+                print(f"  Line content: {current_line.strip()}")
+                print(f"  Error type: {type(e).__name__}")
+                print(f"  Error details: {str(e)}")
+                print("Skipping to next satellite block...\n")
                 # Skip to next block by reading until next PRN
                 while current_line and not current_line.startswith(prn[0]):
                     current_line = f.readline()
+                    line_number += 1
                 continue
 
             current_line = f.readline()
+            line_number += 1
 
     return satellites
 
 
 def calculate_satellite_position(ephemeris, transmit_time):
     """Calculate satellite position in ECEF coordinates at given transmission time"""
-    # Constants
-    mu = 3.986005e14  # Earth's gravitational constant (m^3/s^2)
-    omega_e_dot = 7.2921151467e-5  # Earth rotation rate (rad/s)
+    system = ephemeris['prn'][0]
 
-    # Semi-major axis
-    a = ephemeris['sqrt_a'] ** 2
+    if system == 'R':  # GLONASS - use position + velocity * time
+        dt = transmit_time
+        # Convert km to meters and add velocity component
+        xk = ephemeris['x'] * 1000 + ephemeris['x_vel'] * 1000 * dt
+        yk = ephemeris['y'] * 1000 + ephemeris['y_vel'] * 1000 * dt
+        zk = ephemeris['z'] * 1000 + ephemeris['z_vel'] * 1000 * dt
+    else:
+        # Constants
+        mu = 3.986005e14  # Earth's gravitational constant (m^3/s^2)
+        omega_e_dot = 7.2921151467e-5  # Earth rotation rate (rad/s)
 
-    # Time difference from ephemeris reference time
-    tk = transmit_time - ephemeris['toe']
+        # Semi-major axis
+        a = ephemeris['sqrt_a'] ** 2
 
-    # Corrected mean motion
-    n0 = sqrt(mu / (a ** 3))
-    n = n0 + ephemeris['delta_n']
+        # Time difference from ephemeris reference time
+        tk = transmit_time - ephemeris['toe']
 
-    # Mean anomaly
-    mk = ephemeris['m0'] + n * tk
+        # Corrected mean motion
+        n0 = sqrt(mu / (a ** 3))
+        n = n0 + ephemeris['delta_n']
 
-    # Solve Kepler's equation for eccentric anomaly (Ek)
-    ek = mk
-    for _ in range(10):
-        ek_old = ek
-        ek = mk + ephemeris['ecc'] * sin(ek)
-        if abs(ek - ek_old) < 1e-12:
-            break
+        # Mean anomaly
+        mk = ephemeris['m0'] + n * tk
 
-    # True anomaly
-    nu_k = atan2(sqrt(1 - ephemeris['ecc']**2) * sin(ek), cos(ek) - ephemeris['ecc'])
+        # Solve Kepler's equation for eccentric anomaly (Ek)
+        ek = mk
+        for _ in range(10):
+            ek_old = ek
+            ek = mk + ephemeris['ecc'] * sin(ek)
+            if abs(ek - ek_old) < 1e-12:
+                break
 
-    # Argument of latitude
-    phi_k = nu_k + ephemeris['omega']
+        # True anomaly
+        nu_k = atan2(sqrt(1 - ephemeris['ecc']**2) * sin(ek), cos(ek) - ephemeris['ecc'])
 
-    # Second harmonic perturbations
-    delta_uk = ephemeris['cus'] * sin(2 * phi_k) + ephemeris['cuc'] * cos(2 * phi_k)
-    delta_rk = ephemeris['crs'] * sin(2 * phi_k) + ephemeris['crc'] * cos(2 * phi_k)
-    delta_ik = ephemeris['cis'] * sin(2 * phi_k) + ephemeris['cic'] * cos(2 * phi_k)
+        # Argument of latitude
+        phi_k = nu_k + ephemeris['omega']
 
-    # Corrected argument of latitude, radius and inclination
-    uk = phi_k + delta_uk
-    rk = a * (1 - ephemeris['ecc'] * cos(ek)) + delta_rk
-    ik = ephemeris['i0'] + delta_ik + ephemeris['idot'] * tk
+        # Second harmonic perturbations
+        delta_uk = ephemeris['cus'] * sin(2 * phi_k) + ephemeris['cuc'] * cos(2 * phi_k)
+        delta_rk = ephemeris['crs'] * sin(2 * phi_k) + ephemeris['crc'] * cos(2 * phi_k)
+        delta_ik = ephemeris['cis'] * sin(2 * phi_k) + ephemeris['cic'] * cos(2 * phi_k)
 
-    # Positions in orbital plane
-    xk_prime = rk * cos(uk)
-    yk_prime = rk * sin(uk)
+        # Corrected argument of latitude, radius and inclination
+        uk = phi_k + delta_uk
+        rk = a * (1 - ephemeris['ecc'] * cos(ek)) + delta_rk
+        ik = ephemeris['i0'] + delta_ik + ephemeris['idot'] * tk
 
-    # Corrected longitude of ascending node
-    omega_k = (
-        ephemeris['omega0']
-        + (ephemeris['omega_dot'] - omega_e_dot) * tk
-        - omega_e_dot * ephemeris['toe']
-    )
+        # Positions in orbital plane
+        xk_prime = rk * cos(uk)
+        yk_prime = rk * sin(uk)
 
-    # Earth-fixed coordinates
-    xk = xk_prime * cos(omega_k) - yk_prime * cos(ik) * sin(omega_k)
-    yk = xk_prime * sin(omega_k) + yk_prime * cos(ik) * cos(omega_k)
-    zk = yk_prime * sin(ik)
+        # Corrected longitude of ascending node
+        omega_k = (
+            ephemeris['omega0']
+            + (ephemeris['omega_dot'] - omega_e_dot) * tk
+            - omega_e_dot * ephemeris['toe']
+        )
+
+        # Earth-fixed coordinates
+        xk = xk_prime * cos(omega_k) - yk_prime * cos(ik) * sin(omega_k)
+        yk = xk_prime * sin(omega_k) + yk_prime * cos(ik) * cos(omega_k)
+        zk = yk_prime * sin(ik)
 
     return xk, yk, zk
 
@@ -222,8 +267,7 @@ def calculate_satellite_positions(ephemeris, start_time, end_time, step_min=15):
     while current_time <= end_time:
         transmit_time = (current_time - ephemeris['epoch']).total_seconds()
 
-        # Only calculate positions within ephemeris validity (typically 4 hours)
-        if abs(transmit_time) <= 4 * 3600:
+        if abs(transmit_time) <= 14400:  # 4 hours
             x, y, z = calculate_satellite_position(ephemeris, transmit_time)
             positions.append((current_time, x, y, z))
 
