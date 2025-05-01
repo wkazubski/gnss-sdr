@@ -385,13 +385,20 @@ def plot_satellite_tracks(satellites, obs_lat, obs_lon, obs_alt,
 
             # Add arrow at last point
             if len(theta) >= 2:  # Need at least 2 points for direction
+                dx = theta[-1] - theta[-2]
+                dy = r[-1] - r[-2]
+
+                # Extend endpoint
+                arrow_length_factor = 1.3
+                extended_theta = theta[-2] + dx * arrow_length_factor
+                extended_r = r[-2] + dy * arrow_length_factor
                 ax.annotate('',
-                           xytext=(theta[-2], r[-2]),
-                           xy=(theta[-1], r[-1]),
+                           xytext=(theta[-1], r[-1]),
+                           xy=(extended_theta, extended_r),
                            arrowprops={
                             'arrowstyle': '->',
                             'color': color,
-                            'alpha': 0.7,
+                            'alpha': 0.9,
                             'linewidth': 1.5,
                             'shrinkA': 0,
                             'shrinkB': 0
