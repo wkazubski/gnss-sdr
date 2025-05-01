@@ -285,14 +285,32 @@ def plot_satellite_tracks(satellites, obs_lat, obs_lon, obs_alt,
 
     # Color scheme by constellation
     system_colors = {
-        'G': 'blue',   # GPS
-        'E': 'green',  # Galileo
-        'R': 'red',    # GLONASS
-        'C': 'orange'  # BeiDou
+        'G': 'blue',    # GPS
+        'E': 'green',   # Galileo
+        'R': 'red',     # GLONASS
+        'C': 'orange',  # BeiDou
+        'J': 'brown',   # QZSS
+        'I': 'pink',    # IRNSS
+        'S': 'gray'     # SBAS
     }
 
+    # System names mapping
+    system_names = {
+        'G': 'GPS',
+        'E': 'Galileo',
+        'R': 'GLONASS',
+        'C': 'BeiDou',
+        'J': 'QZSS',
+        'I': 'IRNSS',
+        'S': 'SBAS'
+    }
+
+    # Find which systems are actually present
+    present_systems = {prn[0] for prn in satellites.keys() if prn[0] in system_colors}
+
+    # Plot each satellite
     for prn, ephemeris_list in satellites.items():
-        color = system_colors.get(prn[0], 'purple')
+        color = system_colors.get(prn[0], 'purple')  # Default to purple for unknown systems
 
         # Get the most recent ephemeris
         if not ephemeris_list:
@@ -327,18 +345,23 @@ def plot_satellite_tracks(satellites, obs_lat, obs_lon, obs_alt,
                     fontsize=12, ha='center', va='center',
                     bbox={"facecolor": "white", "alpha": 0.8, "pad": 2})
 
-    # Add legend and metadata
-    legend_elements = [plt.Line2D([0], [0], marker='o', color='w',
-                      label=f'{sys} ({name})', markerfacecolor=color, markersize=10)
-                      for sys, (name, color) in [
-                          ('G', ('GPS', 'blue')),
-                          ('E', ('Galileo', 'green')),
-                          ('R', ('GLONASS', 'red')),
-                          ('C', ('BeiDou', 'orange'))
-                      ]]
+    # Create legend elements only for present systems
+    legend_elements = [
+        plt.Line2D([0], [0], marker='o', color='w',
+                  label=f'{system_names[sys]} ({sys})',
+                  markerfacecolor=system_colors[sys],
+                  markersize=10)
+        for sys in present_systems
+    ]
 
-    ax.legend(handles=legend_elements, loc='upper right',
-              bbox_to_anchor=(1.3, 1.1), fontsize=14)
+    # Add legend if we have any systems to show
+    if legend_elements:
+        ax.legend(
+            handles=legend_elements,
+            loc='upper right',
+            bbox_to_anchor=(1.3, 1.1),
+            fontsize=14
+        )
 
     lat_deg = np.degrees(obs_lat)
     lon_deg = np.degrees(obs_lon)
