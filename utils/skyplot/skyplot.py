@@ -22,6 +22,7 @@ import re
 import sys
 from datetime import datetime, timedelta
 from math import atan2, cos, sin, sqrt
+from pathlib import Path
 
 import matplotlib.pyplot as plt
 import numpy as np
@@ -447,7 +448,8 @@ def plot_satellite_tracks(satellites, obs_lat, obs_lon, obs_alt,
     plt.tight_layout()
 
     if filename:
-        filename_no_dots = filename.replace('.', '_')
+        filename_no_path = Path(filename).name
+        filename_no_dots = filename_no_path.replace('.', '_')
         output_name = f"skyplot_{filename_no_dots}.pdf"
     else:
         output_name = "skyplot.pdf"
