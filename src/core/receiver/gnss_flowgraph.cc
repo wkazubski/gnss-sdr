@@ -1534,10 +1534,9 @@ int GNSSFlowgraph::assign_channels()
                 }
         }
 
-    for (const auto& [signal_str, signal_info] : signal_mapping)
+    for (const auto& [signal_str, available_signals] : available_signals_map_)
         {
-            const auto& [gnss_system_str, signal_pretty_str] = signal_info;
-            const auto available_signals = available_signals_map_.at(signal_str);
+            const auto& [gnss_system_str, signal_pretty_str] = signal_mapping.at(signal_str);
             const auto channel_count_option = "Channels_" + signal_str + ".count";
             const auto channel_count = configuration_->property(channel_count_option, uint64_t(0ULL));
             auto max_sat_count = available_signals.size();
