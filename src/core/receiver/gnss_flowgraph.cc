@@ -77,6 +77,7 @@
 
 namespace
 {
+
 const auto signal_mapping = std::unordered_map<std::string, std::pair<std::string, std::string>>{
     {"1C", {"GPS", "L1"}},
     {"2S", {"GPS", "L2"}},
@@ -90,7 +91,8 @@ const auto signal_mapping = std::unordered_map<std::string, std::pair<std::strin
     {"1G", {"Glonass", "L1"}},
     {"2G", {"Glonass", "L2"}},
 };
-}
+
+}  // namespace
 
 GNSSFlowgraph::GNSSFlowgraph(std::shared_ptr<ConfigurationInterface> configuration,
     std::shared_ptr<Concurrent_Queue<pmt::pmt_t>> queue)  // NOLINT(performance-unnecessary-value-param)
