@@ -2224,6 +2224,7 @@ Gnss_Signal GNSSFlowgraph::search_next_signal(const std::string& searched_signal
             auto& available_signals = available_signals_map_.at(searched_signal);
             result = available_signals.front();
             available_signals.pop_front();
+            available_signals.push_back(result);
         }
 
     return result;
