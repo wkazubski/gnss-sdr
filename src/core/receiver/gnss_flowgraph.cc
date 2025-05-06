@@ -2188,14 +2188,14 @@ Gnss_Signal GNSSFlowgraph::search_next_signal(const std::string& searched_signal
             break;
         }
 
-    if (assist_signal != "")
+    if (!assist_signal.empty())
         {
             if (configuration_->property("Channels_" + assist_signal + ".count", 0) > 0)
                 {
                     // 1. Get the current channel status map
-                    std::map<int, std::shared_ptr<Gnss_Synchro>> current_channels_status = channels_status_->get_current_status_map();
+                    const auto current_channels_status = channels_status_->get_current_status_map();
                     // 2. search the currently tracked primary signal satellites and assist the acquisition if the satellite is not tracked on the assisted signal
-                    for (auto& current_status : current_channels_status)
+                    for (const auto& current_status : current_channels_status)
                         {
                             if (std::string(current_status.second->Signal) == assist_signal)
                                 {
