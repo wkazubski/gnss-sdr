@@ -212,10 +212,10 @@ void GNSSFlowgraph::init()
 
     auto channels = block_factory->GetChannels(configuration_.get(), queue_.get());
 
-    channels_count_ = static_cast<int>(channels->size());
+    channels_count_ = static_cast<int>(channels.size());
     for (int i = 0; i < channels_count_; i++)
         {
-            std::shared_ptr<GNSSBlockInterface> chan_ = std::move(channels->at(i));
+            std::shared_ptr<GNSSBlockInterface> chan_ = std::move(channels.at(i));
             channels_.push_back(std::dynamic_pointer_cast<ChannelInterface>(chan_));
         }
 
