@@ -241,7 +241,7 @@ auto findRole(ConfigurationInterface const* configuration, std::string const& ba
     return role;
 };
 
-const auto signal_mapping = std::unordered_map<std::string, std::string>{
+const auto signal_mapping = std::vector<std::pair<std::string, std::string>>{
     {"1C", "GPS L1 C/A"},
     {"2S", "GPS L2C (M)"},
     {"L5", "GPS L5"},
