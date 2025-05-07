@@ -1533,10 +1533,19 @@ int GNSSFlowgraph::assign_channels()
                     it = vector_of_channels.insert(it, i);
                 }
         }
-
+#if CXX_LESS_THAN_17
+    for (const auto& entry : available_signals_map_)
+        {
+            const auto& signal_str = entry.first;
+            const auto& available_signals = entry.second;
+            const auto& mapping = signal_mapping.at(signal_str);
+            const auto& gnss_system_str = mapping.first;
+            const auto& signal_pretty_str = mapping.second;
+#else  // structured bindings available from C++17
     for (const auto& [signal_str, available_signals] : available_signals_map_)
         {
             const auto& [gnss_system_str, signal_pretty_str] = signal_mapping.at(signal_str);
+#endif
             const auto channel_count_option = "Channels_" + signal_str + ".count";
             const auto channel_count = configuration_->property(channel_count_option, uint64_t(0ULL));
             auto max_sat_count = available_signals.size();
@@ -1579,7 +1588,8 @@ int GNSSFlowgraph::assign_channels()
                 }
             else
                 {
-                    const auto& [gnss_system_name, _] = signal_mapping.at(gnss_signal_str);
+                    const auto& mapping = signal_mapping.at(gnss_signal_str);
+                    const auto& gnss_system_name = mapping.first;
                     const auto gnss_signal = Gnss_Signal(Gnss_Satellite(gnss_system_name, sat), gnss_signal_str);
                     available_signals_map_.at(gnss_signal_str).remove(gnss_signal);
                     channels_.at(i)->set_signal(gnss_signal);
@@ -2003,9 +2013,15 @@ void GNSSFlowgraph::set_signals_list()
                        38, 39, 40, 41, 42, 43, 44, 45, 46, 47, 48, 49, 50, 51, 52, 53, 54,
                        55, 56, 57, 58, 59, 60, 61, 62, 63}},
     };
-
+#if CXX_LESS_THAN_17
+    for (auto& entry : available_prn_map)
+        {
+            auto& gnss_system_str = entry.first;
+            auto& available_prns = entry.second;
+#else
     for (auto& [gnss_system_str, available_prns] : available_prn_map)
         {
+#endif
             const auto sv_list = configuration_->property(gnss_system_str + ".prns", std::string(""));
 
             if (!sv_list.empty())
@@ -2046,10 +2062,16 @@ void GNSSFlowgraph::set_signals_list()
                         }
                 }
         }
-
+#if CXX_LESS_THAN_17
+    for (const auto& entry : signal_mapping)
+        {
+            const auto& signal_str = entry.first;
+            const auto& signal_info = entry.second;
+#else
     for (const auto& [signal_str, signal_info] : signal_mapping)
         {
-            const auto& [gnss_system_str, _] = signal_info;
+#endif
+            const auto& gnss_system_str = signal_info.first;
             const auto channel_count_option = "Channels_" + signal_str + ".count";
 
             if (configuration_->property(channel_count_option, 0) > 0)
