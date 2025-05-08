@@ -104,6 +104,7 @@ private:
  *    105   |  Galileo E1B + Galileo E5b + Galileo E6B
  *    106   |  GPS L1 C/A + Galileo E1B + Galileo E6B
  *    107   |  GPS L1 C/A + Galileo E6B
+ *    108   |  GPS L1 C/A + Galileo E1B + GPS L5 + Galileo E5a + Galileo E6B
  *    Skipped previous values to avoid overlapping
  *    500   |  BeiDou B1I
  *    501   |  BeiDou B1I + GPS L1 C/A
@@ -117,13 +118,6 @@ private:
  *    601   |  BeiDou B3I + GPS L2C
  *    602   |  BeiDou B3I + GLONASS L2 C/A
  *    603   |  BeiDou B3I + GPS L2C + GLONASS L2 C/A
- *    604   |  BeiDou B3I + GPS L1 C/A
- *    605   |  BeiDou B3I + Galileo E1B
- *    606   |  BeiDou B3I + GLONASS L1 C/A
- *    607   |  BeiDou B3I + GPS L1 C/A + Galileo E1B
- *    608   |  BeiDou B3I + GPS L1 C/A + Galileo E1B + BeiDou B1I
- *    609   |  BeiDou B3I + GPS L1 C/A + Galileo E1B + GLONASS L1 C/A
- *    610   |  BeiDou B3I + GPS L1 C/A + Galileo E1B + GLONASS L1 C/A + BeiDou B1I
  *
  *    1000  |  GPS L1 C/A + GPS L2C + GPS L5
  *    1001  |  GPS L1 C/A + Galileo E1B + GPS L2C + GPS L5 + Galileo E5a
