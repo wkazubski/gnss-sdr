@@ -213,20 +213,6 @@ namespace
 auto const impl_prop = ".implementation"s;  // "implementation" property; used nearly universally
 auto const item_prop = ".item_type"s;       // "item_type" property
 
-// unique_ptr dynamic cast from https://stackoverflow.com/a/26377517/9220132
-template <typename To, typename From>
-std::unique_ptr<To> dynamic_unique_cast(std::unique_ptr<From>&& p)
-{
-    if (To* cast = dynamic_cast<To*>(p.get()))
-        {
-            std::unique_ptr<To> result(cast);
-            p.release();  // NOLINT(bugprone-unused-return-value)
-            return result;
-        }
-    return std::unique_ptr<To>(nullptr);
-}
-
-
 auto findRole(ConfigurationInterface const* configuration, std::string const& base, int ID) -> std::string
 {
     auto role = base + std::to_string(ID);
@@ -286,6 +272,7 @@ auto get_block(
 
     return block;
 }
+
 
 std::unique_ptr<SignalSourceInterface> get_signal_source_block(
     const std::string& implementation,
@@ -367,21 +354,18 @@ std::unique_ptr<SignalSourceInterface> get_signal_source_block(
             return std::make_unique<RawArraySignalSource>(configuration, role, in_streams, out_streams, queue);
         }
 #endif
-
 #if OSMOSDR_DRIVER
     else if (implementation == "Osmosdr_Signal_Source")
         {
             return std::make_unique<OsmosdrSignalSource>(configuration, role, in_streams, out_streams, queue);
         }
 #endif
-
 #if LIMESDR_DRIVER
     else if (implementation == "Limesdr_Signal_Source")
         {
             return std::make_unique<LimesdrSignalSource>(configuration, role, in_streams, out_streams, queue);
         }
 #endif
-
 #if PLUTOSDR_DRIVER
     else if (implementation == "Plutosdr_Signal_Source")
         {
@@ -394,21 +378,18 @@ std::unique_ptr<SignalSourceInterface> get_signal_source_block(
             return std::make_unique<Ad936xCustomSignalSource>(configuration, role, in_streams, out_streams, queue);
         }
 #endif
-
 #if FMCOMMS2_DRIVER
     else if (implementation == "Fmcomms2_Signal_Source")
         {
             return std::make_unique<Fmcomms2SignalSource>(configuration, role, in_streams, out_streams, queue);
         }
 #endif
-
 #if FLEXIBAND_DRIVER
     else if (implementation == "Flexiband_Signal_Source")
         {
             return std::make_unique<FlexibandSignalSource>(configuration, role, in_streams, out_streams, queue);
         }
 #endif
-
 #if ENABLE_FPGA and AD9361_DRIVER
     else if (implementation == "ADRV9361_Z7035_Signal_Source_FPGA")
         {
@@ -419,21 +400,18 @@ std::unique_ptr<SignalSourceInterface> get_signal_source_block(
             return std::make_unique<Fmcomms5SignalSourceFPGA>(configuration, role, in_streams, out_streams, queue);
         }
 #endif
-
 #if ENABLE_FPGA and MAX2771_DRIVER
     else if (implementation == "MAX2771_EVKIT_Signal_Source_FPGA")
         {
             return std::make_unique<MAX2771EVKITSignalSourceFPGA>(configuration, role, in_streams, out_streams, queue);
         }
 #endif
-
 #if ENABLE_FPGA and DMA_PROXY_DRIVER
     else if (implementation == "DMA_Signal_Source_FPGA")
         {
             return std::make_unique<DMASignalSourceFPGA>(configuration, role, in_streams, out_streams, queue);
         }
 #endif
-
 #if ZEROMQ_DRIVER
     else if (implementation == "ZMQ_Signal_Source")
         {
@@ -443,6 +421,7 @@ std::unique_ptr<SignalSourceInterface> get_signal_source_block(
 
     return nullptr;
 }
+
 
 std::unique_ptr<AcquisitionInterface> get_acq_block(
     const std::string& implementation,
@@ -496,7 +475,6 @@ std::unique_ptr<AcquisitionInterface> get_acq_block(
         {
             return std::make_unique<GalileoE1PcpsCccwsrAmbiguousAcquisition>(configuration, role, in_streams, out_streams);
         }
-
     else if (implementation == "Galileo_E1_PCPS_QuickSync_Ambiguous_Acquisition")
         {
             return std::make_unique<GalileoE1PcpsQuickSyncAmbiguousAcquisition>(configuration, role, in_streams, out_streams);
@@ -568,6 +546,7 @@ std::unique_ptr<AcquisitionInterface> get_acq_block(
 
     return nullptr;
 }
+
 
 std::unique_ptr<TrackingInterface> get_trk_block(
     const std::string& implementation,
@@ -675,6 +654,7 @@ std::unique_ptr<TrackingInterface> get_trk_block(
 
     return nullptr;
 }
+
 
 std::unique_ptr<TelemetryDecoderInterface> get_tlm_block(
     const std::string& implementation,
