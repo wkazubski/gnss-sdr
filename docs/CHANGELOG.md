@@ -20,6 +20,10 @@ All notable changes to GNSS-SDR will be documented in this file.
   [lintian tag](https://lintian.debian.org/tags/very-long-line-length-in-source-file.html)
   warning).
 - Added formatting of `.proto` files with clang-format. Added check in CI job.
+- Major refactoring of the `GNSSFlowgraph` and `GNSSBlockFactory` class
+  implementations, greatly improving maintainability, simplifying the addition
+  of new signals, and eliminating a lot of duplicated code. Awesome contribution
+  by @MathieuFavreau.
 
 ### Improvements in Portability:
 
