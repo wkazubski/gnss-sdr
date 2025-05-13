@@ -24,6 +24,7 @@ set(PVT_LIB_SOURCES
     has_simple_printer.cc
     geohash.cc
     pvt_kf.cc
+    receiver_type.cc
 )
 
 set(PVT_LIB_HEADERS
@@ -47,6 +48,7 @@ set(PVT_LIB_HEADERS
     has_simple_printer.h
     geohash.h
     pvt_kf.h
+    receiver_type.h
 )
 
 list(SORT PVT_LIB_HEADERS)
@@ -156,6 +158,16 @@ if(Boost_VERSION_STRING VERSION_LESS 1.71.0)
         PUBLIC
             -DBOOST_ASIO_USE_RESOLVER_ITERATOR=1
             -DBOOST_ASIO_USE_IOCONTEXT_POST=1
+    )
+endif()
+
+if((CMAKE_CXX_STANDARD AND CMAKE_CXX_STANDARD VERSION_LESS 17) OR
+  (CMAKE_CXX_COMPILER_ID STREQUAL "GNU" AND CMAKE_CXX_COMPILER_VERSION VERSION_LESS "8.0") OR
+  (CMAKE_CXX_COMPILER_ID STREQUAL "Clang" AND CMAKE_CXX_COMPILER_VERSION VERSION_LESS "4.0") OR
+  (CMAKE_CXX_COMPILER_ID STREQUAL "AppleClang" AND CMAKE_CXX_COMPILER_VERSION VERSION_LESS "10.0"))
+    target_compile_definitions(pvt_libs
+        PUBLIC
+            -DNO_FOLD_EXPRESSIONS=1
     )
 endif()
 

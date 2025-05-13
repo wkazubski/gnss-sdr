@@ -10,14 +10,12 @@ if(USE_CMAKE_TARGET_SOURCES)
     target_sources(pvt_adapters
         PRIVATE
             rtklib_pvt.cc
-            receiver_type.cc
         PUBLIC
             rtklib_pvt.h
-            receiver_type.h
     )
 else()
-    source_group(Headers FILES rtklib_pvt.h receiver_type.h)
-    add_library(pvt_adapters rtklib_pvt.cc rtklib_pvt.h receiver_type.h receiver_type.cc)
+    source_group(Headers FILES rtklib_pvt.h)
+    add_library(pvt_adapters rtklib_pvt.cc rtklib_pvt.h)
 endif()
 
 target_link_libraries(pvt_adapters

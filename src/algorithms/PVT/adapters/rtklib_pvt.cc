@@ -16,17 +16,18 @@
 
 
 #include "rtklib_pvt.h"
-#include "MATH_CONSTANTS.h"           // for D2R
-#include "configuration_interface.h"  // for ConfigurationInterface
-#include "galileo_almanac.h"          // for Galileo_Almanac
-#include "galileo_ephemeris.h"        // for Galileo_Ephemeris
-#include "gnss_sdr_flags.h"           // for FLAGS_RINEX_version
-#include "gps_almanac.h"              // for Gps_Almanac
-#include "gps_ephemeris.h"            // for Gps_Ephemeris
-#include "pvt_conf.h"                 // for Pvt_Conf
-#include "receiver_type.h"            // for get_type_of_receiver
-#include "rtklib_rtkpos.h"            // for rtkfree, rtkinit
-#include <iostream>                   // for std::cout
+#include "MATH_CONSTANTS.h"            // for D2R
+#include "configuration_interface.h"   // for ConfigurationInterface
+#include "galileo_almanac.h"           // for Galileo_Almanac
+#include "galileo_ephemeris.h"         // for Galileo_Ephemeris
+#include "gnss_sdr_flags.h"            // for FLAGS_RINEX_version
+#include "gnss_sdr_string_literals.h"  // for std::string_literals in C++11
+#include "gps_almanac.h"               // for Gps_Almanac
+#include "gps_ephemeris.h"             // for Gps_Ephemeris
+#include "pvt_conf.h"                  // for Pvt_Conf
+#include "receiver_type.h"             // for get_type_of_receiver
+#include "rtklib_rtkpos.h"             // for rtkfree, rtkinit
+#include <iostream>                    // for std::cout
 #if USE_GLOG_AND_GFLAGS
 #include <glog/logging.h>
 #else

@@ -33,8 +33,15 @@ Signal_Enabled_Flags::Signal_Enabled_Flags(const ConfigurationInterface* configu
         {BDS_B1, "Channels_B1.count"},
         {BDS_B3, "Channels_B3.count"}};
 
+#if NO_FOLD_EXPRESSIONS
+    for (const auto& pair_aux : signal_flag_to_prop)
+        {
+            auto flag = pair_aux.first;
+            auto prop = pair_aux.second;
+#else
     for (const auto& [flag, prop] : signal_flag_to_prop)
         {
+#endif
             const auto enabled = configuration->property(prop, 0) > 0;
 
             if (enabled)
@@ -43,6 +50,7 @@ Signal_Enabled_Flags::Signal_Enabled_Flags(const ConfigurationInterface* configu
                 }
         }
 }
+
 
 uint32_t get_type_of_receiver(const Signal_Enabled_Flags& signal_enabled_flags)
 {

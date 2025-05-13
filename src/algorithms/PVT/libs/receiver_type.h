@@ -41,6 +41,31 @@ class Signal_Enabled_Flags
 public:
     explicit Signal_Enabled_Flags(const ConfigurationInterface* configuration);
 
+#if NO_FOLD_EXPRESSIONS
+    template <typename T>
+    uint32_t or_all(const T& value) const
+    {
+        return value;
+    }
+
+    template <typename T, typename... Args>
+    uint32_t or_all(const T& first, const Args&... rest) const
+    {
+        return first | or_all(rest...);
+    }
+
+    template <typename... Args>
+    bool check_only_enabled(const Args&... args) const
+    {
+        return (flags_ ^ or_all(args...)) == 0;
+    }
+
+    template <typename... Args>
+    bool check_any_enabled(const Args&... args) const
+    {
+        return (flags_ & or_all(args...)) > 0;
+    }
+#else
     template <typename... Args>
     bool check_only_enabled(const Args&... args) const
     {
@@ -52,6 +77,7 @@ public:
     {
         return (flags_ & (args | ...)) > 0;
     }
+#endif
 
 private:
     uint32_t flags_;
