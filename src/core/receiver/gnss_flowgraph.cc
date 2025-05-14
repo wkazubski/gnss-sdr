@@ -1557,9 +1557,14 @@ int GNSSFlowgraph::assign_channels()
 
             if (channel_count > max_sat_count - 1)
                 {
-                    help_hint_ += " * The number of " + gnss_system_str + " " + signal_pretty_str + " channels is set to " + channel_count_option + "=" + std::to_string(channel_count);
-                    help_hint_ += " but the maximum number of available " + gnss_system_str + " satellites is " + std::to_string(max_sat_count) + ".\n";
-                    help_hint_ += " Please set " + channel_count_option + "=" + std::to_string(max_sat_count - 1) + " or lower in your configuration file.\n";
+                    help_hint_ += " * The number of " + gnss_system_str;
+                    help_hint_ += " " + signal_pretty_str;
+                    help_hint_ += " channels is set to " + channel_count_option;
+                    help_hint_ += "=" + std::to_string(channel_count);
+                    help_hint_ += " but the maximum number of available " + gnss_system_str;
+                    help_hint_ += " satellites is " + std::to_string(max_sat_count) + ".\n";
+                    help_hint_ += " Please set " + channel_count_option + "=";
+                    help_hint_ += std::to_string(max_sat_count - 1) + " or lower in your configuration file.\n";
                     top_block_->disconnect_all();
                     return 1;
                 }
