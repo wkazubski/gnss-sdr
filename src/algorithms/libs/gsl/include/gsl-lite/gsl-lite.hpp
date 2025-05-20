@@ -8,7 +8,6 @@
 // Copyright (c) 2019-2025 Moritz Beutel
 // Copyright (c) 2015-2025 Microsoft Corporation. All rights reserved.
 //
-//
 // SPDX-License-Identifier: MIT
 //
 
@@ -32,7 +31,7 @@
 
 #define gsl_lite_MAJOR 1
 #define gsl_lite_MINOR 0
-#define gsl_lite_PATCH 0
+#define gsl_lite_PATCH 1
 
 #define gsl_lite_VERSION gsl_STRINGIFY(gsl_lite_MAJOR) "." gsl_STRINGIFY(gsl_lite_MINOR) "." gsl_STRINGIFY(gsl_lite_PATCH)
 
@@ -1544,6 +1543,19 @@ gsl_DISABLE_MSVC_WARNINGS(26432 26410 26415 26418 26472 26439 26440 26455 26473 
     };
 #endif
 
+#if gsl_HAVE(ALIAS_TEMPLATE)
+    template <class T>
+    using add_const_t = typename add_const<T>::type;
+    template <class T>
+    using remove_const_t = typename remove_const<T>::type;
+    template <class T>
+    using remove_volatile_t = typename remove_volatile<T>::type;
+    template <class T>
+    using remove_cv_t = typename remove_cv<T>::type;
+    template <class T>
+    using remove_reference_t = typename remove_reference<T>::type;
+#endif  // gsl_HAVE( ALIAS_TEMPLATE )
+
 
 #if gsl_HAVE(INTEGRAL_CONSTANT)
 
@@ -1794,6 +1806,11 @@ gsl_DISABLE_MSVC_WARNINGS(26432 26410 26415 26418 26472 26439 26440 26455 26473 
 
     }  // namespace std17
 
+#if gsl_HAVE(CONSTRAINED_SPAN_CONTAINER_CTOR)
+    using std17::data;
+    using std17::size;
+#endif  // gsl_HAVE( CONSTRAINED_SPAN_CONTAINER_CTOR )
+
     // C++20 emulation:
 
     namespace std20
@@ -1873,8 +1890,24 @@ gsl_DISABLE_MSVC_WARNINGS(26432 26410 26415 26418 26472 26439 26440 26455 26473 
     {
         typedef typename std11::remove_cv<typename std11::remove_reference<T>::type>::type type;
     };
+#if gsl_HAVE(ALIAS_TEMPLATE)
+    template <class T>
+    using remove_cvref_t = typename remove_cvref<T>::type;
+#endif  // gsl_HAVE( ALIAS_TEMPLATE )
 
     }  // namespace std20
+
+#if gsl_HAVE(STD_SSIZE) || gsl_HAVE(CONSTRAINED_SPAN_CONTAINER_CTOR)
+    using std20::ssize;
+#endif  // gsl_HAVE( STD_SSIZE ) || gsl_HAVE( CONSTRAINED_SPAN_CONTAINER_CTOR )
+
+#if gsl_CPP11_100
+    using std20::identity;
+#endif  // gsl_CPP11_100
+    using std20::type_identity;
+#if gsl_HAVE(ALIAS_TEMPLATE)
+    using std20::type_identity_t;
+#endif  // gsl_HAVE( ALIAS_TEMPLATE )
 
     // C++23 emulation:
 
@@ -2285,7 +2318,7 @@ gsl_DISABLE_MSVC_WARNINGS(26432 26410 26415 26418 26472 26439 26440 26455 26473 
 
     // Add uncaught_exceptions() for pre-2017 MSVC, GCC and Clang
 
-    namespace std11
+    namespace std17
     {
 
 #if gsl_HAVE(UNCAUGHT_EXCEPTIONS)
@@ -2311,6 +2344,16 @@ gsl_DISABLE_MSVC_WARNINGS(26432 26410 26415 26418 26472 26439 26440 26455 26473 
     }
 
 #endif
+#endif
+
+    }  // namespace std17
+
+    namespace std11
+    {
+
+#if gsl_HAVE(UNCAUGHT_EXCEPTIONS) || defined(_MSC_VER) || gsl_COMPILER_CLANG_VERSION || gsl_COMPILER_GNUC_VERSION || gsl_COMPILER_APPLECLANG_VERSION || gsl_COMPILER_NVHPC_VERSION
+    // Retain alias for backward compatibility
+    using ::gsl_lite::std17::uncaught_exceptions;
 #endif
 
     }  // namespace std11
@@ -2378,7 +2421,7 @@ gsl_DISABLE_MSVC_WARNINGS(26432 26410 26415 26418 26472 26439 26440 26455 26473 
     public:
         explicit final_action_return(F action) gsl_noexcept
             : action_(std::move(action)),
-              exception_count_(std11::uncaught_exceptions())
+              exception_count_(std17::uncaught_exceptions())
         {
         }
 
@@ -2394,7 +2437,7 @@ gsl_DISABLE_MSVC_WARNINGS(26432 26410 26415 26418 26472 26439 26440 26455 26473 
 
         gsl_SUPPRESS_MSGSL_WARNING(f.6) ~final_action_return() gsl_noexcept
         {
-            if (std11::uncaught_exceptions() == exception_count_)  // always false if `exception_count_ == -1`
+            if (std17::uncaught_exceptions() == exception_count_)  // always false if `exception_count_ == -1`
                 {
                     action_();
                 }
@@ -2417,7 +2460,7 @@ gsl_DISABLE_MSVC_WARNINGS(26432 26410 26415 26418 26472 26439 26440 26455 26473 
     public:
         explicit final_action_error(F action) gsl_noexcept
             : action_(std::move(action)),
-              exception_count_(std11::uncaught_exceptions())
+              exception_count_(std17::uncaught_exceptions())
         {
         }
 
@@ -2435,7 +2478,7 @@ gsl_DISABLE_MSVC_WARNINGS(26432 26410 26415 26418 26472 26439 26440 26455 26473 
         {
             if (exception_count_ != -1)  // abuse member as special "no-invoke" marker
                 {
-                    if (std11::uncaught_exceptions() != exception_count_)
+                    if (std17::uncaught_exceptions() != exception_count_)
                         {
                             action_();
                         }
@@ -4313,10 +4356,29 @@ gsl_DISABLE_MSVC_WARNINGS(26432 26410 26415 26418 26472 26439 26440 26455 26473 
             gsl_CONFIG_SPAN_INDEX_TYPE MyExtent = Extent
                 // We *have* to use SFINAE with an NTTP arg here, otherwise the overload is ambiguous.
                 gsl_ENABLE_IF_NTTP_((MyExtent != dynamic_extent))>
-        gsl_api gsl_constexpr14 gsl_explicit span(pointer firstElem, pointer lastElem)
-            : storage_(firstElem, narrow_cast<size_type>(lastElem - firstElem))
+        gsl_api gsl_constexpr14 gsl_explicit span(iterator it, size_type count)
+            : storage_(it.current_, count)
         {
-            gsl_Expects(firstElem <= lastElem);
+            gsl_Expects(count == Extent);
+            gsl_Expects(it.end_ - it.current_ == static_cast<difference_type>(Extent));
+        }
+        template <
+            gsl_CONFIG_SPAN_INDEX_TYPE MyExtent = Extent
+                // We *have* to use SFINAE with an NTTP arg here, otherwise the overload is ambiguous.
+                gsl_ENABLE_IF_NTTP_((MyExtent == dynamic_extent))>
+        gsl_api gsl_constexpr14 span(iterator it, size_type count)
+            : storage_(it.current_, count)
+        {
+            gsl_Expects(it.end_ - it.current_ >= static_cast<difference_type>(count));
+        }
+
+        template <
+            gsl_CONFIG_SPAN_INDEX_TYPE MyExtent = Extent
+                // We *have* to use SFINAE with an NTTP arg here, otherwise the overload is ambiguous.
+                gsl_ENABLE_IF_NTTP_((MyExtent != dynamic_extent))>
+        gsl_api gsl_constexpr14 gsl_explicit span(pointer firstElem, pointer lastElem)
+            : storage_(firstElem, gsl_lite::narrow_cast<size_type>(lastElem - firstElem))
+        {
             gsl_Expects(lastElem - firstElem == static_cast<difference_type>(Extent));
         }
         template <
@@ -4324,7 +4386,26 @@ gsl_DISABLE_MSVC_WARNINGS(26432 26410 26415 26418 26472 26439 26440 26455 26473 
                 // We *have* to use SFINAE with an NTTP arg here, otherwise the overload is ambiguous.
                 gsl_ENABLE_IF_NTTP_((MyExtent == dynamic_extent))>
         gsl_api gsl_constexpr14 span(pointer firstElem, pointer lastElem)
-            : storage_(firstElem, narrow_cast<size_type>(lastElem - firstElem))
+            : storage_(firstElem, gsl_lite::narrow_cast<size_type>(lastElem - firstElem))
+        {
+            gsl_Expects(firstElem <= lastElem);
+        }
+
+        template <
+            gsl_CONFIG_SPAN_INDEX_TYPE MyExtent = Extent
+                // We *have* to use SFINAE with an NTTP arg here, otherwise the overload is ambiguous.
+                gsl_ENABLE_IF_NTTP_((MyExtent != dynamic_extent))>
+        gsl_api gsl_constexpr14 gsl_explicit span(iterator firstElem, iterator lastElem)
+            : storage_(firstElem.current_, gsl_lite::narrow_cast<size_type>(lastElem - firstElem))
+        {
+            gsl_Expects(lastElem - firstElem == static_cast<difference_type>(Extent));
+        }
+        template <
+            gsl_CONFIG_SPAN_INDEX_TYPE MyExtent = Extent
+                // We *have* to use SFINAE with an NTTP arg here, otherwise the overload is ambiguous.
+                gsl_ENABLE_IF_NTTP_((MyExtent == dynamic_extent))>
+        gsl_api gsl_constexpr14 span(iterator firstElem, iterator lastElem)
+            : storage_(firstElem.current_, gsl_lite::narrow_cast<size_type>(lastElem - firstElem))
         {
             gsl_Expects(firstElem <= lastElem);
         }
@@ -4334,8 +4415,20 @@ gsl_DISABLE_MSVC_WARNINGS(26432 26410 26415 26418 26472 26439 26440 26455 26473 
         {
             gsl_Expects(Extent == dynamic_extent || count == Extent);
         }
+        gsl_api gsl_constexpr14 span(iterator it, size_type count)
+            : storage_(it.current_, count)
+        {
+            gsl_Expects(Extent == dynamic_extent || count == Extent);
+            gsl_Expects(it.end_ - it.current_ >= static_cast<difference_type>(count));
+        }
         gsl_api gsl_constexpr14 span(pointer firstElem, pointer lastElem)
-            : storage_(firstElem, narrow_cast<size_type>(lastElem - firstElem))
+            : storage_(firstElem, gsl_lite::narrow_cast<size_type>(lastElem - firstElem))
+        {
+            gsl_Expects(firstElem <= lastElem);
+            gsl_Expects(Extent == dynamic_extent || lastElem - firstElem == static_cast<difference_type>(Extent));
+        }
+        gsl_api gsl_constexpr14 span(iterator firstElem, iterator lastElem)
+            : storage_(firstElem.current_, gsl_lite::narrow_cast<size_type>(lastElem - firstElem))
         {
             gsl_Expects(firstElem <= lastElem);
             gsl_Expects(Extent == dynamic_extent || lastElem - firstElem == static_cast<difference_type>(Extent));
@@ -4578,7 +4671,7 @@ gsl_DISABLE_MSVC_WARNINGS(26432 26410 26415 26418 26472 26439 26440 26455 26473 
         gsl_NODISCARD gsl_api gsl_constexpr std::ptrdiff_t
         ssize() const gsl_noexcept
         {
-            return narrow_cast<std::ptrdiff_t>(storage_.size());
+            return gsl_lite::narrow_cast<std::ptrdiff_t>(storage_.size());
         }
 
         gsl_NODISCARD gsl_api gsl_constexpr size_type
@@ -5499,14 +5592,14 @@ gsl_DISABLE_MSVC_WARNINGS(26432 26410 26415 26418 26472 26439 26440 26455 26473 
         gsl_NODISCARD static gsl_constexpr14 span_type
         remove_z(std::array<typename std11::remove_const<element_type>::type, N> &arr)
         {
-            return remove_z(gsl_ADDRESSOF(arr[0]), narrow_cast<std::size_t>(N));
+            return remove_z(gsl_ADDRESSOF(arr[0]), gsl_lite::narrow_cast<std::size_t>(N));
         }
 
         template <size_t N>
         gsl_NODISCARD static gsl_constexpr14 span_type
         remove_z(std::array<typename std11::remove_const<element_type>::type, N> const &arr)
         {
-            return remove_z(gsl_ADDRESSOF(arr[0]), narrow_cast<std::size_t>(N));
+            return remove_z(gsl_ADDRESSOF(arr[0]), gsl_lite::narrow_cast<std::size_t>(N));
         }
 #endif
 
