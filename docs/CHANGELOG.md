@@ -28,6 +28,8 @@ All notable changes to GNSS-SDR will be documented in this file.
 ### Improvements in Portability:
 
 - Fix building option `-DENABLE_ION=ON` when using CMake >= 4.0.
+- Updated `gsl-lite` to v1.0.1. See the
+  [gsl-lite release](https://github.com/gsl-lite/gsl-lite/releases/tag/v1.0.1).
 
 ### Improvements in Usability:
 
