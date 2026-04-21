@@ -33,6 +33,14 @@ if(ENABLE_AD936X_SDR AND NOT ENABLE_PLUTOSDR)
     set(OPT_DRIVER_HEADERS ${OPT_DRIVER_HEADERS} ad936x_custom_signal_source.h)
 endif()
 
+if(ENABLE_GNMAX)
+    ##############################################
+    # gnMAX2769 (USB dongle)
+    ##############################################
+    set(OPT_DRIVER_SOURCES ${OPT_DRIVER_SOURCES} gnmax_signal_source.cc)
+    set(OPT_DRIVER_HEADERS ${OPT_DRIVER_HEADERS} gnmax_signal_source.h)
+endif()
+
 if(ENABLE_FMCOMMS2)
     ###############################################
     # FMCOMMS2 based SDR Hardware
@@ -275,6 +283,13 @@ if(ENABLE_FLEXIBAND AND TELEORBIT_FOUND)
     target_link_libraries(signal_source_adapters
         PRIVATE
             Gnuradio::teleorbit
+    )
+endif()
+
+if(ENABLE_GNMAX AND GRGNMAX_FOUND)
+    target_link_libraries(signal_source_adapters
+        PRIVATE
+            Gnuradio::gnmax
     )
 endif()
 
