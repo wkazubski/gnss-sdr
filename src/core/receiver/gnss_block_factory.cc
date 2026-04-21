@@ -152,6 +152,10 @@
 #include "gps_l1_ca_pcps_opencl_acquisition.h"
 #endif
 
+#if GNMAX_DRIVER
+#include "gnmax_signal_source.h"
+#endif
+
 #if RAW_ARRAY_DRIVER
 #include "raw_array_signal_source.h"
 #endif
@@ -226,7 +230,11 @@ auto findRole(const ConfigurationInterface* configuration, const std::string& ba
     // Current behavior: if there is no "Tag0" use "Tag" instead
     if (ID < 1 && !configuration->is_present(role + impl_prop))
         {
-            return base;  //  legacy format
+            const auto stub = configuration->property(role + impl_prop, ""s);
+            if (stub.empty())
+                {
+                    return base;
+                }
         }
 
     return role;
@@ -369,6 +377,12 @@ std::unique_ptr<SignalSourceInterface> get_signal_source_block(
     else if (implementation == "ION_GSMS_Signal_Source")
         {
             return std::make_unique<IONGSMSSignalSource>(configuration, role, in_streams, out_streams, queue);
+        }
+#endif
+#if GNMAX_DRIVER
+    else if (implementation == "GNMAX_Signal_Source")
+        {
+            return std::make_unique<GnMaxSignalSource>(configuration, role, in_streams, out_streams, queue);
         }
 #endif
 #if RAW_ARRAY_DRIVER
