@@ -52,6 +52,7 @@
 #include <cstddef>                   // for size_t
 #include <cstdlib>                   // for exit
 #include <exception>                 // for exception
+#include <fstream>                   // for std::ifstream
 #include <iostream>                  // for operator<<
 #include <iterator>                  // for insert_iterator, inserter
 #include <memory>                    // for std::shared_ptr
@@ -127,8 +128,6 @@ void GNSSFlowgraph::init()
     /*
      * Instantiates the receiver blocks
      */
-    auto block_factory = std::make_unique<GNSSBlockFactory>();
-
     channels_status_ = channel_status_msg_receiver_make();
 
     if (configuration_->property("Channels_E6.count", 0) > 0)
@@ -147,14 +146,23 @@ void GNSSFlowgraph::init()
         {
             enable_osnma_rx_ = true;
             const auto certFilePath = configuration_->property("GNSS-SDR.osnma_public_key", CRTFILE_DEFAULT);
-            const auto merKleTreePath = configuration_->property("GNSS-SDR.osnma_merkletree", MERKLEFILE_DEFAULT);
-            std::string osnma_mode = configuration_->property("GNSS-SDR.osnma_mode", std::string(""));
-            bool strict_mode = false;
-            if (osnma_mode == "strict")
+            auto merKleTreePath = configuration_->property("GNSS-SDR.osnma_merkletree", MERKLEFILE_DEFAULT);
+            if (!configuration_->is_present("GNSS-SDR.osnma_merkletree"))
                 {
-                    strict_mode = true;
+                    std::ifstream default_merkle_tree(MERKLEFILE_DEFAULT);
+                    if (!default_merkle_tree.good())
+                        {
+                            merKleTreePath.clear();
+                        }
                 }
-            osnma_rx_ = osnma_msg_receiver_make(certFilePath, merKleTreePath, strict_mode);
+            std::string osnma_mode = configuration_->property("GNSS-SDR.osnma_mode", std::string(""));
+            const bool strict_mode = osnma_mode == "strict";
+            const bool replay_mode = osnma_mode == "replay";
+            if (!osnma_mode.empty() && !strict_mode && !replay_mode)
+                {
+                    LOG(WARNING) << "Unknown GNSS-SDR.osnma_mode=" << osnma_mode << ". Falling back to default mode.";
+                }
+            osnma_rx_ = osnma_msg_receiver_make(certFilePath, merKleTreePath, strict_mode, replay_mode);
         }
     else
         {
@@ -178,7 +186,7 @@ void GNSSFlowgraph::init()
     for (int i = 0; i < sources_count_; i++)
         {
             DLOG(INFO) << "Creating source " << i;
-            auto check_not_nullptr = block_factory->GetSignalSource(configuration_.get(), queue_.get(), i);
+            auto check_not_nullptr = block_factory::GetSignalSource(configuration_.get(), queue_.get(), i);
             if (!check_not_nullptr)
                 {
                     std::cout << "GNSS-SDR program ended.\n";
@@ -195,7 +203,7 @@ void GNSSFlowgraph::init()
                         }
                     for (auto j = 0U; j < RF_Channels; ++j)
                         {
-                            sig_conditioner_.push_back(block_factory->GetSignalConditioner(configuration_.get(), signal_conditioner_ID));
+                            sig_conditioner_.push_back(block_factory::GetSignalConditioner(configuration_.get(), signal_conditioner_ID));
                             signal_conditioner_ID++;
                         }
                 }
@@ -209,11 +217,11 @@ void GNSSFlowgraph::init()
             signal_conditioner_connected_ = std::vector<bool>(sig_conditioner_.size(), false);
         }
 
-    observables_ = block_factory->GetObservables(configuration_.get());
+    observables_ = block_factory::GetObservables(configuration_.get());
 
-    pvt_ = block_factory->GetPVT(configuration_.get());
+    pvt_ = block_factory::GetPVT(configuration_.get());
 
-    auto channels = block_factory->GetChannels(configuration_.get(), queue_.get());
+    auto channels = block_factory::GetChannels(configuration_.get(), queue_.get());
 
     channels_count_ = static_cast<int>(channels.size());
     for (int i = 0; i < channels_count_; i++)
