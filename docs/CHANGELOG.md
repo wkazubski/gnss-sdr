@@ -22,6 +22,13 @@ All notable changes to GNSS-SDR will be documented in this file.
   RTKLIB/PVT.
 - Fixed bugs in the generation of RTCM MSM messages.
 - Fixed identification of GLONASS satellites.
+- Fixed bug in the generation of the spreading code for QZSS L5 PRN 196.
+- Improved validation of GPS/QZSS CNAV Clock, Ephemeris, Integrity (CEI)
+  dataset.
+- Implemented QZSS LNAV almanac/auxiliary pages decoding.
+- Hardened BeiDou DNAV decoding.
+- Improved performance of Galileo's Viterbi decoder.
+- Fixed edge cases in the retrieving of GPS L1 C/A navigation data.
 
 ### Improvements in Maintainability:
 

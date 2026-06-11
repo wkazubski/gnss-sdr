@@ -20,6 +20,7 @@
 
 #include "gnss_ephemeris.h"
 #include <boost/serialization/nvp.hpp>
+#include <boost/serialization/version.hpp>
 #include <cstdint>
 
 /** \addtogroup Core
@@ -52,12 +53,18 @@ public:
     int32_t toe1{};           //!< Ephemeris data reference time of week (Ref. 20.3.3.4.3 IS-GPS-200M) [s]
     int32_t toe2{};           //!< Ephemeris data reference time of week (Ref. 20.3.3.4.3 IS-GPS-200M) [s]
     int32_t signal_health{};  //!< Signal health (L1/L2/L5)
+    int32_t WNop{-1};         //!< CEI data sequence propagation week number from MT30, modulo 256
     int32_t top{};            //!< Data predict time of week
-    int32_t URA{};            //!< ED Accuracy Index
+    int32_t URAED{};          //!< ED Accuracy Index from MT10
 
-    double URA0{};  //!< NED Accuracy Index
-    double URA1{};  //!< NED Accuracy Change Index
-    double URA2{};  //!< NED Accuracy Change Rate Index
+    int32_t URANED0{};  //!< NED Accuracy Index from MT30-37
+    int32_t URANED1{};  //!< NED Accuracy Change Index from MT30-37
+    int32_t URANED2{};  //!< NED Accuracy Change Rate Index from MT30-37
+
+    int32_t URA{};  //!< Legacy alias for URAED
+    double URA0{};  //!< Legacy alias for URANED0
+    double URA1{};  //!< Legacy alias for URANED1
+    double URA2{};  //!< Legacy alias for URANED2
 
     // Group Delay Differential Parameters
     double TGD{};  //!< Estimated Group Delay Differential: L1-L2 correction term only for the benefit of "L1 P(Y)" or "L2 P(Y)" s users [s]
@@ -92,11 +99,6 @@ public:
      */
     inline void serialize(Archive& archive, const uint32_t version)
     {
-        using boost::serialization::make_nvp;
-        if (version)
-            {
-            };
-
         archive& BOOST_SERIALIZATION_NVP(PRN);
         archive& BOOST_SERIALIZATION_NVP(M_0);
         archive& BOOST_SERIALIZATION_NVP(delta_n);
@@ -125,6 +127,19 @@ public:
 
         archive& BOOST_SERIALIZATION_NVP(toe1);
         archive& BOOST_SERIALIZATION_NVP(toe2);
+        if (version > 0)
+            {
+                archive& BOOST_SERIALIZATION_NVP(WNop);
+                archive& BOOST_SERIALIZATION_NVP(top);
+                archive& BOOST_SERIALIZATION_NVP(URAED);
+                archive& BOOST_SERIALIZATION_NVP(URANED0);
+                archive& BOOST_SERIALIZATION_NVP(URANED1);
+                archive& BOOST_SERIALIZATION_NVP(URANED2);
+                archive& BOOST_SERIALIZATION_NVP(URA);
+                archive& BOOST_SERIALIZATION_NVP(URA0);
+                archive& BOOST_SERIALIZATION_NVP(URA1);
+                archive& BOOST_SERIALIZATION_NVP(URA2);
+            }
         archive& BOOST_SERIALIZATION_NVP(TGD);
         archive& BOOST_SERIALIZATION_NVP(ISCL1);
         archive& BOOST_SERIALIZATION_NVP(ISCL2);
@@ -139,6 +154,8 @@ public:
         archive& BOOST_SERIALIZATION_NVP(antispoofing_flag);
     }
 };
+
+BOOST_CLASS_VERSION(Gps_CNAV_Ephemeris, 1)
 
 
 /** \} */
