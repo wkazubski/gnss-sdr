@@ -105,6 +105,14 @@
 #include "pcps_acquisition_adapter_fpga.h"
 #endif
 
+#if OPENCL_BLOCKS
+#include "gps_l1_ca_pcps_opencl_acquisition.h"
+#endif
+
+#if GNMAX_DRIVER
+#include "gnmax_signal_source.h"
+#endif
+
 #if RAW_ARRAY_DRIVER
 #include "raw_array_signal_source.h"
 #endif
@@ -322,6 +330,12 @@ std::unique_ptr<SignalSourceInterface> get_signal_source_block(
     else if (implementation == "ION_GSMS_Signal_Source")
         {
             return std::make_unique<IONGSMSSignalSource>(configuration, role, in_streams, out_streams, queue);
+        }
+#endif
+#if GNMAX_DRIVER
+    else if (implementation == "GNMAX_Signal_Source")
+        {
+            return std::make_unique<GnMaxSignalSource>(configuration, role, in_streams, out_streams, queue);
         }
 #endif
 #if RAW_ARRAY_DRIVER
