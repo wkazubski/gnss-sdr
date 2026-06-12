@@ -28,6 +28,124 @@
 #include "gps_ephemeris.h"           // for Gps_Ephemeris
 #include "rtklib_rtkcmn.h"
 #include <cmath>
+#include <vector>
+
+namespace
+{
+const HAS_obs_corrections* find_has_obs_correction(const std::map<std::string, std::map<int, HAS_obs_corrections>>& has_obs_corr,
+    const std::vector<std::string>& signal_candidates,
+    int prn)
+{
+    for (const auto& signal : signal_candidates)
+        {
+            const auto signal_it = has_obs_corr.find(signal);
+            if (signal_it == has_obs_corr.cend())
+                {
+                    continue;
+                }
+
+            const auto prn_it = signal_it->second.find(prn);
+            if (prn_it != signal_it->second.cend())
+                {
+                    return &prn_it->second;
+                }
+        }
+    return nullptr;
+}
+}  // namespace
+
+
+static double gps_cnav_ura_upper_bound_m(int32_t ura_index)
+{
+    switch (ura_index)
+        {
+        case -15:
+            return 0.01;
+        case -14:
+            return 0.02;
+        case -13:
+            return 0.03;
+        case -12:
+            return 0.04;
+        case -11:
+            return 0.06;
+        case -10:
+            return 0.08;
+        case -9:
+            return 0.11;
+        case -8:
+            return 0.15;
+        case -7:
+            return 0.21;
+        case -6:
+            return 0.30;
+        case -5:
+            return 0.43;
+        case -4:
+            return 0.60;
+        case -3:
+            return 0.85;
+        case -2:
+            return 1.20;
+        case -1:
+            return 1.70;
+        case 0:
+            return 2.40;
+        case 1:
+            return 3.40;
+        case 2:
+            return 4.85;
+        case 3:
+            return 6.85;
+        case 4:
+            return 9.65;
+        case 5:
+            return 13.65;
+        case 6:
+            return 24.0;
+        case 7:
+            return 48.0;
+        case 8:
+            return 96.0;
+        case 9:
+            return 192.0;
+        case 10:
+            return 384.0;
+        case 11:
+            return 768.0;
+        case 12:
+            return 1536.0;
+        case 13:
+            return 3072.0;
+        case 14:
+            return 6144.0;
+        default:
+            return 6144.0;
+        }
+}
+
+
+static int32_t gps_cnav_ura_to_rtklib_sva(int32_t uraed, int32_t uraned0)
+{
+    if (uraed == 15 || uraed == -16 || uraned0 == 15 || uraned0 == -16)
+        {
+            return 15;
+        }
+
+    const double composite_ura_m = std::hypot(gps_cnav_ura_upper_bound_m(uraed), gps_cnav_ura_upper_bound_m(uraned0));
+    const double rtklib_ura_bound_m[] = {
+        2.4, 3.4, 4.85, 6.85, 9.65, 13.65, 24.0, 48.0, 96.0, 192.0, 384.0, 768.0, 1536.0, 3072.0, 6144.0};
+
+    for (int32_t i = 0; i < 15; ++i)
+        {
+            if (composite_ura_m <= rtklib_ura_bound_m[i])
+                {
+                    return i;
+                }
+        }
+
+    return 15;
+}
 
 
 obsd_t insert_obs_to_rtklib(obsd_t& rtklib_obs,
@@ -35,8 +153,14 @@ obsd_t insert_obs_to_rtklib(obsd_t& rtklib_obs,
     const std::map<std::string, std::map<int, HAS_obs_corrections>>& has_obs_corr,
     int week,
     int band,
+    const HAS_obs_corrections** applied_has_correction,
     bool pre_2009_file)
 {
+    if (applied_has_correction != nullptr)
+        {
+            *applied_has_correction = nullptr;
+        }
+
     // Get signal type info to adjust code type based on constellation
     const std::string sig_(gnss_synchro.Signal, 2);
 
@@ -138,77 +262,26 @@ obsd_t insert_obs_to_rtklib(obsd_t& rtklib_obs,
 
     if (!has_obs_corr.empty())
         {
-            float has_pseudorange_correction_m = 0.0;
-            float has_bias_correction_cycle = 0.0;
+            const HAS_obs_corrections* has_correction = nullptr;
+            const int prn = static_cast<int>(gnss_synchro.PRN);
             switch (gnss_synchro.System)
                 {
                 case 'G':
                     {
                         if (sig_ == "1C")
                             {
-                                const auto it = has_obs_corr.find("L1 C/A");
-                                if (it != has_obs_corr.cend())
-                                    {
-                                        const auto it2 = it->second.find(static_cast<int>(gnss_synchro.PRN));
-                                        if (it2 != it->second.cend())
-                                            {
-                                                has_pseudorange_correction_m = it2->second.code_bias_m;
-                                                has_bias_correction_cycle = it2->second.phase_bias_cycle;
-                                            }
-                                    }
+                                const std::vector<std::string> signal_candidates = {"L1 C/A"};
+                                has_correction = find_has_obs_correction(has_obs_corr, signal_candidates, prn);
                             }
                         else if (sig_ == "2S")
                             {
-                                const auto it = has_obs_corr.find("L2 CM");
-                                if (it != has_obs_corr.cend())
-                                    {
-                                        const auto it2 = it->second.find(static_cast<int>(gnss_synchro.PRN));
-                                        if (it2 != it->second.cend())
-                                            {
-                                                has_pseudorange_correction_m = it2->second.code_bias_m;
-                                                has_bias_correction_cycle = it2->second.phase_bias_cycle;
-                                            }
-                                    }
+                                const std::vector<std::string> signal_candidates = {"L2 CM", "L2 CL", "L2 CM+CL", "L2 P"};
+                                has_correction = find_has_obs_correction(has_obs_corr, signal_candidates, prn);
                             }
                         else if (sig_ == "L5")
                             {
-                                //  TODO: determine which one
-                                const auto it = has_obs_corr.find("L5 I");
-                                if (it != has_obs_corr.cend())
-                                    {
-                                        const auto it2 = it->second.find(static_cast<int>(gnss_synchro.PRN));
-                                        if (it2 != it->second.cend())
-                                            {
-                                                has_pseudorange_correction_m = it2->second.code_bias_m;
-                                                has_bias_correction_cycle = it2->second.phase_bias_cycle;
-                                            }
-                                    }
-                                else
-                                    {
-                                        const auto it_2nd_attempt = has_obs_corr.find("L5 Q");
-                                        if (it_2nd_attempt != has_obs_corr.cend())
-                                            {
-                                                const auto it2 = it_2nd_attempt->second.find(static_cast<int>(gnss_synchro.PRN));
-                                                if (it2 != it_2nd_attempt->second.cend())
-                                                    {
-                                                        has_pseudorange_correction_m = it2->second.code_bias_m;
-                                                        has_bias_correction_cycle = it2->second.phase_bias_cycle;
-                                                    }
-                                            }
-                                        else
-                                            {
-                                                const auto it_3rd_attempt = has_obs_corr.find("L5 I + L5 Q");
-                                                if (it_3rd_attempt != has_obs_corr.cend())
-                                                    {
-                                                        const auto it2 = it_3rd_attempt->second.find(static_cast<int>(gnss_synchro.PRN));
-                                                        if (it2 != it_3rd_attempt->second.cend())
-                                                            {
-                                                                has_pseudorange_correction_m = it2->second.code_bias_m;
-                                                                has_bias_correction_cycle = it2->second.phase_bias_cycle;
-                                                            }
-                                                    }
-                                            }
-                                    }
+                                const std::vector<std::string> signal_candidates = {"L5 I", "L5 Q", "L5 I + L5 Q"};
+                                has_correction = find_has_obs_correction(has_obs_corr, signal_candidates, prn);
                             }
                     }
                     break;
@@ -216,164 +289,24 @@ obsd_t insert_obs_to_rtklib(obsd_t& rtklib_obs,
                     {
                         if (sig_ == "1B")
                             {
-                                //  TODO: determine which one
-                                const auto it = has_obs_corr.find("E1-B I/NAV OS");
-                                if (it != has_obs_corr.cend())
-                                    {
-                                        const auto it2 = it->second.find(static_cast<int>(gnss_synchro.PRN));
-                                        if (it2 != it->second.cend())
-                                            {
-                                                has_pseudorange_correction_m = it2->second.code_bias_m;
-                                                has_bias_correction_cycle = it2->second.phase_bias_cycle;
-                                            }
-                                    }
-                                else
-                                    {
-                                        const auto it_2nd_attempt = has_obs_corr.find("E1-C");
-                                        if (it_2nd_attempt != has_obs_corr.cend())
-                                            {
-                                                const auto it2 = it_2nd_attempt->second.find(static_cast<int>(gnss_synchro.PRN));
-                                                if (it2 != it_2nd_attempt->second.cend())
-                                                    {
-                                                        has_pseudorange_correction_m = it2->second.code_bias_m;
-                                                        has_bias_correction_cycle = it2->second.phase_bias_cycle;
-                                                    }
-                                            }
-                                        else
-                                            {
-                                                const auto it_3rd_attempt = has_obs_corr.find("E1-B + E1-C");
-                                                if (it_3rd_attempt != has_obs_corr.cend())
-                                                    {
-                                                        const auto it2 = it_3rd_attempt->second.find(static_cast<int>(gnss_synchro.PRN));
-                                                        if (it2 != it_3rd_attempt->second.cend())
-                                                            {
-                                                                has_pseudorange_correction_m = it2->second.code_bias_m;
-                                                                has_bias_correction_cycle = it2->second.phase_bias_cycle;
-                                                            }
-                                                    }
-                                            }
-                                    }
+                                const std::vector<std::string> signal_candidates = {"E1-B I/NAV OS", "E1-C", "E1-B + E1-C"};
+                                has_correction = find_has_obs_correction(has_obs_corr, signal_candidates, prn);
                             }
                         else if (sig_ == "5X")
                             {
-                                //  TODO: determine which one
-                                const auto it = has_obs_corr.find("E5a-I F/NAV OS");
-                                if (it != has_obs_corr.cend())
-                                    {
-                                        const auto it2 = it->second.find(static_cast<int>(gnss_synchro.PRN));
-                                        if (it2 != it->second.cend())
-                                            {
-                                                has_pseudorange_correction_m = it2->second.code_bias_m;
-                                                has_bias_correction_cycle = it2->second.phase_bias_cycle;
-                                            }
-                                    }
-                                else
-                                    {
-                                        const auto it_2nd_attempt = has_obs_corr.find("E5a-Q");
-                                        if (it_2nd_attempt != has_obs_corr.cend())
-                                            {
-                                                const auto it2 = it_2nd_attempt->second.find(static_cast<int>(gnss_synchro.PRN));
-                                                if (it2 != it_2nd_attempt->second.cend())
-                                                    {
-                                                        has_pseudorange_correction_m = it2->second.code_bias_m;
-                                                        has_bias_correction_cycle = it2->second.phase_bias_cycle;
-                                                    }
-                                            }
-                                        else
-                                            {
-                                                const auto it_3rd_attempt = has_obs_corr.find("E5a-I+E5a-Q");
-                                                if (it_3rd_attempt != has_obs_corr.cend())
-                                                    {
-                                                        const auto it2 = it_3rd_attempt->second.find(static_cast<int>(gnss_synchro.PRN));
-                                                        if (it2 != it_3rd_attempt->second.cend())
-                                                            {
-                                                                has_pseudorange_correction_m = it2->second.code_bias_m;
-                                                                has_bias_correction_cycle = it2->second.phase_bias_cycle;
-                                                            }
-                                                    }
-                                            }
-                                    }
+                                const std::vector<std::string> signal_candidates = {"E5a-I F/NAV OS", "E5a-Q", "E5a-I+E5a-Q"};
+                                has_correction = find_has_obs_correction(has_obs_corr, signal_candidates, prn);
                             }
 
                         else if (sig_ == "7X")
                             {
-                                //  TODO: determine which one
-                                const auto it = has_obs_corr.find("E5bI I/NAV OS");
-                                if (it != has_obs_corr.cend())
-                                    {
-                                        const auto it2 = it->second.find(static_cast<int>(gnss_synchro.PRN));
-                                        if (it2 != it->second.cend())
-                                            {
-                                                has_pseudorange_correction_m = it2->second.code_bias_m;
-                                                has_bias_correction_cycle = it2->second.phase_bias_cycle;
-                                            }
-                                    }
-                                else
-                                    {
-                                        const auto it_2nd_attempt = has_obs_corr.find("E5b-Q");
-                                        if (it_2nd_attempt != has_obs_corr.cend())
-                                            {
-                                                const auto it2 = it_2nd_attempt->second.find(static_cast<int>(gnss_synchro.PRN));
-                                                if (it2 != it_2nd_attempt->second.cend())
-                                                    {
-                                                        has_pseudorange_correction_m = it2->second.code_bias_m;
-                                                        has_bias_correction_cycle = it2->second.phase_bias_cycle;
-                                                    }
-                                            }
-                                        else
-                                            {
-                                                const auto it_3rd_attempt = has_obs_corr.find("E5b-I+E5b-Q");
-                                                if (it_3rd_attempt != has_obs_corr.cend())
-                                                    {
-                                                        const auto it2 = it_3rd_attempt->second.find(static_cast<int>(gnss_synchro.PRN));
-                                                        if (it2 != it_3rd_attempt->second.cend())
-                                                            {
-                                                                has_pseudorange_correction_m = it2->second.code_bias_m;
-                                                                has_bias_correction_cycle = it2->second.phase_bias_cycle;
-                                                            }
-                                                    }
-                                            }
-                                    }
+                                const std::vector<std::string> signal_candidates = {"E5b-I I/NAV OS", "E5b-Q", "E5b-I+E5b-Q"};
+                                has_correction = find_has_obs_correction(has_obs_corr, signal_candidates, prn);
                             }
-                        else if (sig_ == "6B")
+                        else if (sig_ == "E6")
                             {
-                                //  TODO: determine which one
-                                const auto it = has_obs_corr.find("E6-B C/NAV HAS");
-                                if (it != has_obs_corr.cend())
-                                    {
-                                        const auto it2 = it->second.find(static_cast<int>(gnss_synchro.PRN));
-                                        if (it2 != it->second.cend())
-                                            {
-                                                has_pseudorange_correction_m = it2->second.code_bias_m;
-                                                has_bias_correction_cycle = it2->second.phase_bias_cycle;
-                                            }
-                                    }
-                                else
-                                    {
-                                        const auto it_2nd_attempt = has_obs_corr.find("E6-C");
-                                        if (it_2nd_attempt != has_obs_corr.cend())
-                                            {
-                                                const auto it2 = it_2nd_attempt->second.find(static_cast<int>(gnss_synchro.PRN));
-                                                if (it2 != it_2nd_attempt->second.cend())
-                                                    {
-                                                        has_pseudorange_correction_m = it2->second.code_bias_m;
-                                                        has_bias_correction_cycle = it2->second.phase_bias_cycle;
-                                                    }
-                                            }
-                                        else
-                                            {
-                                                const auto it_3rd_attempt = has_obs_corr.find("E6-B + E6-C");
-                                                if (it_3rd_attempt != has_obs_corr.cend())
-                                                    {
-                                                        const auto it2 = it_3rd_attempt->second.find(static_cast<int>(gnss_synchro.PRN));
-                                                        if (it2 != it_3rd_attempt->second.cend())
-                                                            {
-                                                                has_pseudorange_correction_m = it2->second.code_bias_m;
-                                                                has_bias_correction_cycle = it2->second.phase_bias_cycle;
-                                                            }
-                                                    }
-                                            }
-                                    }
+                                const std::vector<std::string> signal_candidates = {"E6-B C/NAV HAS", "E6-C", "E6-B + E6-C"};
+                                has_correction = find_has_obs_correction(has_obs_corr, signal_candidates, prn);
                             }
                     }
                     break;
@@ -381,10 +314,38 @@ obsd_t insert_obs_to_rtklib(obsd_t& rtklib_obs,
                     break;
                 }
 
-            rtklib_obs.P[band] += has_pseudorange_correction_m;
-            rtklib_obs.L[band] += has_bias_correction_cycle;
+            if (has_correction != nullptr)
+                {
+                    rtklib_obs.P[band] += has_correction->code_bias_m;
+                    rtklib_obs.L[band] += has_correction->phase_bias_cycle;
+                    if (has_correction->phase_bias_discontinuity)
+                        {
+                            rtklib_obs.LLI[band] |= 1U;
+                        }
+                    if (applied_has_correction != nullptr)
+                        {
+                            *applied_has_correction = has_correction;
+                        }
+                }
         }
     return rtklib_obs;
+}
+
+
+obsd_t insert_obs_to_rtklib(obsd_t& rtklib_obs,
+    const Gnss_Synchro& gnss_synchro,
+    const std::map<std::string, std::map<int, HAS_obs_corrections>>& has_obs_corr,
+    int week,
+    int band,
+    bool pre_2009_file)
+{
+    return insert_obs_to_rtklib(rtklib_obs,
+        gnss_synchro,
+        has_obs_corr,
+        week,
+        band,
+        static_cast<const HAS_obs_corrections**>(nullptr),
+        pre_2009_file);
 }
 
 
@@ -457,7 +418,7 @@ eph_t eph_to_rtklib(const Galileo_Ephemeris& gal_eph,
     const std::map<int, HAS_clock_corrections>& clock_correction_map)
 {
     eph_t rtklib_sat = {0, 0, 0, 0, 0, 0, 0, 0, {0, 0}, {0, 0}, {0, 0}, 0.0, 0.0, 0.0, 0.0, 0.0,
-        0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, {}, {}, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, false};
+        0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, {}, {}, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, false, 0, 0, 0, 0, 0.0, -1, 0};
     // Galileo is the third satellite system for RTKLIB, so, add the required offset to discriminate Galileo ephemeris
     rtklib_sat.sat = gal_eph.PRN + NSATGPS + NSATGLO;
     rtklib_sat.A = gal_eph.sqrtA * gal_eph.sqrtA;
@@ -513,16 +474,24 @@ eph_t eph_to_rtklib(const Galileo_Ephemeris& gal_eph,
         {
             int count_has_corrections = 0;
             const auto it_orbit = orbit_correction_map.find(static_cast<int>(gal_eph.PRN));
-            if (it_orbit != orbit_correction_map.cend())
+            const auto sis_iod = static_cast<uint16_t>(gal_eph.IOD_ephemeris);
+            bool orbit_correction_applied = false;
+            if (it_orbit != orbit_correction_map.cend() &&
+                it_orbit->second.iod == sis_iod)
                 {
                     rtklib_sat.has_orbit_radial_correction_m = it_orbit->second.radial_m;
                     rtklib_sat.has_orbit_in_track_correction_m = it_orbit->second.in_track_m;
                     rtklib_sat.has_orbit_cross_track_correction_m = it_orbit->second.cross_track_m;
+                    orbit_correction_applied = true;
                     count_has_corrections++;
                 }
 
             const auto it_clock = clock_correction_map.find(static_cast<int>(gal_eph.PRN));
-            if (it_clock != clock_correction_map.cend())
+            if (it_clock != clock_correction_map.cend() &&
+                it_clock->second.iod == sis_iod &&
+                orbit_correction_applied &&
+                it_clock->second.mask_id == it_orbit->second.mask_id &&
+                it_clock->second.iod_set_id == it_orbit->second.iod_set_id)
                 {
                     rtklib_sat.has_clock_correction_m = it_clock->second.clock_correction_m;
                     count_has_corrections++;
@@ -556,7 +525,7 @@ eph_t eph_to_rtklib(const Gps_Ephemeris& gps_eph,
     bool pre_2009_file)
 {
     eph_t rtklib_sat = {0, 0, 0, 0, 0, 0, 0, 0, {0, 0}, {0, 0}, {0, 0}, 0.0, 0.0, 0.0, 0.0, 0.0,
-        0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, {}, {}, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, false};
+        0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, {}, {}, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, false, 0, 0, 0, 0, 0.0, -1, 0};
     const int gps_sys = (MINPRNQZS <= gps_eph.PRN && gps_eph.PRN <= MAXPRNQZS) ? SYS_QZS : SYS_GPS;
     rtklib_sat.sat = satno(gps_sys, gps_eph.PRN);
     rtklib_sat.A = gps_eph.sqrtA * gps_eph.sqrtA;
@@ -612,16 +581,24 @@ eph_t eph_to_rtklib(const Gps_Ephemeris& gps_eph,
         {
             int count_has_corrections = 0;
             const auto it_orbit = orbit_correction_map.find(static_cast<int>(gps_eph.PRN));
-            if (it_orbit != orbit_correction_map.cend())
+            const auto sis_iod = static_cast<uint16_t>(gps_eph.IODE_SF3);
+            bool orbit_correction_applied = false;
+            if (it_orbit != orbit_correction_map.cend() &&
+                it_orbit->second.iod == sis_iod)
                 {
                     rtklib_sat.has_orbit_radial_correction_m = it_orbit->second.radial_m;
                     rtklib_sat.has_orbit_in_track_correction_m = it_orbit->second.in_track_m;
                     rtklib_sat.has_orbit_cross_track_correction_m = it_orbit->second.cross_track_m;
+                    orbit_correction_applied = true;
                     count_has_corrections++;
                 }
 
             const auto it_clock = clock_correction_map.find(static_cast<int>(gps_eph.PRN));
-            if (it_clock != clock_correction_map.cend())
+            if (it_clock != clock_correction_map.cend() &&
+                it_clock->second.iod == sis_iod &&
+                orbit_correction_applied &&
+                it_clock->second.mask_id == it_orbit->second.mask_id &&
+                it_clock->second.iod_set_id == it_orbit->second.iod_set_id)
                 {
                     rtklib_sat.has_clock_correction_m = it_clock->second.clock_correction_m;
                     count_has_corrections++;
@@ -649,7 +626,7 @@ eph_t eph_to_rtklib(const Gps_Ephemeris& gps_eph,
 eph_t eph_to_rtklib(const Beidou_Dnav_Ephemeris& bei_eph)
 {
     eph_t rtklib_sat = {0, 0, 0, 0, 0, 0, 0, 0, {0, 0}, {0, 0}, {0, 0}, 0.0, 0.0, 0.0, 0.0, 0.0,
-        0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, {}, {}, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, false};
+        0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, {}, {}, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, false, 0, 0, 0, 0, 0.0, -1, 0};
     rtklib_sat.sat = bei_eph.PRN + NSATGPS + NSATGLO + NSATGAL + NSATQZS;
     rtklib_sat.A = bei_eph.sqrtA * bei_eph.sqrtA;
     rtklib_sat.M0 = bei_eph.M_0;
@@ -724,7 +701,7 @@ eph_t eph_to_rtklib(const Beidou_Dnav_Ephemeris& bei_eph)
 eph_t eph_to_rtklib(const Gps_CNAV_Ephemeris& gps_cnav_eph)
 {
     eph_t rtklib_sat = {0, 0, 0, 0, 0, 0, 0, 0, {0, 0}, {0, 0}, {0, 0}, 0.0, 0.0, 0.0, 0.0, 0.0,
-        0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, {}, {}, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, false};
+        0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, {}, {}, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, false, 0, 0, 0, 0, 0.0, -1, 0};
     const int gps_sys = (MINPRNQZS <= gps_cnav_eph.PRN && gps_cnav_eph.PRN <= MAXPRNQZS) ? SYS_QZS : SYS_GPS;
     rtklib_sat.sat = satno(gps_sys, gps_cnav_eph.PRN);
     rtklib_sat.A = gps_cnav_eph.sqrtA * gps_cnav_eph.sqrtA;
@@ -738,6 +715,14 @@ eph_t eph_to_rtklib(const Gps_CNAV_Ephemeris& gps_cnav_eph)
     rtklib_sat.e = gps_cnav_eph.ecc;
     rtklib_sat.Adot = gps_cnav_eph.Adot;        // only in CNAV;
     rtklib_sat.ndot = gps_cnav_eph.delta_ndot;  // only in CNAV;
+    rtklib_sat.cnav_uraed = gps_cnav_eph.URAED;
+    rtklib_sat.cnav_uraned0 = gps_cnav_eph.URANED0;
+    rtklib_sat.cnav_uraned1 = gps_cnav_eph.URANED1;
+    rtklib_sat.cnav_uraned2 = gps_cnav_eph.URANED2;
+    rtklib_sat.cnav_top = gps_cnav_eph.top;
+    rtklib_sat.cnav_wnop = gps_cnav_eph.WNop;
+    rtklib_sat.cnav_ura_valid = 1;
+    rtklib_sat.sva = gps_cnav_ura_to_rtklib_sva(gps_cnav_eph.URAED, gps_cnav_eph.URANED0);
 
     rtklib_sat.week = adjgpsweek(gps_cnav_eph.WN); /* week of tow */
     rtklib_sat.cic = gps_cnav_eph.Cic;
@@ -796,7 +781,9 @@ alm_t alm_to_rtklib(const Gps_Almanac& gps_alm)
 
     rtklib_alm = {0, 0, 0, 0, {0, 0}, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0};
 
-    rtklib_alm.sat = gps_alm.PRN;
+    const int gps_sys = (MINPRNQZS <= gps_alm.PRN && gps_alm.PRN <= MAXPRNQZS) ? SYS_QZS : SYS_GPS;
+
+    rtklib_alm.sat = satno(gps_sys, gps_alm.PRN);
     rtklib_alm.svh = gps_alm.SV_health;
     rtklib_alm.svconf = gps_alm.AS_status;
     rtklib_alm.week = gps_alm.WNa;
@@ -806,7 +793,7 @@ alm_t alm_to_rtklib(const Gps_Almanac& gps_alm)
     rtklib_alm.toa = toa;
     rtklib_alm.A = gps_alm.sqrtA * gps_alm.sqrtA;
     rtklib_alm.e = gps_alm.ecc;
-    rtklib_alm.i0 = (gps_alm.delta_i + 0.3) * GNSS_PI;
+    rtklib_alm.i0 = ((gps_alm.get_system() == 'J') ? gps_alm.delta_i : (gps_alm.delta_i + 0.3)) * GNSS_PI;
     rtklib_alm.OMG0 = gps_alm.OMEGA_0 * GNSS_PI;
     rtklib_alm.OMGd = gps_alm.OMEGAdot * GNSS_PI;
     rtklib_alm.omg = gps_alm.omega * GNSS_PI;

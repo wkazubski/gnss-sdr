@@ -1592,7 +1592,17 @@ void rtklib_pvt_gs::msg_handler_has_data(const pmt::pmt_t& msg)
             if (msg_type_hash_code == d_galileo_has_data_sptr_type_hash_code)
                 {
                     const auto has_data = wht::any_cast<std::shared_ptr<Galileo_HAS_data>>(pmt::any_ref(msg));
-                    if (d_use_has_corrections && (has_data->has_status == 1))  // operational mode
+                    constexpr uint32_t galileo_has_seconds_per_week = 604800;
+                    const bool has_valid_tow = has_data->tow < galileo_has_seconds_per_week;
+                    if (d_use_has_corrections && (has_data->has_status == 3))  // do not use HAS
+                        {
+                            d_internal_pvt_solver->clear_has_corrections();
+                            if (d_enable_rx_clock_correction == true)
+                                {
+                                    d_user_pvt_solver->clear_has_corrections();
+                                }
+                        }
+                    else if (d_use_has_corrections && (has_data->has_status == 1) && has_valid_tow)  // operational mode
                         {
                             d_internal_pvt_solver->store_has_data(*has_data);
                             if (d_enable_rx_clock_correction == true)
@@ -1604,7 +1614,7 @@ void rtklib_pvt_gs::msg_handler_has_data(const pmt::pmt_t& msg)
                         {
                             d_has_simple_printer->print_message(has_data.get());
                         }
-                    if (d_rtcm_printer && has_data->tow <= 604800)
+                    if (d_rtcm_printer && has_valid_tow)
                         {
                             d_rtcm_printer->Print_IGM_Messages(*has_data.get());
                         }
@@ -1868,6 +1878,7 @@ std::map<int, Gnss_Synchro> rtklib_pvt_gs::interpolate_observables(const std::ma
 {
     std::map<int, Gnss_Synchro> interp_observables_map;
     // Linear interpolation: y(t) = y(t0) + (y(t1) - y(t0)) * (t - t0) / (t1 - t0)
+    constexpr double GPS_WEEK_SECONDS = 604800.0;
 
     // check TOW rollover
     double time_factor;
@@ -1881,8 +1892,8 @@ std::map<int, Gnss_Synchro> rtklib_pvt_gs::interpolate_observables(const std::ma
     else
         {
             // TOW rollover situation
-            time_factor = (604800000.0 + rx_time_s - observables_map_t0.cbegin()->second.RX_time) /
-                          (604800000.0 + observables_map_t1.cbegin()->second.RX_time -
+            time_factor = (GPS_WEEK_SECONDS + rx_time_s - observables_map_t0.cbegin()->second.RX_time) /
+                          (GPS_WEEK_SECONDS + observables_map_t1.cbegin()->second.RX_time -
                               observables_map_t0.cbegin()->second.RX_time);
         }
 

@@ -141,7 +141,7 @@ endif()
 
 option(ENABLE_GNSSSDR_ADHOC_CODESIGN
     "Ad-hoc sign local Darwin build-tree executables that must run after the build."
-    ON
+    OFF
 )
 
 # Testing
@@ -284,9 +284,13 @@ if(NOT ("${CMAKE_BUILD_TYPE}" STREQUAL "Release"))
 endif()
 if("${CMAKE_SYSTEM_NAME}" MATCHES "Darwin")
     find_program(CODESIGN_EXECUTABLE codesign)
-endif()
-if(NOT CODESIGN_EXECUTABLE)
-    set(ENABLE_GNSSSDR_ADHOC_CODESIGN OFF)
+    if(NOT CODESIGN_EXECUTABLE)
+        set(ENABLE_GNSSSDR_ADHOC_CODESIGN OFF)
+    else()
+        if(CMAKE_GENERATOR STREQUAL Xcode)
+            set(ENABLE_GNSSSDR_ADHOC_CODESIGN ON)
+        endif()
+    endif()
 endif()
 
 # Enable optimization options in GCC for Release and RelWithDebInfo build types
@@ -507,6 +511,9 @@ if(CMAKE_CXX_COMPILER_ID MATCHES "Clang")
         endif()
     else()
         message(WARNING "\nCannot determine the version of the compiler selected to build GNSS-SDR (${APPLE_STR}Clang : ${CMAKE_CXX_COMPILER}). This build may or not work. We highly recommend using Apple Clang version ${GNSSSDR_APPLECLANG_MIN_VERSION} or more recent, or Clang version ${GNSSSDR_CLANG_MIN_VERSION} or more recent.")
+    endif()
+    if(NOT CMAKE_VERSION VERSION_LESS 3.28)
+        set(CMAKE_CXX_SCAN_FOR_MODULES OFF)
     endif()
 endif()
 

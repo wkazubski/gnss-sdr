@@ -28,6 +28,7 @@
 #include "beidou_dnav_iono.h"
 #include "beidou_dnav_utc_model.h"
 #include <bitset>
+#include <cstddef>
 #include <cstdint>
 #include <map>
 #include <string>
@@ -142,6 +143,12 @@ private:
     int64_t read_navigation_signed(const std::bitset<BEIDOU_DNAV_SUBFRAME_DATA_BITS>& bits, const std::vector<std::pair<int32_t, int32_t>>& parameter) const;
     bool read_navigation_bool(const std::bitset<BEIDOU_DNAV_SUBFRAME_DATA_BITS>& bits, const std::vector<std::pair<int32_t, int32_t>>& parameter) const;
     void print_beidou_word_bytes(uint32_t BEIDOU_word) const;
+    double wrap_dnav_sow(double sow) const;
+    bool d1_ephemeris_sow_is_consistent() const;
+    bool format_check(std::string const& subframe) const;
+    void clear_d2_ephemeris_page_flags();
+    bool d2_ephemeris_page_is_expected(int32_t page_ID, double sow);
+    void advance_d2_ephemeris_page(int32_t page_ID, double sow);
 
     // broadcast orbit 1
     double d_SOW{};      // Time of BeiDou Week of the ephemeris set (taken from subframes SOW) [s]
@@ -293,6 +300,9 @@ private:
     bool flag_sf1_p8{};   // D2 NAV Message, Subframe 1, Page 8 decoded indicator
     bool flag_sf1_p9{};   // D2 NAV Message, Subframe 1, Page 9 decoded indicator
     bool flag_sf1_p10{};  // D2 NAV Message, Subframe 1, Page 10 decoded indicator
+    bool flag_d2_ephemeris_collection_started{};
+    int32_t d_d2_expected_page{1};
+    double d_d2_expected_sow{};
 };
 
 

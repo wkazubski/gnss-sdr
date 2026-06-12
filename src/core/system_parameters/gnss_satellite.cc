@@ -15,6 +15,8 @@
  */
 
 #include "gnss_satellite.h"
+#include "GLONASS_L1_L2_CA.h"
+#include <stdexcept>
 #include <utility>
 
 #if USE_GLOG_AND_GFLAGS
@@ -22,6 +24,50 @@
 #else
 #include <absl/log/log.h>
 #endif
+
+
+static bool is_known_system(const std::string& system)
+{
+    static constexpr const char* valid_systems[] = {"GPS", "Glonass", "SBAS", "Galileo", "Beidou", "QZSS"};
+    for (const auto* valid_system : valid_systems)
+        {
+            if (system == valid_system)
+                {
+                    return true;
+                }
+        }
+    return false;
+}
+
+
+static const char* satellite_system_short_name(const std::string& system)
+{
+    if (system == "GPS")
+        {
+            return "G";
+        }
+    if (system == "Glonass")
+        {
+            return "R";
+        }
+    if (system == "SBAS")
+        {
+            return "S";
+        }
+    if (system == "Galileo")
+        {
+            return "E";
+        }
+    if (system == "Beidou")
+        {
+            return "C";
+        }
+    if (system == "QZSS")
+        {
+            return "J";
+        }
+    throw std::out_of_range("Satellite system is not defined");
+}
 
 
 Gnss_Satellite::Gnss_Satellite(const std::string& system_, uint32_t PRN_)
@@ -159,9 +205,7 @@ Gnss_Satellite& Gnss_Satellite::operator=(Gnss_Satellite&& other) noexcept
 void Gnss_Satellite::set_system(const std::string& system_)
 {
     // Set the satellite system {"GPS", "Glonass", "SBAS", "Galileo", "Beidou", "QZSS"}
-    auto it = system_set.find(system_);
-
-    if (it != system_set.cend())
+    if (is_known_system(system_))
         {
             system = system_;
         }
@@ -182,14 +226,17 @@ void Gnss_Satellite::update_PRN(uint32_t PRN_)
         }
     else
         {
-            if (PRN_ < 1 or PRN_ > 24)
+            if (PRN_ < 1 or PRN_ > 31)
                 {
-                    DLOG(INFO) << "This PRN is not defined";
-                    // Adjusting for PRN 26, now used in
-                    PRN = PRN_;
+                    DLOG(INFO) << "This GLONASS slot number is not defined";
+                    PRN = 0;
                 }
             else
                 {
+                    if (GLONASS_PRN.find(PRN_) == GLONASS_PRN.cend())
+                        {
+                            DLOG(INFO) << "GLONASS frequency channel for slot " << PRN_ << " is not configured";
+                        }
                     PRN = PRN_;
                 }
         }
@@ -218,9 +265,9 @@ void Gnss_Satellite::set_PRN(uint32_t PRN_)
         }
     else if (system == "Glonass")
         {
-            if (PRN_ < 1 or PRN_ > 24)
+            if (PRN_ == 0 or GLONASS_PRN.find(PRN_) == GLONASS_PRN.cend())
                 {
-                    DLOG(INFO) << "This PRN is not defined";
+                    DLOG(INFO) << "This GLONASS slot/frequency channel is not configured";
                     PRN = 0;
                 }
             else
@@ -323,7 +370,7 @@ std::string Gnss_Satellite::get_system() const
 std::string Gnss_Satellite::get_system_short() const
 {
     // Get the satellite system {"G", "R", "S", "E", "C", "J"}
-    return satelliteSystem.at(system);
+    return satellite_system_short_name(system);
 }
 
 
@@ -446,108 +493,11 @@ std::string Gnss_Satellite::what_block(const std::string& system_, uint32_t PRN_
 
     if (system_ == "Glonass")
         {
-            // Info from http://www.sdcm.ru/smglo/grupglo?version=eng&site=extern
-            // See also https://www.glonass-iac.ru/en/GLONASS/
-            switch (PRN_)
+            const auto freq_channel = GLONASS_PRN.find(PRN_);
+            if (freq_channel != GLONASS_PRN.cend())
                 {
-                case 1:
-                    block_ = std::string("1");  // Plane 1
-                    rf_link = 1;
-                    break;
-                case 2:
-                    block_ = std::string("-4");  // Plane 1
-                    rf_link = -4;
-                    break;
-                case 3:
-                    block_ = std::string("5");  // Plane 1
-                    rf_link = 5;
-                    break;
-                case 4:
-                    block_ = std::string("6");  // Plane 1
-                    rf_link = 6;
-                    break;
-                case 5:
-                    block_ = std::string("1");  // Plane 1
-                    rf_link = 1;
-                    break;
-                case 6:
-                    block_ = std::string("-4");  // Plane 1
-                    rf_link = -4;
-                    break;
-                case 7:
-                    block_ = std::string("5");  // Plane 1
-                    rf_link = 5;
-                    break;
-                case 8:
-                    block_ = std::string("6");  // Plane 1
-                    rf_link = 6;
-                    break;
-                case 9:
-                    block_ = std::string("-2");  // Plane 2
-                    rf_link = -2;
-                    break;
-                case 10:
-                    block_ = std::string("-7");  // Plane 2
-                    rf_link = -7;
-                    break;
-                case 11:
-                    block_ = std::string("0");  // Plane 2
-                    rf_link = 0;
-                    break;
-                case 12:
-                    block_ = std::string("-1");  // Plane 2
-                    rf_link = -1;
-                    break;
-                case 13:
-                    block_ = std::string("-2");  // Plane 2
-                    rf_link = -2;
-                    break;
-                case 14:
-                    block_ = std::string("-7");  // Plane 2
-                    rf_link = -7;
-                    break;
-                case 15:
-                    block_ = std::string("0");  // Plane 2
-                    rf_link = 0;
-                    break;
-                case 16:
-                    block_ = std::string("-1");  // Plane 2
-                    rf_link = -1;
-                    break;
-                case 17:
-                    block_ = std::string("4");  // Plane 3
-                    rf_link = 4;
-                    break;
-                case 18:
-                    block_ = std::string("-3");  // Plane 3
-                    rf_link = -3;
-                    break;
-                case 19:
-                    block_ = std::string("3");  // Plane 3
-                    rf_link = 3;
-                    break;
-                case 20:
-                    block_ = std::string("2");  // Plane 3
-                    rf_link = 2;
-                    break;
-                case 21:
-                    block_ = std::string("4");  // Plane 3
-                    rf_link = 4;
-                    break;
-                case 22:
-                    block_ = std::string("-3");  // Plane 3
-                    rf_link = -3;
-                    break;
-                case 23:
-                    block_ = std::string("3");  // Plane 3
-                    rf_link = 3;
-                    break;
-                case 24:
-                    block_ = std::string("2");  // Plane 3
-                    rf_link = 2;
-                    break;
-                default:
-                    block_ = std::string("Unknown");
+                    rf_link = freq_channel->second;
+                    block_ = std::to_string(freq_channel->second);
                 }
         }
     if (system_ == "SBAS")

@@ -14,6 +14,22 @@ All notable changes to GNSS-SDR will be documented in this file.
 
 ## [Unreleased](https://github.com/gnss-sdr/gnss-sdr/tree/next)
 
+### Improvements in Interoperability:
+
+- Improved Galileo HAS robustness and ICD compliance, including stricter MT1
+  validation, correct cache/Do-Not-Use handling, TOW fallback for E6 HAS pages,
+  preserved mask/IOD correction context, and corrected HAS application in
+  RTKLIB/PVT.
+- Fixed bugs in the generation of RTCM MSM messages.
+- Fixed identification of GLONASS satellites.
+- Fixed bug in the generation of the spreading code for QZSS L5 PRN 196.
+- Improved validation of GPS/QZSS CNAV Clock, Ephemeris, Integrity (CEI)
+  dataset.
+- Implemented QZSS LNAV almanac/auxiliary pages decoding.
+- Hardened BeiDou DNAV decoding.
+- Improved performance of Galileo's Viterbi decoder.
+- Fixed edge cases in the retrieving of GPS L1 C/A navigation data.
+
 ### Improvements in Maintainability:
 
 - Refactored main Acquisition, Tracking, and Telemetry Decoder adapters,

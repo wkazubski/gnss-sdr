@@ -42,7 +42,7 @@ std::string trim_copy(const std::string& input)
         {
             return {};
         }
-    return std::string(first, last);
+    return {first, last};
 }
 
 
@@ -124,7 +124,7 @@ bool parse_uint4_value(const std::string& value, uint8_t& output)
     try
         {
             size_t processed = 0;
-            const auto parsed = static_cast<unsigned long>(std::stoul(value, &processed, 0));
+            const auto parsed = static_cast<uint64_t>(std::stoul(value, &processed, 0));
             if (processed != value.size())
                 {
                     return false;
