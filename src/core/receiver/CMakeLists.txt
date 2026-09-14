@@ -136,6 +136,8 @@ endif()
 
 if(ENABLE_POCKETSDR)
     target_compile_definitions(core_receiver PRIVATE -DPOCKETSDR_DRIVER=1)
+if(ENABLE_GNMAX)
+    target_compile_definitions(core_receiver PRIVATE -DGNMAX_DRIVER=1)
 endif()
 
 if(ENABLE_ARRAY)
@@ -285,6 +287,13 @@ if(ENABLE_FLEXIBAND AND TELEORBIT_FOUND)
     target_link_libraries(core_receiver
         PRIVATE
             Gnuradio::teleorbit
+    )
+endif()
+
+if(ENABLE_GNMAX AND GRGNMAX_FOUND)
+    target_link_libraries(core_receiver
+        PRIVATE
+            Gnuradio::gnmax
     )
 endif()
 
