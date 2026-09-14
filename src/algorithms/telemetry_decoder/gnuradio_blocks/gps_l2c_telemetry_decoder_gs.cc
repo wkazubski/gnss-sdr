@@ -21,6 +21,7 @@
 #include "dump_logger_helper.h"
 #include "gnss_sdr_make_unique.h"  // for std::make_unique in C++11
 #include "gnss_synchro.h"
+#include "gps_cnav_eop.h"        // for Gps_CNAV_Eop
 #include "gps_cnav_ephemeris.h"  // for Gps_CNAV_Ephemeris
 #include "gps_cnav_iono.h"       // for Gps_CNAV_Iono
 #include "gps_cnav_utc_model.h"  // for Gps_CNAV_Utc_Model
@@ -28,11 +29,12 @@
 #include "tlm_crc_stats.h"
 #include "tlm_utils.h"
 #include "tow_to_trk.h"
+#include "tow_utils.h"  // for gnss_tow helpers
 #include <gnuradio/io_signature.h>
 #include <pmt/pmt.h>        // for make_any
 #include <pmt/pmt_sugar.h>  // for mp
 #include <bitset>           // for bitset
-#include <cmath>            // for round
+#include <cmath>            // for lround
 #include <iomanip>          // for setprecision
 #include <iostream>         // for cout
 
@@ -124,8 +126,11 @@ void gps_l2c_telemetry_decoder_gs::set_channel(int channel)
 
 void gps_l2c_telemetry_decoder_gs::reset()
 {
+    cnav_msg_decoder_init(&d_cnav_decoder);
     d_last_valid_preamble = d_sample_counter;
+    d_TOW_at_current_symbol = 0;
     d_sent_tlm_failed_msg = false;
+    d_flag_valid_word = false;
     DLOG(INFO) << "Telemetry decoder reset for satellite " << d_satellite;
 }
 
@@ -210,6 +215,16 @@ int gps_l2c_telemetry_decoder_gs::general_work(int noutput_items __attribute__((
                               << " with CN0=" << std::setprecision(2) << current_synchro_data.CN0_dB_hz << std::setprecision(default_precision)
                               << " dB-Hz" << TEXT_RESET << std::endl;
                 }
+            if (d_CNAV_Message.have_new_eop() == true)
+                {
+                    const std::shared_ptr<Gps_CNAV_Eop> tmp_obj = std::make_shared<Gps_CNAV_Eop>(d_CNAV_Message.get_eop());
+                    this->message_port_pub(pmt::mp("telemetry"), pmt::make_any(tmp_obj));
+                    const auto default_precision = std::cout.precision();
+                    std::cout << TEXT_BLUE << "New GPS CNAV message received in channel " << d_channel
+                              << ": Earth orientation parameters from satellite " << d_satellite
+                              << " with CN0=" << std::setprecision(2) << current_synchro_data.CN0_dB_hz << std::setprecision(default_precision)
+                              << " dB-Hz" << TEXT_RESET << std::endl;
+                }
             if (d_CNAV_Message.have_new_iono() == true)
                 {
                     const std::shared_ptr<Gps_CNAV_Iono> tmp_obj = std::make_shared<Gps_CNAV_Iono>(d_CNAV_Message.get_iono());
@@ -234,21 +249,37 @@ int gps_l2c_telemetry_decoder_gs::general_work(int noutput_items __attribute__((
 
             // update TOW at the preamble instant
             d_TOW_at_Preamble = static_cast<double>(msg.tow);
-            d_last_valid_preamble = d_sample_counter;
+            // check TOW update consistency
+            const uint32_t last_TOW_at_current_symbol_ms = gnss_tow::wrap_s_to_ms(d_TOW_at_current_symbol);
             // The time of the last input symbol can be computed from the message ToW and
             // delay by the formulae:
             // \code
             // symbolTime_ms = msg->tow * 6000 + *pdelay * 20 + (12 * 20); 12 symbols of the encoder's transitory
-            d_TOW_at_current_symbol = static_cast<double>(msg.tow) * 6.0 + static_cast<double>(delay) * GPS_L2_M_PERIOD_S + 12 * GPS_L2_M_PERIOD_S;
+            d_TOW_at_current_symbol = gnss_tow::wrap_s(static_cast<double>(msg.tow) * 6.0 + static_cast<double>(delay) * GPS_L2_M_PERIOD_S + 12 * GPS_L2_M_PERIOD_S);
             // d_TOW_at_current_symbol = floor(d_TOW_at_current_symbol * 1000.0) / 1000.0;
-            d_flag_valid_word = true;
-            LOG(INFO) << "Successful frame synchronization in channel " << d_channel << " for satellite " << this->d_satellite
-                      << " at sample_counter=" << d_sample_counter;
+            const auto symbol_period_ms = static_cast<uint32_t>(std::lround(GPS_L2_M_PERIOD_S * 1000.0));
+            const uint32_t tow_update_error_ms = gnss_tow::circular_error_ms(gnss_tow::wrap_s_to_ms(d_TOW_at_current_symbol), last_TOW_at_current_symbol_ms);
+            if (last_TOW_at_current_symbol_ms != 0 && tow_update_error_ms > symbol_period_ms)
+                {
+                    LOG(INFO) << "Warning: GPS L2C TOW update in ch " << d_channel
+                              << " does not match the TLM TOW counter " << tow_update_error_ms << " ms";
+                    // Distrust both the decoded and the propagated TOW until the
+                    // next CNAV message provides a fresh value
+                    d_TOW_at_current_symbol = 0;
+                    d_flag_valid_word = false;
+                }
+            else
+                {
+                    d_last_valid_preamble = d_sample_counter;
+                    d_flag_valid_word = true;
+                    LOG(INFO) << "Successful frame synchronization in channel " << d_channel << " for satellite " << this->d_satellite
+                              << " at sample_counter=" << d_sample_counter;
+                }
 
             if (d_enable_navdata_monitor && !d_nav_msg_packet.nav_message.empty())
                 {
                     d_nav_msg_packet.prn = static_cast<int32_t>(current_synchro_data.PRN);
-                    d_nav_msg_packet.tow_at_current_symbol_ms = static_cast<int32_t>(d_TOW_at_current_symbol * 1000.0);
+                    d_nav_msg_packet.tow_at_current_symbol_ms = static_cast<int32_t>(gnss_tow::wrap_s_to_ms(d_TOW_at_current_symbol));
                     const std::shared_ptr<Nav_Message_Packet> tmp_obj = std::make_shared<Nav_Message_Packet>(d_nav_msg_packet);
                     this->message_port_pub(pmt::mp("Nav_msg_from_TLM"), pmt::make_any(tmp_obj));
                     d_nav_msg_packet.nav_message = "";
@@ -256,10 +287,13 @@ int gps_l2c_telemetry_decoder_gs::general_work(int noutput_items __attribute__((
         }
     else
         {
-            d_TOW_at_current_symbol += GPS_L2_M_PERIOD_S;
-            if (current_synchro_data.Flag_valid_symbol_output == false)
+            if (d_flag_valid_word)
                 {
-                    d_flag_valid_word = false;
+                    d_TOW_at_current_symbol = gnss_tow::wrap_s(d_TOW_at_current_symbol + GPS_L2_M_PERIOD_S);
+                    if (current_synchro_data.Flag_valid_symbol_output == false)
+                        {
+                            d_flag_valid_word = false;
+                        }
                 }
         }
 
@@ -274,7 +308,7 @@ int gps_l2c_telemetry_decoder_gs::general_work(int noutput_items __attribute__((
             current_synchro_data.Flag_PLL_180_deg_phase_locked = false;
         }
 
-    current_synchro_data.TOW_at_current_symbol_ms = round(d_TOW_at_current_symbol * 1000.0);
+    current_synchro_data.TOW_at_current_symbol_ms = gnss_tow::wrap_s_to_ms(d_TOW_at_current_symbol);
     current_synchro_data.Flag_valid_word = d_flag_valid_word;
 
     if (d_dump == true)

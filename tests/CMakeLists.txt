@@ -414,6 +414,22 @@ if(ENABLE_UNIT_TESTING_EXTRA OR ENABLE_SYSTEM_TESTING_EXTRA OR ENABLE_FPGA)
         else()
             set(TOOLCHAIN_ARG_GNSS_SIM "")
         endif()
+        # Fix for Boost >= 1.92, which provides again a Boost::system target and
+        # thus clashes with the alias unconditionally defined by gnss-sim.
+        set(GNSS_SIM_PATCH_COMMAND "")
+        if(Boost_VERSION_STRING VERSION_GREATER 1.91.99)
+            find_program(Patch_EXECUTABLE NAME patch PATHS ENV PATH)
+            if(NOT Patch_EXECUTABLE)
+                message(FATAL_ERROR "The patch command is not found. It is required to build gnss-sim. Please check your OS documentation and install the patch command.")
+            endif()
+            set(GNSS_SIM_PATCH_COMMAND
+                ${Patch_EXECUTABLE} -p0 -i ${GNSSSDR_SOURCE_DIR}/utils/patches/gnss_sim_boost_system.patch
+            )
+        endif()
+        # Patch only once
+        if(EXISTS ${GNSSSDR_BINARY_DIR}/thirdparty/gnss-sim/CMakeLists.txt)
+            set(GNSS_SIM_PATCH_COMMAND "")
+        endif()
         ExternalProject_Add(gnss-sim
             GIT_REPOSITORY https://bitbucket.org/jarribas/gnss-simulator
             GIT_TAG ${GNSSSDR_GNSS_SIM_LOCAL_VERSION}
@@ -422,17 +438,17 @@ if(ENABLE_UNIT_TESTING_EXTRA OR ENABLE_SYSTEM_TESTING_EXTRA OR ENABLE_FPGA)
             CMAKE_ARGS ${GTEST_COMPILER} ${TOOLCHAIN_ARG} ${CROSS_INSTALL_DIR} ${TOOLCHAIN_ARG_GNSS_SIM} -DBoost_DIR=${Boost_DIR}
             BUILD_COMMAND ${GNSS_SIM_BUILD_COMMAND}
             UPDATE_COMMAND ""
-            PATCH_COMMAND ""
+            PATCH_COMMAND ${GNSS_SIM_PATCH_COMMAND}
             INSTALL_COMMAND ""
         )
         if(ENABLE_INSTALL_TESTS)
-            install(PROGRAMS ${GNSSSDR_BINARY_DIR}/gnss-sim/gnss_sim DESTINATION bin)
-            install(FILES ${GNSSSDR_BINARY_DIR}/thirdparty/gnss-sim/brdc3540.14n DESTINATION share/gnss-sim)
-            install(FILES ${GNSSSDR_BINARY_DIR}/thirdparty/gnss-sim/circle.csv DESTINATION share/gnss-sim)
-            set(SW_GENERATOR_BIN ${CMAKE_INSTALL_PREFIX}/bin/gnss_sim)
+            install(PROGRAMS ${GNSSSDR_BINARY_DIR}/gnss-sim/gnss_sim DESTINATION ${CMAKE_INSTALL_BINDIR})
+            install(FILES ${GNSSSDR_BINARY_DIR}/thirdparty/gnss-sim/brdc3540.14n DESTINATION ${CMAKE_INSTALL_DATADIR}/gnss-sim)
+            install(FILES ${GNSSSDR_BINARY_DIR}/thirdparty/gnss-sim/circle.csv DESTINATION ${CMAKE_INSTALL_DATADIR}/gnss-sim)
+            set(SW_GENERATOR_BIN ${CMAKE_INSTALL_FULL_BINDIR}/gnss_sim)
             add_definitions(-DSW_GENERATOR_BIN="${SW_GENERATOR_BIN}")
-            add_definitions(-DDEFAULT_RINEX_NAV="${CMAKE_INSTALL_PREFIX}/share/gnss-sim/brdc3540.14n")
-            add_definitions(-DDEFAULT_POSITION_FILE="${CMAKE_INSTALL_PREFIX}/share/gnss-sim/circle.csv")
+            add_definitions(-DDEFAULT_RINEX_NAV="${CMAKE_INSTALL_FULL_DATADIR}/gnss-sim/brdc3540.14n")
+            add_definitions(-DDEFAULT_POSITION_FILE="${CMAKE_INSTALL_FULL_DATADIR}/gnss-sim/circle.csv")
         else()
             set(SW_GENERATOR_BIN ${GNSSSDR_BINARY_DIR}/gnss-sim/gnss_sim)
             if(CMAKE_GENERATOR STREQUAL Xcode)
@@ -635,22 +651,22 @@ if(ENABLE_UNIT_TESTING_EXTRA)
     )
     message(STATUS "Done.")
     if(ENABLE_INSTALL_TESTS)
-        install(FILES ${GNSSSDR_BINARY_DIR}/thirdparty/signal_samples/gps_l2c_m_prn7_5msps.dat DESTINATION share/gnss-sdr/signal_samples)
-        install(FILES ${GNSSSDR_BINARY_DIR}/thirdparty/signal_samples/Glonass_L1_CA_SIM_Fs_62Msps_4ms.dat DESTINATION share/gnss-sdr/signal_samples)
-        install(FILES ${GNSSSDR_BINARY_DIR}/thirdparty/signal_samples/BdsB1IStr01_fs25e6_if0_4ms.dat DESTINATION share/gnss-sdr/signal_samples)
-        install(FILES ${GNSSSDR_BINARY_DIR}/thirdparty/signal_samples/BdsB1IStr01_fs25e6_if0_4ms.dat DESTINATION share/gnss-sdr/signal_samples)
+        install(FILES ${GNSSSDR_BINARY_DIR}/thirdparty/signal_samples/gps_l2c_m_prn7_5msps.dat DESTINATION ${CMAKE_INSTALL_DATADIR}/gnss-sdr/signal_samples)
+        install(FILES ${GNSSSDR_BINARY_DIR}/thirdparty/signal_samples/Glonass_L1_CA_SIM_Fs_62Msps_4ms.dat DESTINATION ${CMAKE_INSTALL_DATADIR}/gnss-sdr/signal_samples)
+        install(FILES ${GNSSSDR_BINARY_DIR}/thirdparty/signal_samples/BdsB1IStr01_fs25e6_if0_4ms.dat DESTINATION ${CMAKE_INSTALL_DATADIR}/gnss-sdr/signal_samples)
+        install(FILES ${GNSSSDR_BINARY_DIR}/thirdparty/signal_samples/BdsB3IStr01_fs50e6_if0_4ms.dat DESTINATION ${CMAKE_INSTALL_DATADIR}/gnss-sdr/signal_samples)
     endif()
 endif()
 
 if(NOT ENABLE_PACKAGING)
     if(ENABLE_INSTALL_TESTS)
-        install(FILES ${GNSSSDR_BINARY_DIR}/thirdparty/signal_samples/GSoC_CTTC_capture_2012_07_26_4Msps_4ms.dat DESTINATION share/gnss-sdr/signal_samples)
-        install(FILES ${GNSSSDR_BINARY_DIR}/thirdparty/signal_samples/Galileo_E1_ID_1_Fs_4Msps_8ms.dat DESTINATION share/gnss-sdr/signal_samples)
-        install(FILES ${GNSSSDR_BINARY_DIR}/thirdparty/signal_samples/GPS_L1_CA_ID_1_Fs_4Msps_2ms.dat DESTINATION share/gnss-sdr/signal_samples)
-        install(FILES ${GNSSSDR_BINARY_DIR}/thirdparty/signal_samples/NT1065_GLONASS_L1_20160831_fs6625e6_if0e3_4ms.bin DESTINATION share/gnss-sdr/signal_samples)
-        install(FILES ${GNSSSDR_SOURCE_DIR}/tests/data/rtklib_test/obs_test1.xml DESTINATION share/gnss-sdr/data/rtklib_test)
-        install(FILES ${GNSSSDR_SOURCE_DIR}/tests/data/rtklib_test/eph_GPS_L1CA_test1.xml DESTINATION share/gnss-sdr/data/rtklib_test)
-        add_definitions(-DTEST_PATH="${CMAKE_INSTALL_PREFIX}/share/gnss-sdr/")
+        install(FILES ${GNSSSDR_BINARY_DIR}/thirdparty/signal_samples/GSoC_CTTC_capture_2012_07_26_4Msps_4ms.dat DESTINATION ${CMAKE_INSTALL_DATADIR}/gnss-sdr/signal_samples)
+        install(FILES ${GNSSSDR_BINARY_DIR}/thirdparty/signal_samples/Galileo_E1_ID_1_Fs_4Msps_8ms.dat DESTINATION ${CMAKE_INSTALL_DATADIR}/gnss-sdr/signal_samples)
+        install(FILES ${GNSSSDR_BINARY_DIR}/thirdparty/signal_samples/GPS_L1_CA_ID_1_Fs_4Msps_2ms.dat DESTINATION ${CMAKE_INSTALL_DATADIR}/gnss-sdr/signal_samples)
+        install(FILES ${GNSSSDR_BINARY_DIR}/thirdparty/signal_samples/NT1065_GLONASS_L1_20160831_fs6625e6_if0e3_4ms.bin DESTINATION ${CMAKE_INSTALL_DATADIR}/gnss-sdr/signal_samples)
+        install(FILES ${GNSSSDR_SOURCE_DIR}/tests/data/rtklib_test/obs_test1.xml DESTINATION ${CMAKE_INSTALL_DATADIR}/gnss-sdr/data/rtklib_test)
+        install(FILES ${GNSSSDR_SOURCE_DIR}/tests/data/rtklib_test/eph_GPS_L1CA_test1.xml DESTINATION ${CMAKE_INSTALL_DATADIR}/gnss-sdr/data/rtklib_test)
+        add_definitions(-DTEST_PATH="${CMAKE_INSTALL_FULL_DATADIR}/gnss-sdr/")
     else()
         file(COPY ${GNSSSDR_SOURCE_DIR}/tests/data/rtklib_test/obs_test1.xml DESTINATION ${GNSSSDR_BINARY_DIR}/thirdparty/data/rtklib_test)
         file(COPY ${GNSSSDR_SOURCE_DIR}/tests/data/rtklib_test/eph_GPS_L1CA_test1.xml DESTINATION ${GNSSSDR_BINARY_DIR}/thirdparty/data/rtklib_test)
@@ -704,6 +720,9 @@ if(ENABLE_UNIT_TESTING)
             system_testing_lib
             core_receiver
     )
+    # rtklib_tls_test.cc drives the crypto backend directly (test TLS server),
+    # so link it explicitly instead of relying on transitive propagation
+    link_to_crypto_dependencies(run_tests PRIVATE)
     if(ENABLE_GLOG_AND_GFLAGS)
         target_link_libraries(run_tests PRIVATE Gflags::gflags Glog::glog)
         target_compile_definitions(run_tests PRIVATE -DUSE_GLOG_AND_GFLAGS=1)
@@ -746,7 +765,7 @@ if(ENABLE_UNIT_TESTING)
         if(EXISTS ${LOCAL_INSTALL_BASE_DIR}/install/run_tests)
             file(REMOVE ${LOCAL_INSTALL_BASE_DIR}/install/run_tests)
         endif()
-        install(TARGETS run_tests RUNTIME DESTINATION bin COMPONENT "run_tests")
+        install(TARGETS run_tests RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR} COMPONENT "run_tests")
     else()
         gnsssdr_copy_target_to_local_install(run_tests)
     endif()
@@ -865,7 +884,7 @@ if(ENABLE_FPGA)
     )
     xcode_remove_warning_duplicates(gps_l1_ca_dll_pll_tracking_test_fpga)
     install(TARGETS gps_l1_ca_dll_pll_tracking_test_fpga
-        RUNTIME DESTINATION bin
+        RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR}
         COMPONENT "fpga-test"
     )
 endif()
@@ -917,7 +936,7 @@ function(add_system_test executable)
             file(REMOVE ${LOCAL_INSTALL_BASE_DIR}/install/${executable})
         endif()
         install(TARGETS ${executable}
-            RUNTIME DESTINATION bin
+            RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR}
             COMPONENT "${executable}_test"
         )
     else()
@@ -1032,6 +1051,7 @@ if(NOT ENABLE_PACKAGING AND NOT ENABLE_FPGA)
     set(FLOWGRAPH_TEST_SOURCES
         ${CMAKE_CURRENT_SOURCE_DIR}/single_test_main.cc
         ${CMAKE_CURRENT_SOURCE_DIR}/unit-tests/control-plane/gnss_flowgraph_test.cc
+        ${CMAKE_CURRENT_SOURCE_DIR}/unit-tests/control-plane/satellite_visibility_test.cc
     )
     if(USE_CMAKE_TARGET_SOURCES)
         add_executable(flowgraph_test)
@@ -1051,6 +1071,8 @@ if(NOT ENABLE_PACKAGING AND NOT ENABLE_FPGA)
             input_filter_adapters
             channel_adapters
             core_receiver
+            pvt_gr_blocks
+            obs_gr_blocks
             algorithms_libs
     )
     if(ENABLE_GLOG_AND_GFLAGS)
@@ -1142,8 +1164,14 @@ endif()
 if(NOT ENABLE_PACKAGING AND NOT ENABLE_FPGA)
     set(GNURADIO_BLOCK_TEST_SOURCES
         ${CMAKE_CURRENT_SOURCE_DIR}/single_test_main.cc
+        ${CMAKE_CURRENT_SOURCE_DIR}/unit-tests/signal-processing-blocks/sources/labsat23_source_test.cc
         ${CMAKE_CURRENT_SOURCE_DIR}/unit-tests/signal-processing-blocks/sources/unpack_2bit_samples_test.cc
     )
+    if(ENABLE_ION)
+        list(APPEND GNURADIO_BLOCK_TEST_SOURCES
+            ${CMAKE_CURRENT_SOURCE_DIR}/unit-tests/signal-processing-blocks/sources/ion_gsms_chunk_data_test.cc
+        )
+    endif()
     if(USE_CMAKE_TARGET_SOURCES)
         add_executable(gnuradio_block_test)
         target_sources(gnuradio_block_test PRIVATE ${GNURADIO_BLOCK_TEST_SOURCES})
@@ -1161,6 +1189,7 @@ if(NOT ENABLE_PACKAGING AND NOT ENABLE_FPGA)
             GTest::GTest
             GTest::Main
             Volkgnsssdr::volkgnsssdr
+            signal_source_adapters
             signal_source_gr_blocks
             signal_source_libs
             core_receiver
@@ -1228,6 +1257,7 @@ if(NOT ENABLE_PACKAGING AND NOT ENABLE_FPGA)
     set(ACQ_TEST_SOURCES
         ${CMAKE_CURRENT_SOURCE_DIR}/single_test_main.cc
         ${CMAKE_CURRENT_SOURCE_DIR}/unit-tests/signal-processing-blocks/acquisition/gps_l1_ca_pcps_acquisition_test.cc
+        ${CMAKE_CURRENT_SOURCE_DIR}/unit-tests/signal-processing-blocks/acquisition/pcps_acquisition_doppler_narrowing_test.cc
     )
     if(USE_CMAKE_TARGET_SOURCES)
         add_executable(acq_test)
@@ -1245,6 +1275,7 @@ if(NOT ENABLE_PACKAGING AND NOT ENABLE_FPGA)
             Gnuradio::analog
             GTest::GTest
             GTest::Main
+            Matio::matio
             Volkgnsssdr::volkgnsssdr
             signal_generator_gr_blocks
             signal_source_gr_blocks
@@ -1313,6 +1344,7 @@ if(NOT ENABLE_PACKAGING AND NOT ENABLE_FPGA)
     endif()
     set(TRKTEST_SOURCES
         ${CMAKE_CURRENT_SOURCE_DIR}/single_test_main.cc
+        ${CMAKE_CURRENT_SOURCE_DIR}/unit-tests/signal-processing-blocks/tracking/bit_synchronizer_test.cc
         ${CMAKE_CURRENT_SOURCE_DIR}/unit-tests/signal-processing-blocks/tracking/galileo_e1_dll_pll_veml_tracking_test.cc
         ${CMAKE_CURRENT_SOURCE_DIR}/unit-tests/signal-processing-blocks/tracking/tracking_loop_filter_test.cc
         ${CMAKE_CURRENT_SOURCE_DIR}/unit-tests/signal-processing-blocks/tracking/cpu_multicorrelator_real_codes_test.cc
@@ -1339,6 +1371,7 @@ if(NOT ENABLE_PACKAGING AND NOT ENABLE_FPGA)
             signal_source_gr_blocks
             signal_source_libs
             algorithms_libs
+            tracking_libs
             tracking_adapters
             signal_generator_gr_blocks
             core_receiver

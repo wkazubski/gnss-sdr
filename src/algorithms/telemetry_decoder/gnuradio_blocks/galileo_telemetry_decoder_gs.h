@@ -36,6 +36,7 @@
  * \{ */
 
 class Viterbi_Decoder;               // forward declaration
+class Gnss_Synchro;                  // forward declaration
 class galileo_telemetry_decoder_gs;  // forward declaration
 
 using galileo_telemetry_decoder_gs_sptr = gnss_shared_ptr<galileo_telemetry_decoder_gs>;
@@ -64,12 +65,27 @@ private:
 
     galileo_telemetry_decoder_gs(const Tlm_Conf &conf, int frame_type);
 
+    struct CnavPageReceptionTime
+    {
+        uint32_t week;
+        uint32_t tow_ms;
+    };
+
     void check_tlm_separation();
     void msg_handler_read_galileo_tow_map(const pmt::pmt_t &msg);
+    void clear_galileo_tow_map_entry();
+    void publish_galileo_tow_map_entry(uint32_t week, uint32_t tow_ms, uint64_t sample_counter);
+    void publish_current_galileo_tow_map_entry(uint64_t sample_counter);
+    bool update_known_galileo_week(int32_t week);
+    bool set_current_tow_from_preamble(uint32_t preamble_week, uint32_t preamble_tow_ms, int64_t delay_ms);
+    void advance_current_tow(int64_t delta_ms);
+    void capture_pending_reduced_ced(double cn0);
+    void publish_pending_reduced_ced();
+    CnavPageReceptionTime get_cnav_page_reception_time(const Gnss_Synchro &current_symbol) const;
     void deinterleaver(int32_t rows, int32_t cols, const float *in, float *out);
     void decode_INAV_word(float *page_part_symbols, int32_t frame_length, double cn0);
     void decode_FNAV_word(float *page_symbols, int32_t frame_length, double cn0);
-    void decode_CNAV_word(uint64_t time_stamp, float *page_symbols, int32_t page_length, double cn0);
+    void decode_CNAV_word(uint64_t time_stamp, CnavPageReceptionTime page_reception_time, float *page_symbols, int32_t page_length, double cn0);
 
     std::unique_ptr<Viterbi_Decoder> d_viterbi;
     std::vector<int32_t> d_preamble_samples;
@@ -86,6 +102,7 @@ private:
     Galileo_Cnav_Message d_cnav_nav;
     Galileo_Inav_Message d_inav_nav;
     Galileo_Fnav_Message d_fnav_nav;
+    Galileo_Reduced_CED d_pending_reduced_ced_data;
 
     Nav_Message_Packet d_nav_msg_packet;
     GnssTime d_current_timetag{};
@@ -98,6 +115,9 @@ private:
     uint64_t d_preamble_index;
     uint64_t d_last_valid_preamble;
     uint64_t d_received_sample_counter;
+    uint64_t d_pending_reduced_ced_start_symbol;
+
+    double d_pending_reduced_ced_cn0;
 
     int32_t d_mm;
     int32_t d_codelength;
@@ -117,7 +137,10 @@ private:
     uint32_t d_TOW_at_Preamble_ms;
     uint32_t d_TOW_at_current_symbol_ms;
     uint32_t d_max_symbols_without_valid_frame;
+    uint32_t d_received_week;
     uint32_t d_received_tow_ms;
+    uint32_t d_TOW_week;
+    uint32_t d_galileo_week;
 
     char d_band;  // This variable will store which band we are dealing with (Galileo E1 or E5b)
 
@@ -129,6 +152,7 @@ private:
     const bool d_dump_mat;
     const bool d_remove_dat;
     bool d_first_eph_sent;
+    bool d_pending_reduced_ced;
     bool d_cnav_dummy_page;
     bool d_print_cnav_page;
     const bool d_enable_navdata_monitor;
@@ -136,6 +160,7 @@ private:
     bool d_enable_reed_solomon_inav;
     bool d_valid_timetag;
     bool d_E6_TOW_set;
+    bool d_galileo_week_valid;
     const bool d_there_are_e1_channels;
     const bool d_there_are_e6_channels;
     const bool d_use_ced;

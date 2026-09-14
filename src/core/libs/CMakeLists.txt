@@ -45,6 +45,7 @@ set(CORE_LIBS_HEADERS
     osnma_helper.h
     osnma_msg_receiver.h
     osnma_nav_data_manager.h
+    protobuf_cleanup_manager.h
     serdes_nav_message.h
     string_converter.h
 )
@@ -134,7 +135,11 @@ target_include_directories(core_libs
 
 # links to the appropriate library and defines
 # USE_GNUTLS_FALLBACK, USE_OPENSSL_3, or USE_OPENSSL_111 accordingly.
-link_to_crypto_dependencies(core_libs)
+# PUBLIC scope (the default) is required here: the public header
+# gnss_crypto.h includes the backend headers and switches the class
+# definition on those macros, so every consumer must see the same
+# defines and include directories.
+link_to_crypto_dependencies(core_libs PUBLIC)
 
 if(USE_GENERIC_LAMBDAS)
     set(has_generic_lambdas HAS_GENERIC_LAMBDA=1)

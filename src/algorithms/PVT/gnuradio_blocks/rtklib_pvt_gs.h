@@ -31,6 +31,7 @@
 #include <gnuradio/sync_block.h>  // for sync_block
 #include <gnuradio/types.h>       // for gr_vector_const_void_star
 #include <pmt/pmt.h>              // for pmt_t
+#include <atomic>                 // for atomic
 #include <chrono>                 // for system_clock
 #include <cstddef>                // for size_t
 #include <cstdint>                // for int32_t
@@ -38,6 +39,7 @@
 #include <fstream>                // for std::fstream
 #include <map>                    // for map
 #include <memory>                 // for shared_ptr, unique_ptr
+#include <mutex>                  // for mutex
 #include <queue>                  // for std::queue
 #include <string>                 // for string
 #include <vector>                 // for vector
@@ -49,11 +51,16 @@
  * \{ */
 
 
+class Gps_CNAV_Ephemeris;
+class Glonass_Gnav_Ephemeris;
+class Glonass_Gnav_Almanac;
+class Glonass_Gnav_Utc_Model;
 class Beidou_Dnav_Almanac;
 class Beidou_Dnav_Ephemeris;
 class Galileo_Almanac;
 class Galileo_Ephemeris;
 class Galileo_HAS_data;
+class Galileo_Reduced_CED;
 class Geohash;
 class GeoJSON_Printer;
 class Gps_Almanac;
@@ -63,6 +70,8 @@ class Kml_Printer;
 class Monitor_Pvt_Udp_Sink;
 class Monitor_Ephemeris_Udp_Sink;
 class Nmea_Printer;
+class Ntrip_Rtcm_Client;
+struct Ntrip_Rtcm_Snapshot;
 class Pvt_Conf;
 class Rinex_Printer;
 class Rtcm_Printer;
@@ -84,11 +93,15 @@ rtklib_pvt_gs_sptr rtklib_make_pvt_gs(uint32_t nchannels,
 class rtklib_pvt_gs : public gr::sync_block
 {
 public:
-    ~rtklib_pvt_gs();  //!< Default destructor
+    ~rtklib_pvt_gs() override;  //!< Default destructor
 
     /*!
      * \brief Get latest set of GPS ephemeris from PVT block
      */
+    std::map<int, Gps_CNAV_Ephemeris> get_gps_cnav_ephemeris_map() const;
+    std::map<int, Glonass_Gnav_Ephemeris> get_glonass_ephemeris_map() const;
+    std::map<int, Glonass_Gnav_Almanac> get_glonass_almanac_map() const;
+    Glonass_Gnav_Utc_Model get_glonass_utc_model() const;
     std::map<int, Gps_Ephemeris> get_gps_ephemeris_map() const;
 
     /*!
@@ -117,9 +130,26 @@ public:
     std::map<int, Beidou_Dnav_Almanac> get_beidou_dnav_almanac_map() const;
 
     /*!
-     * \brief Clear all ephemeris information and the almanacs for GPS and Galileo
+     * \brief Clears the published navigation snapshot now and the solver maps
+     * at the worker's next work() or telemetry callback.
      */
     void clear_ephemeris();
+
+    /*!
+     * \brief Interpolates one observable between two epochs, in the carrier
+     * polarity frame of the later epoch.
+     *
+     * A plain linear carrier-phase interpolation across a PLL-180 half-cycle
+     * re-resolution would leak a fraction of the pi step into the output with
+     * no slip flag attached; the early phase is therefore shifted into the
+     * late epoch's polarity frame first, the late polarity is stamped on the
+     * output, and a slip on either endpoint (or a polarity change itself)
+     * marks the output.
+     */
+    static Gnss_Synchro interpolate_observable(const Gnss_Synchro& early,
+        const Gnss_Synchro& late,
+        double time_factor,
+        double rx_time_s);
 
     /*!
      * \brief Get the latest Position WGS84 [deg], Ground Velocity, Course over Ground, and UTC Time, if available
@@ -132,7 +162,7 @@ public:
         time_t* UTC_time) const;
 
     int work(int noutput_items, gr_vector_const_void_star& input_items,
-        gr_vector_void_star& output_items);  //!< PVT Signal Processing
+        gr_vector_void_star& output_items) override;  //!< PVT Signal Processing
 
 private:
     friend rtklib_pvt_gs_sptr rtklib_make_pvt_gs(uint32_t nchannels,
@@ -160,6 +190,19 @@ private:
 
     void update_HAS_corrections();
 
+    void report_fixed_base_status();
+
+    void report_solution_status();
+
+    void report_solution_outage();
+
+    // slip flags ride single observables epochs, but the user solver only
+    // samples the maps on output epochs: every flag seen while an epoch
+    // passes through t1 is latched per channel and consumed on the next
+    // interpolated output, so no slip vanishes between outputs
+    std::map<int, bool> d_interp_pending_cycle_slip;
+    std::map<int, bool> d_interp_pending_half_cycle_slip;
+
     std::map<int, Gnss_Synchro> interpolate_observables(const std::map<int, Gnss_Synchro>& observables_map_t0,
         const std::map<int, Gnss_Synchro>& observables_map_t1,
         double rx_time_s);
@@ -179,6 +222,44 @@ private:
 
     std::unique_ptr<SensorDataAggregator> d_sensor_data_aggregator;
 
+    enum class NavigationData
+    {
+        GpsCnavEphemeris,
+        GlonassEphemeris,
+        GlonassAlmanac,
+        GlonassUtcModel,
+        GpsEphemeris,
+        GpsAlmanac,
+        GalileoEphemeris,
+        GalileoAlmanac,
+        BeidouEphemeris,
+        BeidouAlmanac
+    };
+    struct NavigationSnapshot;
+    struct LatestPvt
+    {
+        double longitude_deg = 0.0;
+        double latitude_deg = 0.0;
+        double height_m = 0.0;
+        double ground_speed_kmh = 0.0;
+        double course_over_ground_deg = 0.0;
+        time_t utc_time = 0;
+        bool valid = false;
+    };
+
+    std::shared_ptr<const NavigationSnapshot> navigation_snapshot() const;
+    void publish_navigation_snapshot(NavigationData data);
+    void apply_pending_navigation_clear();
+    void publish_latest_pvt();
+
+    // Only pointer exchanges and the small PVT value copy hold this mutex.
+    // Map construction, copying and destruction happen outside the lock.
+    mutable std::mutex d_snapshot_mutex;
+    const std::shared_ptr<const NavigationSnapshot> d_empty_navigation_snapshot;
+    std::shared_ptr<const NavigationSnapshot> d_navigation_snapshot;
+    LatestPvt d_latest_pvt;
+    std::atomic<uint32_t> d_navigation_generation{0};
+    uint32_t d_applied_navigation_generation = 0;  // GNU Radio worker only
     std::shared_ptr<Rtklib_Solver> d_internal_pvt_solver;
     std::shared_ptr<Rtklib_Solver> d_user_pvt_solver;
 
@@ -188,6 +269,11 @@ private:
     std::unique_ptr<Kml_Printer> d_kml_dump;
     std::unique_ptr<Gpx_Printer> d_gpx_dump;
     std::unique_ptr<Nmea_Printer> d_nmea_printer;
+    std::unique_ptr<Ntrip_Rtcm_Client> d_ntrip_client;
+    // Cached copy of the client's latest snapshot, refreshed only when the
+    // client's snapshot generation changes (the deep copy is expensive at the
+    // observables rate).
+    std::unique_ptr<Ntrip_Rtcm_Snapshot> d_fixed_base_snapshot;
     std::unique_ptr<GeoJSON_Printer> d_geojson_printer;
     std::unique_ptr<Rtcm_Printer> d_rtcm_printer;
     std::unique_ptr<Monitor_Pvt_Udp_Sink> d_udp_sink_ptr;
@@ -220,10 +306,17 @@ private:
     const size_t d_gps_iono_sptr_type_hash_code;
     const size_t d_gps_utc_model_sptr_type_hash_code;
     const size_t d_gps_cnav_ephemeris_sptr_type_hash_code;
+    const size_t d_gps_cnav_eop_sptr_type_hash_code;
     const size_t d_gps_cnav_iono_sptr_type_hash_code;
     const size_t d_gps_cnav_utc_model_sptr_type_hash_code;
     const size_t d_gps_almanac_sptr_type_hash_code;
+    const size_t d_qzss_iono_sptr_type_hash_code;
+    const size_t d_qzss_utc_model_sptr_type_hash_code;
+    const size_t d_qzss_cnav_eop_sptr_type_hash_code;
+    const size_t d_qzss_cnav_iono_sptr_type_hash_code;
+    const size_t d_qzss_cnav_utc_model_sptr_type_hash_code;
     const size_t d_galileo_ephemeris_sptr_type_hash_code;
+    const size_t d_galileo_reduced_ced_sptr_type_hash_code;
     const size_t d_galileo_iono_sptr_type_hash_code;
     const size_t d_galileo_utc_model_sptr_type_hash_code;
     const size_t d_galileo_almanac_helper_sptr_type_hash_code;
@@ -235,6 +328,11 @@ private:
     const size_t d_beidou_dnav_iono_sptr_type_hash_code;
     const size_t d_beidou_dnav_utc_model_sptr_type_hash_code;
     const size_t d_beidou_dnav_almanac_sptr_type_hash_code;
+    const size_t d_beidou_cnav1_ephemeris_sptr_type_hash_code;
+    const size_t d_beidou_cnav1_iono_sptr_type_hash_code;
+    const size_t d_beidou_cnav1_utc_model_sptr_type_hash_code;
+    const size_t d_beidou_cnav1_page_data_sptr_type_hash_code;
+    const size_t d_sbas_raw_message_sptr_type_hash_code;
     const size_t d_galileo_has_data_sptr_type_hash_code;
 
     const double d_rinex_version;
@@ -263,7 +361,11 @@ private:
     const uint32_t d_nchannels;
     const uint32_t d_signal_enabled_flags;
     const uint32_t d_observable_interval_ms;
+    const double d_ntrip_max_correction_age_s;
     uint32_t d_pvt_errors_counter;
+    int d_last_fixed_base_status;
+    uint64_t d_ntrip_snapshot_generation = 0;
+    int d_last_solution_status;
 
     bool d_dump;
     const bool d_dump_mat;
@@ -279,6 +381,7 @@ private:
     const bool d_flag_monitor_ephemeris_enabled;
     const bool d_show_local_time_zone;
     const bool d_enable_rx_clock_correction;
+    const bool d_ntrip_client_enabled;
     bool d_enable_has_messages;
     const bool d_an_printer_enabled;
     bool d_log_timetag;

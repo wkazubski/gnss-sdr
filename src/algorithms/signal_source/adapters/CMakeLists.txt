@@ -109,6 +109,20 @@ if(ENABLE_LIMESDR)
     endif()
 endif()
 
+if(ENABLE_BLADERF)
+    if(LIBBLADERF_FOUND)
+        list(APPEND OPT_DRIVER_SOURCES bladerf_signal_source.cc)
+        list(APPEND OPT_DRIVER_HEADERS bladerf_signal_source.h)
+    endif()
+endif()
+
+if(ENABLE_POCKETSDR)
+    if(GRPOCKETSDR_FOUND)
+        list(APPEND OPT_DRIVER_SOURCES pocket_sdr_signal_source.cc)
+        list(APPEND OPT_DRIVER_HEADERS pocket_sdr_signal_source.h)
+    endif()
+endif()
+
 if(ENABLE_UHD)
     list(APPEND OPT_DRIVER_SOURCES uhd_signal_source.cc)
     list(APPEND OPT_DRIVER_HEADERS uhd_signal_source.h)
@@ -124,6 +138,11 @@ if(ENABLE_ION)
     list(APPEND OPT_DRIVER_HEADERS ion_gsms_signal_source.h)
 endif()
 
+if(ENABLE_EVK1029)
+    list(APPEND OPT_DRIVER_SOURCES evk1029_signal_source.cc)
+    list(APPEND OPT_DRIVER_HEADERS evk1029_signal_source.h)
+endif()
+
 set(SIGNAL_SOURCE_ADAPTER_SOURCES
     signal_source_base.cc
     file_source_base.cc
@@ -133,7 +152,7 @@ set(SIGNAL_SOURCE_ADAPTER_SOURCES
     gen_signal_source.cc
     nsr_file_signal_source.cc
     spir_file_signal_source.cc
-    spir_gss6450_file_signal_source.cc
+    gss6450_file_signal_source.cc
     rtl_tcp_signal_source.cc
     labsat_signal_source.cc
     two_bit_cpx_file_signal_source.cc
@@ -153,7 +172,7 @@ set(SIGNAL_SOURCE_ADAPTER_HEADERS
     gen_signal_source.h
     nsr_file_signal_source.h
     spir_file_signal_source.h
-    spir_gss6450_file_signal_source.h
+    gss6450_file_signal_source.h
     rtl_tcp_signal_source.h
     labsat_signal_source.h
     two_bit_cpx_file_signal_source.h
@@ -259,6 +278,13 @@ if(ENABLE_LIMESDR AND GRLIMESDR_FOUND)
     target_link_libraries(signal_source_adapters
         PUBLIC
             Gnuradio::limesdr
+    )
+endif()
+
+if(ENABLE_POCKETSDR AND GRPOCKETSDR_FOUND)
+    target_link_libraries(signal_source_adapters
+        PUBLIC
+            Gnuradio::pocketsdr
     )
 endif()
 

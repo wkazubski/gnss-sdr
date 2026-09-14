@@ -28,8 +28,9 @@
 #include "acquisition_interface.h"
 #include "array_signal_conditioner.h"
 #include "beamformer_filter.h"
-#include "beidou_b1i_telemetry_decoder_gs.h"
-#include "beidou_b3i_telemetry_decoder_gs.h"
+#include "beidou_b1c_telemetry_decoder_gs.h"
+#include "beidou_b2a_telemetry_decoder_gs.h"
+#include "beidou_dnav_telemetry_decoder_gs.h"
 #include "byte_to_short.h"
 #include "channel.h"
 #include "configuration_interface.h"
@@ -44,8 +45,7 @@
 #include "freq_xlating_fir_filter.h"
 #include "galileo_e1_tcp_connector_tracking.h"
 #include "galileo_telemetry_decoder_gs.h"
-#include "glonass_l1_ca_telemetry_decoder_gs.h"
-#include "glonass_l2_ca_telemetry_decoder_gs.h"
+#include "glonass_gnav_telemetry_decoder_gs.h"
 #include "gnss_block_interface.h"
 #include "gnss_sdr_make_unique.h"
 #include "gnss_sdr_string_literals.h"
@@ -55,6 +55,7 @@
 #include "gps_l1_ca_telemetry_decoder_gs.h"
 #include "gps_l2c_telemetry_decoder_gs.h"
 #include "gps_l5_telemetry_decoder_gs.h"
+#include "gss6450_file_signal_source.h"
 #include "hybrid_observables.h"
 #include "ibyte_to_cbyte.h"
 #include "ibyte_to_complex.h"
@@ -78,7 +79,6 @@
 #include "signal_conditioner.h"
 #include "signal_flag.h"
 #include "spir_file_signal_source.h"
-#include "spir_gss6450_file_signal_source.h"
 #include "telemetry_decoder_adapter.h"
 #include "telemetry_decoder_interface.h"
 #include "tlm_conf.h"
@@ -138,7 +138,7 @@
 #include "fmcomms2_signal_source.h"
 #endif
 
-#if ENABLE_FPGA and AD9361_DRIVER
+#if ENABLE_FPGA && AD9361_DRIVER
 #include "adrv9361_z7035_signal_source_fpga.h"
 #include "fmcomms5_signal_source_fpga.h"
 #endif
@@ -153,6 +153,14 @@
 
 #if LIMESDR_DRIVER
 #include "limesdr_signal_source.h"
+#endif
+
+#if BLADERF_DRIVER
+#include "bladerf_signal_source.h"
+#endif
+
+#if POCKETSDR_DRIVER
+#include "pocket_sdr_signal_source.h"
 #endif
 
 #if FLEXIBAND_DRIVER
@@ -170,6 +178,10 @@
 #if ENABLE_ION_SOURCE
 #undef Owner
 #include "ion_gsms_signal_source.h"
+#endif
+
+#if EVK1029_DRIVER
+#include "evk1029_signal_source.h"
 #endif
 
 using namespace std::string_literals;
@@ -215,10 +227,13 @@ const auto signal_mapping = std::vector<std::pair<std::string, std::string>>{
     {"1G", "GLONASS L1 C/A"},
     {"2G", "GLONASS L2 C/A"},
     {"B1", "BEIDOU B1I"},
+    {"1D", "BEIDOU B1C"},
+    {"5D", "BEIDOU B2a"},
     {"B3", "BEIDOU B3I"},
     {"7X", "GALILEO E5b I (I/NAV OS)"},
     {"J1", "QZSS L1 C/A"},
     {"J5", "QZSS L5"},
+    {"S1", "SBAS L1"},
 };
 
 unsigned int get_channel_count(const ConfigurationInterface* configuration)
@@ -308,9 +323,10 @@ std::unique_ptr<SignalSourceInterface> get_signal_source_block(
         {
             return std::make_unique<SpirFileSignalSource>(configuration, role, in_streams, out_streams, queue);
         }
-    else if (implementation == "Spir_GSS6450_File_Signal_Source")
+    else if (implementation == "GSS6450_File_Signal_Source" ||
+             implementation == "Spir_GSS6450_File_Signal_Source")
         {
-            return std::make_unique<SpirGSS6450FileSignalSource>(configuration, role, in_streams, out_streams, queue);
+            return std::make_unique<GSS6450FileSignalSource>(configuration, role, in_streams, out_streams, queue);
         }
     else if (implementation == "RtlTcp_Signal_Source")
         {
@@ -320,6 +336,12 @@ std::unique_ptr<SignalSourceInterface> get_signal_source_block(
         {
             return std::make_unique<LabsatSignalSource>(configuration, role, in_streams, out_streams, queue);
         }
+#if EVK1029_DRIVER
+    else if (implementation == "EVK1029_Signal_Source")
+        {
+            return std::make_unique<Evk1029SignalSource>(configuration, role, in_streams, out_streams, queue);
+        }
+#endif
 #if UHD_DRIVER
     else if (implementation == "UHD_Signal_Source")
         {
@@ -356,6 +378,18 @@ std::unique_ptr<SignalSourceInterface> get_signal_source_block(
             return std::make_unique<LimesdrSignalSource>(configuration, role, in_streams, out_streams, queue);
         }
 #endif
+#if BLADERF_DRIVER
+    else if (implementation == "Bladerf_Signal_Source")
+        {
+            return std::make_unique<BladerfSignalSource>(configuration, role, in_streams, out_streams, queue);
+        }
+#endif
+#if POCKETSDR_DRIVER
+    else if (implementation == "Pocket_SDR_Signal_Source")
+        {
+            return std::make_unique<PocketSdrSignalSource>(configuration, role, in_streams, out_streams, queue);
+        }
+#endif
 #if PLUTOSDR_DRIVER
     else if (implementation == "Plutosdr_Signal_Source")
         {
@@ -380,7 +414,7 @@ std::unique_ptr<SignalSourceInterface> get_signal_source_block(
             return std::make_unique<FlexibandSignalSource>(configuration, role, in_streams, out_streams, queue);
         }
 #endif
-#if ENABLE_FPGA and AD9361_DRIVER
+#if ENABLE_FPGA && AD9361_DRIVER
     else if (implementation == "ADRV9361_Z7035_Signal_Source_FPGA")
         {
             return std::make_unique<Adrv9361z7035SignalSourceFPGA>(configuration, role, in_streams, out_streams, queue);
@@ -390,13 +424,13 @@ std::unique_ptr<SignalSourceInterface> get_signal_source_block(
             return std::make_unique<Fmcomms5SignalSourceFPGA>(configuration, role, in_streams, out_streams, queue);
         }
 #endif
-#if ENABLE_FPGA and MAX2771_DRIVER
+#if ENABLE_FPGA && MAX2771_DRIVER
     else if (implementation == "MAX2771_EVKIT_Signal_Source_FPGA")
         {
             return std::make_unique<MAX2771EVKITSignalSourceFPGA>(configuration, role, in_streams, out_streams, queue);
         }
 #endif
-#if ENABLE_FPGA and DMA_PROXY_DRIVER
+#if ENABLE_FPGA && DMA_PROXY_DRIVER
     else if (implementation == "DMA_Signal_Source_FPGA")
         {
             return std::make_unique<DMASignalSourceFPGA>(configuration, role, in_streams, out_streams, queue);
@@ -497,6 +531,14 @@ std::unique_ptr<AcquisitionInterface> get_acq_block(
         {
             return std::make_unique<PcpsAcquisitionAdapter>(configuration, role, implementation, in_streams, out_streams, BDS_B1);
         }
+    else if (implementation == "BEIDOU_B1C_PCPS_Ambiguous_Acquisition")
+        {
+            return std::make_unique<PcpsAcquisitionAdapter>(configuration, role, implementation, in_streams, out_streams, BDS_B1C);
+        }
+    else if (implementation == "BEIDOU_B2A_PCPS_Acquisition")
+        {
+            return std::make_unique<PcpsAcquisitionAdapter>(configuration, role, implementation, in_streams, out_streams, BDS_B2A);
+        }
     else if (implementation == "BEIDOU_B3I_PCPS_Acquisition")
         {
             return std::make_unique<PcpsAcquisitionAdapter>(configuration, role, implementation, in_streams, out_streams, BDS_B3);
@@ -508,6 +550,10 @@ std::unique_ptr<AcquisitionInterface> get_acq_block(
     else if (implementation == "QZSS_L5i_PCPS_Acquisition")
         {
             return std::make_unique<PcpsAcquisitionAdapter>(configuration, role, implementation, in_streams, out_streams, QZS_J5);
+        }
+    else if (implementation == "SBAS_L1_PCPS_Acquisition")
+        {
+            return std::make_unique<PcpsAcquisitionAdapter>(configuration, role, implementation, in_streams, out_streams, SBAS_S1);
         }
 #if OPENCL_BLOCKS
     else if (implementation == "GPS_L1_CA_PCPS_OpenCl_Acquisition")
@@ -593,7 +639,7 @@ std::unique_ptr<TrackingInterface> get_trk_block(
         {
             return std::make_unique<DllPllTrackingAdapter>(configuration, role, implementation, in_streams, out_streams, GPS_2S);
         }
-    else if ((implementation == "GPS_L5i_DLL_PLL_Tracking") or (implementation == "GPS_L5_DLL_PLL_Tracking"))
+    else if ((implementation == "GPS_L5i_DLL_PLL_Tracking") || (implementation == "GPS_L5_DLL_PLL_Tracking"))
         {
             return std::make_unique<DllPllTrackingAdapter>(configuration, role, implementation, in_streams, out_streams, GPS_L5);
         }
@@ -609,6 +655,14 @@ std::unique_ptr<TrackingInterface> get_trk_block(
         {
             return std::make_unique<DllPllTrackingAdapter>(configuration, role, implementation, in_streams, out_streams, BDS_B1);
         }
+    else if (implementation == "BEIDOU_B1C_DLL_PLL_VEML_Tracking")
+        {
+            return std::make_unique<DllPllTrackingAdapter>(configuration, role, implementation, in_streams, out_streams, BDS_B1C);
+        }
+    else if (implementation == "BEIDOU_B2A_DLL_PLL_Tracking")
+        {
+            return std::make_unique<DllPllTrackingAdapter>(configuration, role, implementation, in_streams, out_streams, BDS_B2A);
+        }
     else if (implementation == "BEIDOU_B3I_DLL_PLL_Tracking")
         {
             return std::make_unique<DllPllTrackingAdapter>(configuration, role, implementation, in_streams, out_streams, BDS_B3);
@@ -620,6 +674,10 @@ std::unique_ptr<TrackingInterface> get_trk_block(
     else if (implementation == "QZSS_L5_DLL_PLL_Tracking")
         {
             return std::make_unique<DllPllTrackingAdapter>(configuration, role, implementation, in_streams, out_streams, QZS_J5);
+        }
+    else if (implementation == "SBAS_L1_DLL_PLL_Tracking")
+        {
+            return std::make_unique<DllPllTrackingAdapter>(configuration, role, implementation, in_streams, out_streams, SBAS_S1);
         }
 #if CUDA_GPU_ACCEL
     else if (implementation == "GPS_L1_CA_DLL_PLL_Tracking_GPU")
@@ -640,7 +698,7 @@ std::unique_ptr<TrackingInterface> get_trk_block(
         {
             return std::make_unique<DllPllTrackingAdapterFpga>(configuration, role, implementation, in_streams, out_streams, GPS_2S);
         }
-    else if ((implementation == "GPS_L5i_DLL_PLL_Tracking_FPGA") or (implementation == "GPS_L5_DLL_PLL_Tracking_FPGA"))
+    else if ((implementation == "GPS_L5i_DLL_PLL_Tracking_FPGA") || (implementation == "GPS_L5_DLL_PLL_Tracking_FPGA"))
         {
             return std::make_unique<DllPllTrackingAdapterFpga>(configuration, role, implementation, in_streams, out_streams, GPS_L5);
         }
@@ -690,7 +748,15 @@ std::unique_ptr<TelemetryDecoderInterface> get_tlm_block(
 {
     telemetry_impl_interface_sptr telemetry;
 
-    if (implementation == "GPS_L1_CA_Telemetry_Decoder")
+    if (implementation == "BEIDOU_B1C_Telemetry_Decoder")
+        {
+            telemetry = beidou_b1c_make_telemetry_decoder_gs(Gnss_Satellite{}, get_tlm_conf(configuration, role));
+        }
+    else if (implementation == "BEIDOU_B2A_Telemetry_Decoder")
+        {
+            telemetry = beidou_b2a_make_telemetry_decoder_gs(Gnss_Satellite{}, get_tlm_conf(configuration, role));
+        }
+    else if (implementation == "GPS_L1_CA_Telemetry_Decoder")
         {
             telemetry = gps_l1_ca_make_telemetry_decoder_gs(get_tlm_conf(configuration, role));
         }
@@ -700,7 +766,9 @@ std::unique_ptr<TelemetryDecoderInterface> get_tlm_block(
         }
     else if (implementation == "SBAS_L1_Telemetry_Decoder")
         {
-            telemetry = sbas_l1_make_telemetry_decoder_gs(configuration != nullptr ? configuration->property(role + ".dump", false) : false);
+            telemetry = sbas_l1_make_telemetry_decoder_gs(
+                configuration != nullptr ? configuration->property(role + ".dump", false) : false,
+                configuration != nullptr ? configuration->property(role + ".dump_filename", std::string()) : std::string());
         }
     else if (implementation == "Galileo_E5a_Telemetry_Decoder")
         {
@@ -720,11 +788,11 @@ std::unique_ptr<TelemetryDecoderInterface> get_tlm_block(
         }
     else if (implementation == "GLONASS_L1_CA_Telemetry_Decoder")
         {
-            telemetry = glonass_l1_ca_make_telemetry_decoder_gs(get_tlm_conf(configuration, role));
+            telemetry = glonass_gnav_make_telemetry_decoder_gs(get_tlm_conf(configuration, role), 1);
         }
     else if (implementation == "GLONASS_L2_CA_Telemetry_Decoder")
         {
-            telemetry = glonass_l2_ca_make_telemetry_decoder_gs(get_tlm_conf(configuration, role));
+            telemetry = glonass_gnav_make_telemetry_decoder_gs(get_tlm_conf(configuration, role), 2);
         }
     else if (implementation == "GPS_L5_Telemetry_Decoder")
         {
@@ -732,11 +800,11 @@ std::unique_ptr<TelemetryDecoderInterface> get_tlm_block(
         }
     else if (implementation == "BEIDOU_B1I_Telemetry_Decoder")
         {
-            telemetry = beidou_b1i_make_telemetry_decoder_gs(get_tlm_conf(configuration, role));
+            telemetry = beidou_dnav_make_telemetry_decoder_gs(get_tlm_conf(configuration, role), 1);
         }
     else if (implementation == "BEIDOU_B3I_Telemetry_Decoder")
         {
-            telemetry = beidou_b3i_make_telemetry_decoder_gs(get_tlm_conf(configuration, role));
+            telemetry = beidou_dnav_make_telemetry_decoder_gs(get_tlm_conf(configuration, role), 3);
         }
     else if (implementation == "QZSS_L1_Telemetry_Decoder")
         {
@@ -944,21 +1012,21 @@ std::unique_ptr<GNSSBlockInterface> GetSignalConditioner(
 
     if (signal_conditioner == "Pass_Through")
         {
-            if (!data_type_adapter.empty() and (data_type_adapter != "Pass_Through"))
+            if (!data_type_adapter.empty() && (data_type_adapter != "Pass_Through"))
                 {
                     LOG(WARNING) << "Configuration warning: if " << role_conditioner << impl_prop << "\n"
                                  << "is set to Pass_Through, then the " << role_datatypeadapter << impl_prop << "\n"
                                  << "parameter should be either not set or set to Pass_Through.\n"
                                  << role_datatypeadapter << " configuration parameters will be ignored.";
                 }
-            if (!input_filter.empty() and (input_filter != "Pass_Through"))
+            if (!input_filter.empty() && (input_filter != "Pass_Through"))
                 {
                     LOG(WARNING) << "Configuration warning: if " << role_conditioner << impl_prop << "\n"
                                  << "is set to Pass_Through, then the " << role_inputfilter << impl_prop << "\n"
                                  << "parameter should be either not set or set to Pass_Through.\n"
                                  << role_inputfilter << " configuration parameters will be ignored.";
                 }
-            if (!resampler.empty() and (resampler != "Pass_Through"))
+            if (!resampler.empty() && (resampler != "Pass_Through"))
                 {
                     LOG(WARNING) << "Configuration warning: if " << role_conditioner << impl_prop << "\n"
                                  << "is set to Pass_Through, then the " << role_resampler << impl_prop << "\n"
@@ -1044,7 +1112,7 @@ std::unique_ptr<GNSSBlockInterface> GetChannel(
     auto trk_ = GetTrkBlock(configuration, trk_role_name, 1, 1);
     auto tlm_ = GetTlmBlock(configuration, tlm_role_name, 1, 1);
 
-    if (acq_ == nullptr or trk_ == nullptr or tlm_ == nullptr)
+    if (acq_ == nullptr || trk_ == nullptr || tlm_ == nullptr)
         {
             return nullptr;
         }

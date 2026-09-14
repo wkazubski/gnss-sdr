@@ -4,6 +4,8 @@
 # SPDX-FileCopyrightText: 2010-2020 C. Fernandez-Prades cfernandez(at)cttc.es
 # SPDX-License-Identifier: BSD-3-Clause
 
+include(XcodeRemoveWarningDuplicates)
+
 if(NOT GNSSTK_FOUND AND NOT ENABLE_OWN_GNSSTK)
     find_package(GNSSTK)
 endif()
@@ -47,9 +49,9 @@ if(CMAKE_VERSION VERSION_LESS 3.5)
         set_property(TARGET Boost::serialization PROPERTY
             INTERFACE_INCLUDE_DIRECTORIES ${Boost_INCLUDE_DIR})
         set_property(TARGET Boost::serialization PROPERTY
-            INTERFACE_LINK_LIBRARIES ${Boost_SERIALIZARION_LIBRARIES})
+            INTERFACE_LINK_LIBRARIES ${Boost_SERIALIZATION_LIBRARIES})
         set_property(TARGET Boost::serialization PROPERTY
-            IMPORTED_LOCATION ${Boost_SERIALIZARION_LIBRARIES})
+            IMPORTED_LOCATION ${Boost_SERIALIZATION_LIBRARIES})
     endif()
 endif()
 
@@ -113,12 +115,12 @@ if(TARGET Boost::iostreams AND TARGET Boost::serialization)
         target_compile_definitions(rinex2assist PRIVATE -DGNSSTK_OLDER_THAN_9=1)
     endif()
 
-    if(NOT UNCOMPRESS_EXECUTABLE-NOTFOUND)
+    if(UNCOMPRESS_EXECUTABLE)
         target_compile_definitions(rinex2assist PRIVATE -DUNCOMPRESS_EXECUTABLE="${UNCOMPRESS_EXECUTABLE}")
     else()
         target_compile_definitions(rinex2assist PRIVATE -DUNCOMPRESS_EXECUTABLE="")
     endif()
-
+    xcode_remove_warning_duplicates(rinex2assist)
     if(NOT GNSSTK_FOUND OR ENABLE_OWN_GNSSTK)
         add_dependencies(rinex2assist gnsstk-${GNSSSDR_GNSSTK_LOCAL_VERSION})
     endif()
@@ -133,7 +135,7 @@ if(TARGET Boost::iostreams AND TARGET Boost::serialization)
     )
 
     install(TARGETS rinex2assist
-        RUNTIME DESTINATION bin
+        RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR}
         COMPONENT "rinex2assist"
     )
 else()

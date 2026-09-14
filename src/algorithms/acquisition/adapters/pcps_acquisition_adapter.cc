@@ -1,5 +1,5 @@
 /*!
- * \file base_ca_pcps_acquisition.h
+ * \file pcps_acquisition_adapter.cc
  * \brief Adapts a PCPS acquisition block to an AcquisitionInterface
  * \authors <ul>
  *          <li> Mathieu Favreau, 2025. favreau.mathieu(at)hotmail.com
@@ -17,7 +17,9 @@
  */
 
 #include "pcps_acquisition_adapter.h"
+#include "Beidou_B1C.h"
 #include "Beidou_B1I.h"
+#include "Beidou_B2a.h"
 #include "Beidou_B3I.h"
 #include "GLONASS_L1_L2_CA.h"
 #include "GPS_L1_CA.h"
@@ -27,8 +29,11 @@
 #include "Galileo_E5a.h"
 #include "Galileo_E5b.h"
 #include "Galileo_E6.h"
+#include "SBAS_L1.h"
 #include "acq_conf.h"
+#include "beidou_b1c_signal_replica.h"
 #include "beidou_b1i_signal_replica.h"
+#include "beidou_b2a_signal_replica.h"
 #include "beidou_b3i_signal_replica.h"
 #include "configuration_interface.h"
 #include "galileo_e1_signal_replica.h"
@@ -42,6 +47,7 @@
 #include "gps_sdr_signal_replica.h"
 #include "qzss.h"
 #include "qzss_signal_replica.h"
+#include "sbas_signal_replica.h"
 #include "signal_flag.h"
 
 #if USE_GLOG_AND_GFLAGS
@@ -96,10 +102,16 @@ signal_info get_signal_info(signal_flag sig_flag)
             return {BEIDOU_B1I_CODE_RATE_CPS, BEIDOU_B1I_OPT_ACQ_FS_SPS, BEIDOU_B1I_CODE_LENGTH_CHIPS, BEIDOU_B1I_CODE_PERIOD_MS};
         case BDS_B3:
             return {BEIDOU_B3I_CODE_RATE_CPS, BEIDOU_B3I_OPT_ACQ_FS_SPS, BEIDOU_B3I_CODE_LENGTH_CHIPS, BEIDOU_B3I_CODE_PERIOD_MS};
+        case BDS_B1C:
+            return {BEIDOU_B1C_CODE_RATE_CPS, BEIDOU_B1C_OPT_ACQ_FS_SPS, BEIDOU_B1C_CODE_LENGTH_CHIPS, BEIDOU_B1C_CODE_PERIOD_MS};
+        case BDS_B2A:
+            return {BEIDOU_B2A_CODE_RATE_CPS, BEIDOU_B2A_OPT_ACQ_FS_SPS, BEIDOU_B2A_CODE_LENGTH_CHIPS, BEIDOU_B2A_CODE_PERIOD_MS};
         case QZS_J1:
             return {QZSS_L1_CHIP_RATE, QZSS_L1_OPT_ACQ_FS_SPS, QZSS_L1_CODE_LENGTH, QZSS_L1_PERIOD_MS};
         case QZS_J5:
             return {QZSS_L5_CHIP_RATE, QZSS_L5_OPT_ACQ_FS_SPS, QZSS_L5_CODE_LENGTH, QZSS_L5I_PERIOD_MS};
+        case SBAS_S1:
+            return {SBAS_L1_CODE_RATE_CPS, SBAS_L1_OPT_ACQ_FS_SPS, SBAS_L1_CODE_LENGTH_CHIPS, SBAS_L1_CODE_PERIOD_MS};
         default:
             break;
         }
@@ -174,11 +186,23 @@ void code_gen_complex_sampled(signal_flag sig_flag, const Acq_Conf& conf, const 
         case BDS_B3:
             beidou_b3i_code_gen_complex_sampled(dest, gnss_synchro.PRN, sampling_freq, 0);
             break;
+        case BDS_B1C:
+            {
+                const auto sig = conf.acquire_pilot ? std::array<char, 3>{'1', 'P', '\0'} : std::array<char, 3>{gnss_synchro.Signal[0], gnss_synchro.Signal[1], '\0'};
+                beidou_b1c_code_gen_complex_sampled(dest, sig, conf.qmboc, gnss_synchro.PRN, sampling_freq, 0, false);
+            }
+            break;
+        case BDS_B2A:
+            beidou_b2a_code_gen_complex_sampled(dest, gnss_synchro.PRN, sampling_freq, 0);
+            break;
         case QZS_J1:
             qzss_l1_code_gen_complex_sampled(dest, gnss_synchro.PRN, sampling_freq);
             break;
         case QZS_J5:
             qzss_l5i_code_gen_complex_sampled(dest, gnss_synchro.PRN, sampling_freq);
+            break;
+        case SBAS_S1:
+            sbas_l1_code_gen_complex_sampled(dest, gnss_synchro.PRN, sampling_freq);
             break;
         default:
             break;
@@ -205,6 +229,12 @@ Acq_Conf get_acq_conf(const ConfigurationInterface* configuration, const std::st
         {
             acq_parameters.acquire_pilot = configuration->property(role + ".acquire_pilot", acq_parameters.acquire_pilot);
             acq_parameters.acquire_iq = configuration->property(role + ".acquire_iq", acq_parameters.acquire_iq);
+        }
+
+    if (sig_flag == BDS_B1C)
+        {
+            acq_parameters.acquire_pilot = configuration->property(role + ".acquire_pilot", true);
+            acq_parameters.qmboc = configuration->property(role + ".qmboc", true);
         }
 
 #if USE_GLOG_AND_GFLAGS
@@ -277,6 +307,12 @@ void PcpsAcquisitionAdapter::stop_acquisition()
 void PcpsAcquisitionAdapter::set_doppler_center(int doppler_center)
 {
     acquisition_->set_doppler_center(doppler_center);
+}
+
+
+void PcpsAcquisitionAdapter::set_doppler_uncertainty(unsigned int doppler_uncertainty)
+{
+    acquisition_->set_doppler_uncertainty(doppler_uncertainty);
 }
 
 
