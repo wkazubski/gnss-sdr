@@ -74,6 +74,39 @@ public:
     bool make_2_steps{false};
     bool use_automatic_resampler{false};
     bool enable_monitor_output{false};
+    // When Doppler is assisted (doppler_uncertainty == 0), collapse the search to
+    // the known bin + one reference bin instead of the full grid. Off by default;
+    // enable per-implementation in the .conf (e.g.
+    // Acquisition_5X.enable_doppler_narrowing = true).
+    //
+    // Applies to any acquisition implementation built on pcps_acquisition (the vast
+    // majority of them); FPGA-offloaded acquisitions use a separate implementation
+    // that never calls set_doppler_uncertainty(), so this has no effect there.
+    //
+    // Only takes effect when the caller also passes doppler_uncertainty == 0 to
+    // set_doppler_uncertainty() -- in practice, this means
+    // GNSS-SDR.assist_dual_frequency_acq must also be enabled and a Doppler
+    // projection from the satellite's already-tracked primary frequency must have
+    // succeeded (see GNSSFlowgraph::acquisition_manager()). With
+    // assist_dual_frequency_acq off, or when no projection is available yet, this
+    // flag has no effect and the full configured Doppler grid is always searched.
+    bool enable_doppler_narrowing{false};
+
+    // Accumulate through the full max_dwells before deciding accept/reject, instead
+    // of exiting as soon as any single dwell's (possibly still noisy, partially
+    // accumulated) grid crosses threshold -- a later dwell's fuller integration can
+    // reveal a different, genuinely stronger peak elsewhere in the grid that an early
+    // exit never gets the chance to compare against. Opt-in: off by default, enable
+    // per-implementation in the .conf (e.g. Acquisition_1B.full_grid_search = true).
+    bool full_grid_search{false};
+
+    // Specific to some implementations
+    bool acquire_pilot{false};
+    bool acquire_iq{false};
+    bool cboc{false};
+    bool qmboc{false};
+    int zero_padding{0};
+    uint32_t folding_factor{0};
 
     // Not part of the configuration interface
     uint32_t num_codes{0};

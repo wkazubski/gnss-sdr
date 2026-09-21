@@ -21,6 +21,8 @@
 #include <gtest/gtest.h>
 #include <fstream>
 #include <iostream>
+#include <memory>
+#include <mutex>
 #include <ostream>
 #include <string>
 
@@ -60,14 +62,65 @@ public:
             }
         logfile.open(filename);
     }
-    void Send(const absl::LogEntry &entry) override
+    void Send(const absl::LogEntry& entry) override
     {
+        std::lock_guard<std::mutex> lock(logfile_mutex);
         logfile << entry.text_message_with_prefix_and_newline() << std::flush;
     }
 
 private:
+    std::mutex logfile_mutex;
     std::ofstream logfile;
     std::string filename;
+};
+
+class TestingLogSinkGuard
+{
+public:
+    TestingLogSinkGuard() = default;
+    TestingLogSinkGuard(const TestingLogSinkGuard&) = delete;
+    TestingLogSinkGuard& operator=(const TestingLogSinkGuard&) = delete;
+    TestingLogSinkGuard(TestingLogSinkGuard&&) = delete;
+    TestingLogSinkGuard& operator=(TestingLogSinkGuard&&) = delete;
+    ~TestingLogSinkGuard() noexcept
+    {
+        Shutdown();
+    }
+
+    void Register()
+    {
+        log_sink.reset(new TestingLogSink);
+        absl::AddLogSink(log_sink.get());
+        registered = true;
+        absl::InitializeLog();
+    }
+
+    void Shutdown() noexcept
+    {
+        if (registered)
+            {
+                try
+                    {
+                        absl::FlushLogSinks();
+                    }
+                catch (...)
+                    {
+                    }
+                try
+                    {
+                        absl::RemoveLogSink(log_sink.get());
+                    }
+                catch (...)
+                    {
+                    }
+                registered = false;
+            }
+        log_sink.reset();
+    }
+
+private:
+    std::unique_ptr<TestingLogSink> log_sink;
+    bool registered = false;
 };
 #endif
 
@@ -94,8 +147,10 @@ private:
 #include "unit-tests/arithmetic/magnitude_squared_test.cc"
 #include "unit-tests/arithmetic/multiply_test.cc"
 #include "unit-tests/arithmetic/preamble_correlator_test.cc"
+#include "unit-tests/control-plane/gnss_synchro_monitor_test.cc"
 #include "unit-tests/control-plane/in_memory_configuration_test.cc"
 #include "unit-tests/control-plane/protobuf_test.cc"
+#include "unit-tests/control-plane/satellite_visibility_test.cc"
 #include "unit-tests/control-plane/string_converter_test.cc"
 #include "unit-tests/signal-processing-blocks/acquisition/galileo_e1_pcps_8ms_ambiguous_acquisition_gsoc2013_test.cc"
 #include "unit-tests/signal-processing-blocks/acquisition/galileo_e1_pcps_ambiguous_acquisition_gsoc2013_test.cc"
@@ -111,33 +166,61 @@ private:
 #include "unit-tests/signal-processing-blocks/acquisition/gps_l1_ca_pcps_tong_acquisition_gsoc2013_test.cc"
 #include "unit-tests/signal-processing-blocks/adapter/adapter_test.cc"
 #include "unit-tests/signal-processing-blocks/adapter/pass_through_test.cc"
+#include "unit-tests/signal-processing-blocks/libs/beidou_b1c_signal_replica_test.cc"
+#include "unit-tests/signal-processing-blocks/libs/beidou_b2a_signal_replica_test.cc"
 #include "unit-tests/signal-processing-blocks/libs/item_type_helpers_test.cc"
+#include "unit-tests/signal-processing-blocks/libs/rtklib_lli_test.cc"
 #include "unit-tests/signal-processing-blocks/osnma/gnss_crypto_test.cc"
 #include "unit-tests/signal-processing-blocks/osnma/osnma_msg_receiver_test.cc"
+#include "unit-tests/signal-processing-blocks/pvt/bds_tgd_iono_test.cc"
+#include "unit-tests/signal-processing-blocks/pvt/galileo_e1_bgd_test.cc"
+#include "unit-tests/signal-processing-blocks/pvt/galileo_nav_fallback_test.cc"
 #include "unit-tests/signal-processing-blocks/pvt/geohash_test.cc"
+#include "unit-tests/signal-processing-blocks/pvt/gps_tgd_isc_test.cc"
 #include "unit-tests/signal-processing-blocks/pvt/nmea_printer_test.cc"
+#include "unit-tests/signal-processing-blocks/pvt/ntrip_rtcm_client_test.cc"
 #include "unit-tests/signal-processing-blocks/pvt/rinex_printer_test.cc"
 #include "unit-tests/signal-processing-blocks/pvt/rtcm_printer_test.cc"
 #include "unit-tests/signal-processing-blocks/pvt/rtcm_test.cc"
+#include "unit-tests/signal-processing-blocks/pvt/rtklib_detslp_dop_test.cc"
+#include "unit-tests/signal-processing-blocks/pvt/rtklib_fixed_base_test.cc"
+#include "unit-tests/signal-processing-blocks/pvt/rtklib_pvt_ntrip_configuration_test.cc"
+#include "unit-tests/signal-processing-blocks/pvt/rtklib_tls_test.cc"
+#include "unit-tests/signal-processing-blocks/pvt/rtklib_udpos_test.cc"
+#include "unit-tests/signal-processing-blocks/pvt/sbas_rtklib_corrections_test.cc"
 #include "unit-tests/signal-processing-blocks/pvt/serdes_monitor_pvt_test.cc"
 #include "unit-tests/signal-processing-blocks/resampler/direct_resampler_conditioner_cc_test.cc"
 #include "unit-tests/signal-processing-blocks/resampler/mmse_resampler_test.cc"
 #include "unit-tests/signal-processing-blocks/sources/gnss_sdr_valve_test.cc"
 #include "unit-tests/signal-processing-blocks/sources/unpack_2bit_samples_test.cc"
 #include "unit-tests/signal-processing-blocks/telemetry_decoder/galileo_fnav_inav_decoder_test.cc"
+#include "unit-tests/signal-processing-blocks/telemetry_decoder/sbas_l1_telemetry_decoder_test.cc"
+#include "unit-tests/signal-processing-blocks/tracking/bit_synchronizer_test.cc"
 #include "unit-tests/signal-processing-blocks/tracking/cpu_multicorrelator_real_codes_test.cc"
 #include "unit-tests/signal-processing-blocks/tracking/cpu_multicorrelator_test.cc"
 #include "unit-tests/signal-processing-blocks/tracking/discriminator_test.cc"
+#include "unit-tests/signal-processing-blocks/tracking/frequency_error_reduction_test.cc"
 #include "unit-tests/signal-processing-blocks/tracking/galileo_e5a_tracking_test.cc"
 #include "unit-tests/signal-processing-blocks/tracking/galileo_e5b_dll_pll_tracking_test.cc"
 #include "unit-tests/signal-processing-blocks/tracking/tracking_loop_filter_test.cc"
+#include "unit-tests/system-parameters/beidou_b1c_pvt_helpers_test.cc"
+#include "unit-tests/system-parameters/beidou_b2a_pvt_helpers_test.cc"
+#include "unit-tests/system-parameters/beidou_bdgim_test.cc"
+#include "unit-tests/system-parameters/beidou_cnav1_ldpc_test.cc"
+#include "unit-tests/system-parameters/beidou_cnav1_navigation_message_test.cc"
+#include "unit-tests/system-parameters/beidou_cnav2_ldpc_test.cc"
+#include "unit-tests/system-parameters/beidou_cnav2_navigation_message_test.cc"
+#include "unit-tests/system-parameters/beidou_dnav_navigation_message_test.cc"
 #include "unit-tests/system-parameters/galileo_e1b_reed_solomon_test.cc"
 #include "unit-tests/system-parameters/galileo_e6b_reed_solomon_test.cc"
 #include "unit-tests/system-parameters/galileo_ism_test.cc"
 #include "unit-tests/system-parameters/glonass_gnav_ephemeris_test.cc"
 #include "unit-tests/system-parameters/glonass_gnav_nav_message_test.cc"
+#include "unit-tests/system-parameters/gnss_ephemeris_posvel_test.cc"
+#include "unit-tests/system-parameters/gps_cnav_navigation_message_test.cc"
 #include "unit-tests/system-parameters/has_decoding_test.cc"
 #include "unit-tests/system-parameters/qzss_code_generation_test.cc"
+#include "unit-tests/system-parameters/qzss_lnav_navigation_message_test.cc"
 
 #ifndef EXCLUDE_TESTS_REQUIRING_BINARIES
 #include "unit-tests/control-plane/control_thread_test.cc"
@@ -147,11 +230,13 @@ private:
 #include "unit-tests/signal-processing-blocks/acquisition/galileo_e1_pcps_ambiguous_acquisition_gsoc_test.cc"
 #include "unit-tests/signal-processing-blocks/acquisition/galileo_e1_pcps_ambiguous_acquisition_test.cc"
 #include "unit-tests/signal-processing-blocks/acquisition/gps_l1_ca_pcps_acquisition_test.cc"
+#include "unit-tests/signal-processing-blocks/acquisition/pcps_acquisition_doppler_narrowing_test.cc"
 #include "unit-tests/signal-processing-blocks/filter/fir_filter_test.cc"
 #include "unit-tests/signal-processing-blocks/filter/notch_filter_lite_test.cc"
 #include "unit-tests/signal-processing-blocks/filter/notch_filter_test.cc"
 #include "unit-tests/signal-processing-blocks/filter/pulse_blanking_filter_test.cc"
 #include "unit-tests/signal-processing-blocks/sources/file_signal_source_test.cc"
+#include "unit-tests/signal-processing-blocks/sources/labsat23_source_test.cc"
 #include "unit-tests/signal-processing-blocks/tracking/galileo_e1_dll_pll_veml_tracking_test.cc"
 #include "unit-tests/signal-processing-blocks/tracking/glonass_l1_ca_dll_pll_tracking_test.cc"
 #endif
@@ -179,6 +264,8 @@ private:
 #if EXTRA_TESTS
 #include "unit-tests/signal-processing-blocks/acquisition/acq_performance_test.cc"
 // #include "unit-tests/signal-processing-blocks/acquisition/beidou_b1i_pcps_acquisition_test.cc"
+#include "unit-tests/signal-processing-blocks/acquisition/beidou_b1c_pcps_acquisition_test.cc"
+#include "unit-tests/signal-processing-blocks/tracking/beidou_b1c_dll_pll_veml_tracking_test.cc"
 // #include "unit-tests/signal-processing-blocks/acquisition/beidou_b3i_pcps_acquisition_test.cc"
 #ifndef EXCLUDE_TESTS_REQUIRING_BINARIES
 #include "unit-tests/signal-processing-blocks/acquisition/glonass_l1_ca_pcps_acquisition_test.cc"
@@ -206,38 +293,48 @@ private:
 Concurrent_Queue<Gps_Acq_Assist> global_gps_acq_assist_queue;
 Concurrent_Map<Gps_Acq_Assist> global_gps_acq_assist_map;
 
-int main(int argc, char **argv)
-{
-    std::cout << "Running GNSS-SDR Tests...\n";
-    int res = 0;
-    try
-        {
-            testing::InitGoogleTest(&argc, argv);
-        }
-    catch (...)
-        {
-        }  // catch the "testing::internal::<unnamed>::ClassUniqueToAlwaysTrue" from gtest
+int main(int argc, char** argv)
+try
+    {
+        std::cout << "Running GNSS-SDR Tests...\n";
+        int res = 0;
+        try
+            {
+                testing::InitGoogleTest(&argc, argv);
+            }
+        catch (...)
+            {
+            }  // catch the "testing::internal::<unnamed>::ClassUniqueToAlwaysTrue" from gtest
 #if USE_GLOG_AND_GFLAGS
-    gflags::ParseCommandLineFlags(&argc, &argv, true);
-    google::InitGoogleLogging(argv[0]);
+        gflags::ParseCommandLineFlags(&argc, &argv, true);
+        google::InitGoogleLogging(argv[0]);
 #else
-    absl::ParseCommandLine(argc, argv);
-    absl::LogSink *testLogSink = new TestingLogSink;
-    absl::AddLogSink(testLogSink);
-    absl::InitializeLog();
+        TestingLogSinkGuard log_sink;
+        absl::ParseCommandLine(argc, argv);
+        log_sink.Register();
 #endif
-    try
-        {
-            res = RUN_ALL_TESTS();
-        }
-    catch (...)
-        {
-            LOG(WARNING) << "Unexpected catch";
-        }
+        try
+            {
+                res = RUN_ALL_TESTS();
+            }
+        catch (...)
+            {
+                LOG(WARNING) << "Unexpected catch";
+            }
 #if USE_GLOG_AND_GFLAGS
-    gflags::ShutDownCommandLineFlags();
+        gflags::ShutDownCommandLineFlags();
 #else
-    absl::FlushLogSinks();
+        log_sink.Shutdown();
 #endif
-    return res;
-}
+        return res;
+    }
+catch (const std::exception& e)
+    {
+        std::cerr << e.what() << '\n';
+        return 1;
+    }
+catch (...)
+    {
+        std::cerr << "Unexpected error\n";
+        return 1;
+    }

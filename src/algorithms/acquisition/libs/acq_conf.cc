@@ -70,18 +70,20 @@ void Acq_Conf::SetFromConfiguration(const ConfigurationInterface *configuration,
     doppler_step = configuration->property(role + ".doppler_step", doppler_step);
     threshold = configuration->property(role + ".threshold", threshold);
     pfa = configuration->property(role + ".pfa", pfa);
-    if ((pfa < 0.0) or (pfa > 1.0))
+    if ((pfa < 0.0) || (pfa > 1.0))
         {
             LOG(WARNING) << "Parameter pfa should between 0.0 and 1.0. Setting it to 0.0";
             pfa = 0.0;
         }
     pfa2 = configuration->property(role + ".pfa_second_step", pfa2);
-    if ((pfa2 <= 0.0) or (pfa2 > 1.0))
+    if ((pfa2 <= 0.0) || (pfa2 > 1.0))
         {
             pfa2 = pfa;
         }
     make_2_steps = configuration->property(role + ".make_two_steps", make_2_steps);
     blocking_on_standby = configuration->property(role + ".blocking_on_standby", blocking_on_standby);
+    enable_doppler_narrowing = configuration->property(role + ".enable_doppler_narrowing", enable_doppler_narrowing);
+    full_grid_search = configuration->property(role + ".full_grid_search", full_grid_search);
 
     if (pfa <= 0.0)
         {
