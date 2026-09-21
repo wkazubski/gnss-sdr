@@ -198,6 +198,7 @@ struct rtklib_pvt_gs::NavigationSnapshot
     using GalileoEphemerisMap = std::map<int, Galileo_Ephemeris>;
     using GalileoAlmanacMap = std::map<int, Galileo_Almanac>;
     using BeidouEphemerisMap = std::map<int, Beidou_Dnav_Ephemeris>;
+    using BeidouCnavEphemerisMap = std::map<int, Beidou_Cnav1_Ephemeris>;
     using BeidouAlmanacMap = std::map<int, Beidou_Dnav_Almanac>;
 
     std::shared_ptr<const GpsCnavEphemerisMap> gps_cnav_ephemeris = std::make_shared<const GpsCnavEphemerisMap>();
@@ -209,6 +210,8 @@ struct rtklib_pvt_gs::NavigationSnapshot
     std::shared_ptr<const GalileoEphemerisMap> galileo_ephemeris = std::make_shared<const GalileoEphemerisMap>();
     std::shared_ptr<const GalileoAlmanacMap> galileo_almanac = std::make_shared<const GalileoAlmanacMap>();
     std::shared_ptr<const BeidouEphemerisMap> beidou_ephemeris = std::make_shared<const BeidouEphemerisMap>();
+    std::shared_ptr<const BeidouCnavEphemerisMap> beidou_cnav1_ephemeris = std::make_shared<const BeidouCnavEphemerisMap>();
+    std::shared_ptr<const BeidouCnavEphemerisMap> beidou_cnav2_ephemeris = std::make_shared<const BeidouCnavEphemerisMap>();
     std::shared_ptr<const BeidouAlmanacMap> beidou_almanac = std::make_shared<const BeidouAlmanacMap>();
 };
 
@@ -276,6 +279,7 @@ rtklib_pvt_gs::rtklib_pvt_gs(uint32_t nchannels,
       d_observable_interval_ms(conf_.observable_interval_ms),
       d_ntrip_max_correction_age_s(conf_.ntrip_max_correction_age_s),
       d_pvt_errors_counter(0),
+      d_pvt_solver_errors_counter(0),
       d_last_fixed_base_status(-1),
       d_last_solution_status(SOLQ_NONE),
       d_dump(conf_.dump),
@@ -1701,10 +1705,18 @@ void rtklib_pvt_gs::msg_handler_telemetry(const pmt::pmt_t& msg)
                 {
                     // ### GPS ALMANAC ###
                     const auto gps_almanac = wht::any_cast<std::shared_ptr<Gps_Almanac>>(pmt::any_ref(msg));
-                    d_internal_pvt_solver->gps_almanac_map[gps_almanac->PRN] = *gps_almanac;
+                    Gps_Almanac new_almanac = *gps_almanac;
+                    // AS_status comes from page 25 of subframe 4: a channel that has not
+                    // decoded it yet reports it as unknown (<= 0). Keep the stored value.
+                    const auto stored_almanac = d_internal_pvt_solver->gps_almanac_map.find(static_cast<int>(new_almanac.PRN));
+                    if ((new_almanac.AS_status <= 0) && (stored_almanac != d_internal_pvt_solver->gps_almanac_map.cend()) && (stored_almanac->second.AS_status > 0))
+                        {
+                            new_almanac.AS_status = stored_almanac->second.AS_status;
+                        }
+                    d_internal_pvt_solver->gps_almanac_map[new_almanac.PRN] = new_almanac;
                     if (d_enable_rx_clock_correction == true)
                         {
-                            d_user_pvt_solver->gps_almanac_map[gps_almanac->PRN] = *gps_almanac;
+                            d_user_pvt_solver->gps_almanac_map[new_almanac.PRN] = new_almanac;
                         }
                     DLOG(INFO) << "New GPS almanac record has arrived";
                 }
@@ -2104,6 +2116,11 @@ void rtklib_pvt_gs::msg_handler_telemetry(const pmt::pmt_t& msg)
                 {
                     publish_navigation_snapshot(NavigationData::BeidouEphemeris);
                 }
+            else if (msg_type_hash_code == d_beidou_cnav1_ephemeris_sptr_type_hash_code ||
+                     msg_type_hash_code == d_beidou_cnav1_page_data_sptr_type_hash_code)
+                {
+                    publish_navigation_snapshot(NavigationData::BeidouCnavEphemeris);
+                }
             else if (msg_type_hash_code == d_beidou_dnav_almanac_sptr_type_hash_code)
                 {
                     publish_navigation_snapshot(NavigationData::BeidouAlmanac);
@@ -2232,8 +2249,33 @@ void rtklib_pvt_gs::publish_navigation_snapshot(NavigationData data)
         case NavigationData::BeidouEphemeris:
             updated->beidou_ephemeris = std::make_shared<const NavigationSnapshot::BeidouEphemerisMap>(d_internal_pvt_solver->beidou_dnav_ephemeris_map);
             break;
+        case NavigationData::BeidouCnavEphemeris:
+            {
+                auto cnav1 = std::make_shared<NavigationSnapshot::BeidouCnavEphemerisMap>(d_internal_pvt_solver->beidou_cnav1_ephemeris_map);
+                // B-CNAV1 health may arrive on a later page without a new orbit.
+                // Use the same latest-page health as the PVT solver.
+                for (auto& entry : *cnav1)
+                    {
+                        const auto page = d_internal_pvt_solver->beidou_cnav1_page_data_map.find(entry.first);
+                        if (page != d_internal_pvt_solver->beidou_cnav1_page_data_map.cend())
+                            {
+                                entry.second.hs = page->second.common.hs;
+                            }
+                    }
+                updated->beidou_cnav1_ephemeris = std::move(cnav1);
+                updated->beidou_cnav2_ephemeris = std::make_shared<const NavigationSnapshot::BeidouCnavEphemerisMap>(d_internal_pvt_solver->beidou_cnav2_ephemeris_map);
+                break;
+            }
         case NavigationData::BeidouAlmanac:
             updated->beidou_almanac = std::make_shared<const NavigationSnapshot::BeidouAlmanacMap>(d_internal_pvt_solver->beidou_dnav_almanac_map);
+            break;
+        case NavigationData::RetainedAlmanacs:
+            updated->gps_almanac = std::make_shared<const NavigationSnapshot::GpsAlmanacMap>(d_internal_pvt_solver->gps_almanac_map);
+            updated->galileo_almanac = std::make_shared<const NavigationSnapshot::GalileoAlmanacMap>(d_internal_pvt_solver->galileo_almanac_map);
+            updated->beidou_almanac = std::make_shared<const NavigationSnapshot::BeidouAlmanacMap>(d_internal_pvt_solver->beidou_dnav_almanac_map);
+            updated->glonass_almanac = std::make_shared<const NavigationSnapshot::GlonassAlmanacMap>(d_internal_pvt_solver->glonass_gnav_almanac_map);
+            // The GLONASS almanac date can come from its retained UTC model.
+            updated->glonass_utc_model = d_internal_pvt_solver->glonass_gnav_utc_model;
             break;
         }
     std::shared_ptr<const NavigationSnapshot> published = std::move(updated);
@@ -2284,6 +2326,18 @@ std::map<int, Beidou_Dnav_Ephemeris> rtklib_pvt_gs::get_beidou_dnav_ephemeris_ma
 }
 
 
+std::map<int, Beidou_Cnav1_Ephemeris> rtklib_pvt_gs::get_beidou_cnav1_ephemeris_map() const
+{
+    return *navigation_snapshot()->beidou_cnav1_ephemeris;
+}
+
+
+std::map<int, Beidou_Cnav1_Ephemeris> rtklib_pvt_gs::get_beidou_cnav2_ephemeris_map() const
+{
+    return *navigation_snapshot()->beidou_cnav2_ephemeris;
+}
+
+
 std::map<int, Beidou_Dnav_Almanac> rtklib_pvt_gs::get_beidou_dnav_almanac_map() const
 {
     const auto snapshot = navigation_snapshot();
@@ -2291,54 +2345,110 @@ std::map<int, Beidou_Dnav_Almanac> rtklib_pvt_gs::get_beidou_dnav_almanac_map() 
 }
 
 
+namespace
+{
+void clear_navigation_maps(Rtklib_Solver& solver, bool keep_almanac)
+{
+    solver.clear_gps_ephemerides();
+    solver.gps_cnav_ephemeris_map.clear();
+    solver.glonass_gnav_ephemeris_map.clear();
+    solver.galileo_ephemeris_map.clear();
+    solver.galileo_ephemeris_store.clear();
+    solver.galileo_reduced_ced_map.clear();
+    solver.beidou_dnav_ephemeris_map.clear();
+    solver.beidou_cnav1_ephemeris_map.clear();
+    solver.beidou_cnav2_ephemeris_map.clear();
+    solver.beidou_cnav1_page_data_map.clear();
+    if (keep_almanac)
+        {
+            return;
+        }
+    solver.gps_almanac_map.clear();
+    solver.glonass_gnav_almanac_map.clear();
+    solver.glonass_gnav_almanac = Glonass_Gnav_Almanac();
+    solver.galileo_almanac_map.clear();
+    solver.beidou_dnav_almanac_map.clear();
+}
+}  // namespace
+
+
 void rtklib_pvt_gs::clear_ephemeris()
 {
-    auto previous = d_empty_navigation_snapshot;
+    request_navigation_clear(NavigationClear::All);
+}
+
+
+void rtklib_pvt_gs::clear_ephemeris_keep_almanac()
+{
+    request_navigation_clear(NavigationClear::EphemerisOnly);
+}
+
+
+void rtklib_pvt_gs::request_navigation_clear(NavigationClear kind)
+{
+    // The worker owns the solvers. Invalidate readers immediately, but defer
+    // clearing the mutable maps until it is between work/telemetry callbacks.
+    std::shared_ptr<const NavigationSnapshot> previous;
     {
         std::lock_guard<std::mutex> lock(d_snapshot_mutex);
+        std::shared_ptr<const NavigationSnapshot> replacement = d_empty_navigation_snapshot;
+        if (kind == NavigationClear::EphemerisOnly)
+            {
+                // Pointer copies only: the almanac maps stay shared with the
+                // current snapshot, the ephemeris entries point at the empty maps.
+                auto almanac_only = std::make_shared<NavigationSnapshot>(*d_navigation_snapshot);
+                almanac_only->gps_ephemeris = d_empty_navigation_snapshot->gps_ephemeris;
+                almanac_only->gps_cnav_ephemeris = d_empty_navigation_snapshot->gps_cnav_ephemeris;
+                almanac_only->glonass_ephemeris = d_empty_navigation_snapshot->glonass_ephemeris;
+                almanac_only->galileo_ephemeris = d_empty_navigation_snapshot->galileo_ephemeris;
+                almanac_only->beidou_ephemeris = d_empty_navigation_snapshot->beidou_ephemeris;
+                almanac_only->beidou_cnav1_ephemeris = d_empty_navigation_snapshot->beidou_cnav1_ephemeris;
+                almanac_only->beidou_cnav2_ephemeris = d_empty_navigation_snapshot->beidou_cnav2_ephemeris;
+                replacement = std::move(almanac_only);
+            }
+        // A full clear requested before the worker has applied an
+        // ephemeris-only one must not be downgraded by it.
+        if (kind == NavigationClear::All || d_pending_navigation_clear == NavigationClear::None)
+            {
+                d_pending_navigation_clear = kind;
+            }
         d_navigation_generation.fetch_add(1, std::memory_order_release);
-        d_navigation_snapshot.swap(previous);
+        previous = std::move(d_navigation_snapshot);
+        d_navigation_snapshot = std::move(replacement);
     }
-    // The worker owns the solvers. Invalidate readers immediately, but defer
-    // clearing mutable maps until it is between work/telemetry callbacks.
+    // The previous snapshot, and the maps only it referenced, die here, outside the lock.
 }
 
 
 void rtklib_pvt_gs::apply_pending_navigation_clear()
 {
-    const uint32_t generation = d_navigation_generation.load(std::memory_order_acquire);
-    if (generation == d_applied_navigation_generation)
+    if (d_navigation_generation.load(std::memory_order_acquire) == d_applied_navigation_generation)
         {
             return;
         }
-    d_internal_pvt_solver->clear_gps_ephemerides();
-    d_internal_pvt_solver->gps_almanac_map.clear();
-    d_internal_pvt_solver->gps_cnav_ephemeris_map.clear();
-    d_internal_pvt_solver->glonass_gnav_ephemeris_map.clear();
-    d_internal_pvt_solver->glonass_gnav_almanac_map.clear();
-    d_internal_pvt_solver->glonass_gnav_almanac = Glonass_Gnav_Almanac();
-    d_internal_pvt_solver->galileo_ephemeris_map.clear();
-    d_internal_pvt_solver->galileo_ephemeris_store.clear();
-    d_internal_pvt_solver->galileo_reduced_ced_map.clear();
-    d_internal_pvt_solver->galileo_almanac_map.clear();
-    d_internal_pvt_solver->beidou_dnav_ephemeris_map.clear();
-    d_internal_pvt_solver->beidou_dnav_almanac_map.clear();
+    uint32_t generation;
+    NavigationClear kind;
+    {
+        std::lock_guard<std::mutex> lock(d_snapshot_mutex);
+        generation = d_navigation_generation.load(std::memory_order_acquire);
+        kind = d_pending_navigation_clear;
+        d_pending_navigation_clear = NavigationClear::None;
+    }
+    const bool keep_almanac = (kind == NavigationClear::EphemerisOnly);
+    clear_navigation_maps(*d_internal_pvt_solver, keep_almanac);
     if (d_enable_rx_clock_correction == true)
         {
-            d_user_pvt_solver->clear_gps_ephemerides();
-            d_user_pvt_solver->gps_almanac_map.clear();
-            d_user_pvt_solver->gps_cnav_ephemeris_map.clear();
-            d_user_pvt_solver->glonass_gnav_ephemeris_map.clear();
-            d_user_pvt_solver->glonass_gnav_almanac_map.clear();
-            d_user_pvt_solver->glonass_gnav_almanac = Glonass_Gnav_Almanac();
-            d_user_pvt_solver->galileo_ephemeris_map.clear();
-            d_user_pvt_solver->galileo_ephemeris_store.clear();
-            d_user_pvt_solver->galileo_reduced_ced_map.clear();
-            d_user_pvt_solver->galileo_almanac_map.clear();
-            d_user_pvt_solver->beidou_dnav_ephemeris_map.clear();
-            d_user_pvt_solver->beidou_dnav_almanac_map.clear();
+            clear_navigation_maps(*d_user_pvt_solver, keep_almanac);
         }
     d_applied_navigation_generation = generation;
+    if (keep_almanac)
+        {
+            // An in-flight telemetry callback may have updated the retained
+            // solver maps but lost publication to the clear's generation guard.
+            // Republish them now; the same guard rejects this snapshot if a
+            // newer clear arrives while these maps are being copied.
+            publish_navigation_snapshot(NavigationData::RetainedAlmanacs);
+        }
 }
 
 
@@ -3080,6 +3190,7 @@ int rtklib_pvt_gs::work(int noutput_items, gr_vector_const_void_star& input_item
                     if (d_internal_pvt_solver->get_PVT(d_gnss_observables_map, d_observable_interval_ms / 1000.0, *d_sensor_data_aggregator, dump_this_epoch))
                         {
                             d_pvt_errors_counter = 0;  // Reset consecutive PVT error counter
+                            d_pvt_solver_errors_counter = 0;
                             const double Rx_clock_offset_s = d_internal_pvt_solver->get_time_offset_s();
                             if (d_ntrip_client)
                                 {
@@ -3212,13 +3323,21 @@ int rtklib_pvt_gs::work(int noutput_items, gr_vector_const_void_star& input_item
                                 {
                                     report_solution_outage();
                                 }
-                            // sanity check: If the PVT solver is getting 100 consecutive errors, send a reset command to observables block
-                            if (d_pvt_errors_counter >= 100)
+                            // sanity check: If the PVT solver is getting 100 consecutive errors, send a reset command to observables block.
+                            // Only the epochs in which the solver had what it takes to compute a solution and failed
+                            // are errors: the epochs without enough satellites tell nothing about the receiver time.
+                            // The command is sent once per outage: the receiver time would be set again from the
+                            // same channels, so repeating it cannot help if the first one did not (e.g., with a poor
+                            // geometry), and each one costs a gap in the observables of every channel
+                            if (d_internal_pvt_solver->solution_attempted() && d_pvt_solver_errors_counter < 100)
                                 {
-                                    int command = 1;
-                                    this->message_port_pub(pmt::mp("pvt_to_observables"), pmt::make_any(command));
-                                    LOG(INFO) << "PVT: Number of consecutive position solver error reached, Sent reset to observables.";
-                                    d_pvt_errors_counter = 0;
+                                    d_pvt_solver_errors_counter++;
+                                    if (d_pvt_solver_errors_counter == 100)
+                                        {
+                                            int command = 1;
+                                            this->message_port_pub(pmt::mp("pvt_to_observables"), pmt::make_any(command));
+                                            LOG(INFO) << "PVT: Number of consecutive position solver error reached, Sent reset to observables.";
+                                        }
                                 }
                         }
 

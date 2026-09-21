@@ -4,7 +4,7 @@
  *  data flow and structures
  * \authors <ul>
  *          <li> 2017-2019, Javier Arribas
- *          <li> 2017-2023, Carles Fernandez
+ *          <li> 2017-2026, Carles Fernandez
  *          <li> 2007-2013, T. Takasu
  *          </ul>
  *
@@ -23,7 +23,7 @@
  * -----------------------------------------------------------------------------
  * Copyright (C) 2007-2013, T. Takasu
  * Copyright (C) 2017-2019, Javier Arribas
- * Copyright (C) 2017-2023, Carles Fernandez
+ * Copyright (C) 2017-2026, Carles Fernandez
  * All rights reserved.
  *
  * SPDX-License-Identifier: BSD-2-Clause
@@ -161,14 +161,23 @@ Rtklib_Solver::Rtklib_Solver(const rtk_t &rtk,
             d_rtklib_freq_index[0] = 2;
         }
 
-    // B2a-only SPP uses RTKLIB slot 0. Default "5D" mapping is slot 2
-    // (L1+L2+L5). RTKLIB BDS satwavelen frq2 is B3 (1268.52 MHz), not L5,
-    // so lam[0] is overridden to c/FREQ5 in get_PVT. This remap is gated on
-    // B2a-only: B1I/B1C/B3 present keeps the default dual-frequency map.
-    if (flags.check_only_enabled(BDS_B2A))
+    // Resolve BeiDou slots independently of the other constellations. B2a
+    // owns slot 2 in a frequency pair; B3I uses the remaining slot when a
+    // B1 signal is enabled, or the primary slot for B3I+B2a reception.
+    if (flags.check_any_enabled(BDS_B2A))
         {
-            d_rtklib_band_index["5D"] = 0;
-            d_rtklib_freq_index[0] = 2;
+            if (flags.check_any_enabled(BDS_B1, BDS_B1C))
+                {
+                    d_rtklib_band_index["B3"] = 1;
+                }
+            else if (flags.check_any_enabled(BDS_B3))
+                {
+                    d_rtklib_band_index["B3"] = 0;
+                }
+            else
+                {
+                    d_rtklib_band_index["5D"] = 0;
+                }
         }
 
     // In automatic I/NAV mode E5a observations are not admitted to PVT, so
@@ -1410,6 +1419,138 @@ bool Rtklib_Solver::get_galileo_signal_health(uint32_t prn, const std::string &s
 }
 
 
+bool Rtklib_Solver::get_broadcast_signal_health(char system, uint32_t prn, const std::string &signal,
+    uint32_t observation_tow, bool &healthy) const
+{
+    const auto prn_key = static_cast<int>(prn);
+    switch (system)
+        {
+        case 'G':
+        case 'J':
+            {
+                // L2C and L5 health comes from the CNAV message that carries them:
+                // bits 52-54 of message type 10 are the L1, L2 and L5 signal health
+                // (0 = OK, IS-GPS-200 30.3.3.1.1.2).
+                if (signal == "2S" || signal == "L5" || signal == "J5")
+                    {
+                        const auto cnav_it = gps_cnav_ephemeris_map.find(prn_key);
+                        if (cnav_it != gps_cnav_ephemeris_map.cend())
+                            {
+                                const int32_t signal_bit = (signal == "2S") ? 0x2 : 0x1;
+                                healthy = ((cnav_it->second.signal_health & signal_bit) == 0);
+                                return true;
+                            }
+                    }
+                // L1 C/A: per-satellite SV health from LNAV subframe 1, falling back
+                // to the almanac (broadcast by every satellite) when no ephemeris has
+                // been decoded for this satellite yet.
+                const auto eph_it = gps_ephemeris_map.find(prn_key);
+                if (eph_it != gps_ephemeris_map.cend())
+                    {
+                        healthy = (eph_it->second.SV_health == 0);
+                        return true;
+                    }
+                const auto alm_it = gps_almanac_map.find(prn_key);
+                if (alm_it != gps_almanac_map.cend())
+                    {
+                        healthy = (alm_it->second.SV_health == 0);
+                        return true;
+                    }
+                return false;
+            }
+        case 'E':
+            {
+                if (get_galileo_signal_health(prn, signal, observation_tow, healthy))
+                    {
+                        return true;
+                    }
+                // No usable ephemeris for this signal's service yet -- fall back
+                // to the almanac health status of the same signal. The I/NAV
+                // almanac carries E1B_HS and E5b_HS; E5a_HS only comes with the
+                // F/NAV almanac. E6 has no broadcast health status.
+                const auto alm_it = galileo_almanac_map.find(prn_key);
+                if (alm_it == galileo_almanac_map.cend())
+                    {
+                        return false;
+                    }
+                if (signal == "1B")
+                    {
+                        healthy = (alm_it->second.E1B_HS == 0);
+                    }
+                else if (signal == "7X")
+                    {
+                        healthy = (alm_it->second.E5b_HS == 0);
+                    }
+                else if (signal == "5X")
+                    {
+                        healthy = (alm_it->second.E5a_HS == 0);
+                    }
+                else
+                    {
+                        return false;
+                    }
+                return true;
+            }
+        case 'R':
+            {
+                // Same predicate as the ephemeris handed to RTKLIB (see
+                // eph_to_rtklib()), so a GLONASS satellite excluded from the solve
+                // for health reasons is reported with used = false, healthy = false.
+                const auto eph_it = glonass_gnav_ephemeris_map.find(prn_key);
+                if (eph_it != glonass_gnav_ephemeris_map.cend())
+                    {
+                        healthy = glonass_gnav_is_healthy(eph_it->second, d_conf.glonass_strict_health);
+                        return true;
+                    }
+                return false;
+            }
+        case 'C':
+            {
+                if (signal == "1D")
+                    {
+                        // B1C: B-CNAV1 subframe 3 health status (HS, 0 = healthy). The
+                        // latest page data is preferred over the ephemeris record, as
+                        // when the ephemeris is handed to RTKLIB.
+                        const auto page_it = beidou_cnav1_page_data_map.find(prn_key);
+                        if (page_it != beidou_cnav1_page_data_map.cend())
+                            {
+                                healthy = (page_it->second.common.hs == 0);
+                                return true;
+                            }
+                        const auto cnav1_it = beidou_cnav1_ephemeris_map.find(prn_key);
+                        if (cnav1_it != beidou_cnav1_ephemeris_map.cend())
+                            {
+                                healthy = (cnav1_it->second.hs == 0);
+                                return true;
+                            }
+                        return false;
+                    }
+                if (signal == "5D")
+                    {
+                        // B2a: B-CNAV2 health status (HS, 0 = healthy)
+                        const auto cnav2_it = beidou_cnav2_ephemeris_map.find(prn_key);
+                        if (cnav2_it != beidou_cnav2_ephemeris_map.cend())
+                            {
+                                healthy = (cnav2_it->second.hs == 0);
+                                return true;
+                            }
+                        return false;
+                    }
+                // B1I / B3I: DNAV satellite health (SatH1, 0 = healthy)
+                const auto dnav_it = beidou_dnav_ephemeris_map.find(prn_key);
+                if (dnav_it != beidou_dnav_ephemeris_map.cend())
+                    {
+                        healthy = (dnav_it->second.SV_health == 0);
+                        return true;
+                    }
+                return false;
+            }
+        default:
+            return false;
+        }
+}
+
+
 std::map<int, Galileo_Ephemeris> Rtklib_Solver::get_galileo_ephemeris_map_for_pvt() const
 {
     auto result = galileo_ephemeris_store.combined_view(d_galileo_nav_message_type_for_pvt);
@@ -1542,6 +1683,40 @@ void Rtklib_Solver::reset_relative_filter()
 }
 
 
+void Rtklib_Solver::update_beidou_observation_wavelengths(const obsd_t &observation)
+{
+    if (satsys(observation.sat, nullptr) != SYS_BDS)
+        {
+            return;
+        }
+    for (int band = 0; band < NFREQ; ++band)
+        {
+            const unsigned char code = observation.code[band];
+            double frequency = 0.0;
+            if (is_bds_b1c_code(code))
+                {
+                    frequency = FREQ1;
+                }
+            else if (is_bds_b2a_code(code))
+                {
+                    frequency = FREQ5;
+                }
+            else if (code == CODE_L6I || code == CODE_L6Q)
+                {
+                    frequency = FREQ3_BDS;
+                }
+            else if (code == CODE_L2I || code == CODE_L1I)
+                {
+                    frequency = FREQ1_BDS;
+                }
+            if (frequency > 0.0)
+                {
+                    d_nav_data.lam[observation.sat - 1][band] = SPEED_OF_LIGHT_M_S / frequency;
+                }
+        }
+}
+
+
 int Rtklib_Solver::merge_duplicated_rover_observations(int rover_observation_count)
 {
     /* Two channels can deliver the same satellite on the same signal (e.g. a
@@ -1573,6 +1748,7 @@ int Rtklib_Solver::merge_duplicated_rover_observations(int rover_observation_cou
                     continue;
                 }
             obsd_t &destination = d_obs_data[match];
+            bool overlapping_signal = false;
             for (int frequency = 0; frequency < NFREQ + NEXOBS; ++frequency)
                 {
                     const bool source_has_data = source.code[frequency] != CODE_NONE &&
@@ -1583,6 +1759,7 @@ int Rtklib_Solver::merge_duplicated_rover_observations(int rover_observation_cou
                         }
                     const bool destination_has_data = destination.code[frequency] != CODE_NONE &&
                                                       (destination.P[frequency] != 0.0 || destination.L[frequency] != 0.0);
+                    overlapping_signal = overlapping_signal || destination_has_data;
                     if (destination_has_data && destination.SNR[frequency] >= source.SNR[frequency])
                         {
                             continue;
@@ -1594,8 +1771,8 @@ int Rtklib_Solver::merge_duplicated_rover_observations(int rover_observation_cou
                     destination.LLI[frequency] = source.LLI[frequency];
                     destination.code[frequency] = source.code[frequency];
                 }
-            merged_any = true;
-            if (!d_duplicated_rover_observations_logged)
+            merged_any = merged_any || overlapping_signal;
+            if (overlapping_signal && !d_duplicated_rover_observations_logged)
                 {
                     LOG(WARNING) << "Duplicated observation of satellite " << satno2id(source.sat)
                                  << " received from two channels: keeping the measurement with the highest C/N0";
@@ -1945,9 +2122,12 @@ bool Rtklib_Solver::get_PVT(const std::map<int, Gnss_Synchro> &gnss_observables_
     d_fixed_base_status = fixed_base == nullptr ? Rtklib_Fixed_Base_Status::NOT_REQUESTED : Rtklib_Fixed_Base_Status::MISSING_OBSERVATIONS;
     d_fixed_base_age_s = 0.0;
     d_fixed_base_common_satellites = 0;
+    d_solution_attempted = false;
 
-    d_obs_data.fill({});
-    std::vector<eph_t> eph_data(MAXOBS);
+    // Before merging, a multi-band satellite contributes several channel
+    // records and ephemerides. MAXOBS limits satellites, not input channels.
+    d_obs_data.assign(std::max(static_cast<size_t>(MAXOBS * 2), gnss_observables_map.size()), obsd_t{});
+    std::vector<eph_t> eph_data(std::max(static_cast<size_t>(MAXOBS), gnss_observables_map.size()));
     std::vector<geph_t> geph_data(MAXOBS);
 
     for (gnss_observables_iter = gnss_observables_map.cbegin();
@@ -2537,6 +2717,7 @@ bool Rtklib_Solver::get_PVT(const std::map<int, Gnss_Synchro> &gnss_observables_
     if (rover_observation_count > 3)
         {
             int result = 0;
+            d_solution_attempted = true;
 
             const auto sbas_time_reference = std::find_if(
                 gnss_observables_map.cbegin(), gnss_observables_map.cend(),
@@ -2722,25 +2903,9 @@ bool Rtklib_Solver::get_PVT(const std::map<int, Gnss_Synchro> &gnss_observables_
                     update_galileo_observation_wavelengths(d_obs_data[i]);
                 }
 
-            /* B1C on slot 0: override lam[0] to FREQ1 (satwavelen frq0 is B1I). */
             for (int k = 0; k < nobs_total; k++)
                 {
-                    if (satsys(d_obs_data[k].sat, nullptr) != SYS_BDS)
-                        {
-                            continue;
-                        }
-                    const unsigned char c0 = d_obs_data[k].code[0];
-                    if (is_bds_b1c_code(c0))
-                        {
-                            d_nav_data.lam[d_obs_data[k].sat - 1][0] = SPEED_OF_LIGHT_M_S / FREQ1;
-                        }
-                    for (int band = 0; band < NFREQ; ++band)
-                        {
-                            if (is_bds_b2a_code(d_obs_data[k].code[band]))
-                                {
-                                    d_nav_data.lam[d_obs_data[k].sat - 1][band] = SPEED_OF_LIGHT_M_S / FREQ5;
-                                }
-                        }
+                    update_beidou_observation_wavelengths(d_obs_data[k]);
                 }
             const int configured_positioning_mode = d_rtk.opt.mode;
             if (use_single_fallback)
@@ -3041,6 +3206,15 @@ bool Rtklib_Solver::get_PVT(const std::map<int, Gnss_Synchro> &gnss_observables_
                                     info.elevation_deg = pvt_ssat[sat_idx].azel[1] * R2D;
                                     info.combined = combined;
                                     info.used = used;
+                                    // Broadcast health of this signal, as reported by the
+                                    // navigation message that carries it (true when no health
+                                    // information is available). Independent of `used`.
+                                    const auto observation_tow = static_cast<uint32_t>(synchro->interp_TOW_ms / 1000.0);
+                                    bool healthy = true;
+                                    if (get_broadcast_signal_health(sys_char, static_cast<uint32_t>(prn), info.signal, observation_tow, healthy))
+                                        {
+                                            info.healthy = healthy;
+                                        }
                                     d_monitor_pvt.tracked_satellites.push_back(info);
                                 }
                         }

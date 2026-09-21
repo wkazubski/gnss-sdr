@@ -890,6 +890,12 @@ void Rtklib_Pvt::clear_ephemeris()
 }
 
 
+void Rtklib_Pvt::clear_ephemeris_keep_almanac()
+{
+    pvt_->clear_ephemeris_keep_almanac();
+}
+
+
 std::map<int, Gps_Ephemeris> Rtklib_Pvt::get_gps_ephemeris() const
 {
     return pvt_->get_gps_ephemeris_map();
@@ -905,6 +911,18 @@ std::map<int, Galileo_Ephemeris> Rtklib_Pvt::get_galileo_ephemeris() const
 std::map<int, Beidou_Dnav_Ephemeris> Rtklib_Pvt::get_beidou_dnav_ephemeris() const
 {
     return pvt_->get_beidou_dnav_ephemeris_map();
+}
+
+
+std::map<int, Beidou_Cnav1_Ephemeris> Rtklib_Pvt::get_beidou_cnav1_ephemeris() const
+{
+    return pvt_->get_beidou_cnav1_ephemeris_map();
+}
+
+
+std::map<int, Beidou_Cnav1_Ephemeris> Rtklib_Pvt::get_beidou_cnav2_ephemeris() const
+{
+    return pvt_->get_beidou_cnav2_ephemeris_map();
 }
 
 

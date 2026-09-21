@@ -57,12 +57,14 @@ class Glonass_Gnav_Almanac;
 class Glonass_Gnav_Utc_Model;
 class Beidou_Dnav_Almanac;
 class Beidou_Dnav_Ephemeris;
+class Beidou_Cnav1_Ephemeris;
 class Galileo_Almanac;
 class Galileo_Ephemeris;
 class Galileo_HAS_data;
 class Galileo_Reduced_CED;
 class Geohash;
 class GeoJSON_Printer;
+class Glonass_Gnav_Ephemeris;
 class Gps_Almanac;
 class Gps_Ephemeris;
 class Gpx_Printer;
@@ -123,6 +125,8 @@ public:
      * \brief Get latest set of BeiDou DNAV ephemeris from PVT block
      */
     std::map<int, Beidou_Dnav_Ephemeris> get_beidou_dnav_ephemeris_map() const;
+    std::map<int, Beidou_Cnav1_Ephemeris> get_beidou_cnav1_ephemeris_map() const;
+    std::map<int, Beidou_Cnav1_Ephemeris> get_beidou_cnav2_ephemeris_map() const;
 
     /*!
      * \brief Get latest set of BeiDou DNAV almanac from PVT block
@@ -134,6 +138,13 @@ public:
      * at the worker's next work() or telemetry callback.
      */
     void clear_ephemeris();
+
+    /*!
+     * \brief Clears the ephemeris entries of the published navigation snapshot
+     * now and the solver ephemeris maps at the worker's next work() or telemetry
+     * callback, leaving the GPS, Galileo, BeiDou and GLONASS almanacs untouched.
+     */
+    void clear_ephemeris_keep_almanac();
 
     /*!
      * \brief Interpolates one observable between two epochs, in the carrier
@@ -233,7 +244,15 @@ private:
         GalileoEphemeris,
         GalileoAlmanac,
         BeidouEphemeris,
-        BeidouAlmanac
+        BeidouCnavEphemeris,
+        BeidouAlmanac,
+        RetainedAlmanacs
+    };
+    enum class NavigationClear : uint8_t
+    {
+        None,
+        EphemerisOnly,
+        All
     };
     struct NavigationSnapshot;
     struct LatestPvt
@@ -249,6 +268,7 @@ private:
 
     std::shared_ptr<const NavigationSnapshot> navigation_snapshot() const;
     void publish_navigation_snapshot(NavigationData data);
+    void request_navigation_clear(NavigationClear kind);
     void apply_pending_navigation_clear();
     void publish_latest_pvt();
 
@@ -259,7 +279,8 @@ private:
     std::shared_ptr<const NavigationSnapshot> d_navigation_snapshot;
     LatestPvt d_latest_pvt;
     std::atomic<uint32_t> d_navigation_generation{0};
-    uint32_t d_applied_navigation_generation = 0;  // GNU Radio worker only
+    NavigationClear d_pending_navigation_clear = NavigationClear::None;  // guarded by d_snapshot_mutex
+    uint32_t d_applied_navigation_generation = 0;                        // GNU Radio worker only
     std::shared_ptr<Rtklib_Solver> d_internal_pvt_solver;
     std::shared_ptr<Rtklib_Solver> d_user_pvt_solver;
 
@@ -362,7 +383,8 @@ private:
     const uint32_t d_signal_enabled_flags;
     const uint32_t d_observable_interval_ms;
     const double d_ntrip_max_correction_age_s;
-    uint32_t d_pvt_errors_counter;
+    uint32_t d_pvt_errors_counter;         // consecutive epochs without a solution, whatever the reason
+    uint32_t d_pvt_solver_errors_counter;  // epochs in which the solver tried and failed since the last solution, up to 100
     int d_last_fixed_base_status;
     uint64_t d_ntrip_snapshot_generation = 0;
     int d_last_solution_status;

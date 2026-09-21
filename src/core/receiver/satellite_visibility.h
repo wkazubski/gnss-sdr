@@ -20,6 +20,7 @@
 #include "gnss_satellite.h"
 #include "rtklib.h"  // for gtime_t
 #include <armadillo>
+#include <array>
 #include <cstdint>
 #include <ctime>
 #include <limits>
@@ -45,7 +46,9 @@ class PvtInterface;
  * almanac data in pvt_ptr (GPS, Galileo, BeiDou, GLONASS, QZSS) and returns
  * those strictly above elevation_mask_deg that broadcast a healthy status.
  * Ephemeris is preferred over almanac, so each satellite is classified by
- * exactly one data source. An unhealthy satellite (SV_health != 0; Galileo
+ * exactly one data source. BeiDou uses the fresh DNAV/CNAV1/CNAV2 orbit
+ * closest to the query epoch (ties: DNAV, CNAV1, CNAV2); B-CNAV is limited
+ * to IGSO/MEO satellite types. An unhealthy satellite (SV_health != 0; Galileo
  * E1B_HS != 0, since 1B initiates the search) is reported as below-mask, not
  * as "no data": it is known unusable whatever its geometry.
  *
@@ -103,7 +106,8 @@ std::vector<std::pair<int, Gnss_Satellite>> compute_visible_satellites(
  * GNSSFlowgraph::pop_by_visibility(): almanac and ephemeris can disagree at
  * the mask boundary, and tracking is stronger evidence than either.
  *
- * Tick() recomputes when: the fix just became valid; any PRN's ephemeris/
+ * Tick() recomputes when: a telecommand reference was supplied; the fix just
+ * became valid; any PRN's ephemeris/
  * almanac fingerprint (toe/toa, health) changed; visibility_recompute_interval_s
  * of receiver time elapsed; the receiver moved more than
  * visibility_recompute_position_threshold_m; or the freshest classified data
@@ -124,8 +128,17 @@ public:
     uint32_t search_ratio() const { return search_ratio_; }
 
     /*!
+     * \brief Supplies a telecommand position and UTC epoch, anchored to the
+     * current sample clock. Forces the next Tick() to recompute and overrides
+     * the current fix/configured reference until a different PVT epoch arrives.
+     */
+    void SetCommandReference(time_t utc_time, const std::array<float, 3>& LLH,
+        const Monitor_Pvt& current_fix, double receiver_time_s);
+
+    /*!
      * \brief Re-evaluates visibility when one of the triggers listed in the
-     * class description fires. Uses the latest fix position, else
+     * class description fires. Uses an active telecommand reference, else
+     * the latest fix position, else
      * GNSS-SDR.AGNSS_ref_location/AGNSS_ref_utc_time if configured, else
      * does nothing. Elapsed sample time advances the epoch between fixes
      * and before the first fix, including during recorded-data playback.
@@ -189,6 +202,13 @@ private:
     // unrelated to the GNSS time in the samples, so configure it explicitly.
     time_t agnss_ref_utc_time_;
 
+    bool have_command_reference_{false};
+    std::array<float, 3> command_reference_llh_{};
+    time_t command_reference_utc_time_{0};
+    double command_reference_receiver_time_s_{0.0};
+    double command_previous_fix_time_s_{-1.0};
+    bool command_reference_changed_{false};
+
     // GNSS-SDR.<System>_banned_prns, parsed as in GNSSFlowgraph::set_signals_list().
     // A banned PRN is never classified visible, keeping the diagnostics
     // consistent with its removal from the search pool.
@@ -212,10 +232,12 @@ private:
     double last_fix_time_s_{-1.0};
     double last_fix_receiver_time_s_{0.0};
 
-    // (system, "EPH"/"ALM"/"CNAV", PRN) -> (toe/toa as absolute seconds,
-    // health). Catches a PRN's data being replaced, not only new PRNs.
+    // (system, navigation family, PRN) -> (absolute toe/toa, health,
+    // IODE, IODC, satellite type, signal type). Extra fields are zero for
+    // legacy navigation families. Detect replacements as well as new PRNs.
     // first_data_check_ tells "never checked" from "checked, still empty".
-    std::map<std::tuple<std::string, std::string, uint32_t>, std::pair<double, int32_t>> last_data_fingerprints_;
+    using NavigationFingerprint = std::tuple<double, int32_t, uint32_t, uint32_t, int32_t, int32_t>;
+    std::map<std::tuple<std::string, std::string, uint32_t>, NavigationFingerprint> last_data_fingerprints_;
 
     // Absolute GPST seconds (gtime_t.time + sec) of the last full sweep:
     // monotonic across week rollover, and receiver time keeps the interval

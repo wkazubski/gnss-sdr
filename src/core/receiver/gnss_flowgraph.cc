@@ -137,6 +137,14 @@ GNSSFlowgraph::GNSSFlowgraph(std::shared_ptr<ConfigurationInterface> configurati
       enable_e6_has_rx_(false)
 {
     enable_fpga_offloading_ = configuration_->property("GNSS-SDR.enable_FPGA", false);
+    // Skip the assisted acquisition of secondary signals reported as not
+    // available (GPS SV configuration) or unhealthy by the broadcast data.
+    // Can be disabled so that acquisition does not rely on that data.
+    enable_secondary_signal_status_gating_ = configuration_->property("GNSS-SDR.enable_secondary_signal_status_gating", true);
+    const double acquisition_max_retry_rate_hz = configuration_->property("GNSS-SDR.acquisition_max_retry_rate_hz", 0.0);
+    // Paced by the receiver time reported by the observables block every
+    // 100 ms (or every epoch, if longer): higher rates act as that rate.
+    acquisition_retry_min_interval_s_ = (acquisition_max_retry_rate_hz > 0.0) ? (1.0 / acquisition_max_retry_rate_hz) : 0.0;
     init();
 }
 
@@ -1953,38 +1961,45 @@ void GNSSFlowgraph::apply_action(unsigned int who, unsigned int what)
                         }
                     break;
                 }
-            if (acq_channels_count_ < max_acq_channels_)
-                {
-                    // try to acquire the same satellite
-                    channels_state_[who] = 2;
-                    acq_channels_count_++;
-                    DLOG(INFO) << "Channel " << who << " Starting acquisition " << gs.get_satellite() << ", Signal " << gs.get_signal_str();
-                    channels_[who]->set_signal(channels_[who]->get_signal());
+            // Retry the same satellite unless it is in acquisition cooldown (a
+            // signal that locks and drops at once would loop here).
+            {
+                double receiver_time_s = 0.0;
+                channels_status_->get_current_status_pvt(&receiver_time_s);
+                if (acq_channels_count_ < max_acq_channels_ && !InAcquisitionCooldown(gs, receiver_time_s))
+                    {
+                        // try to acquire the same satellite
+                        channels_state_[who] = 2;
+                        acq_channels_count_++;
+                        DLOG(INFO) << "Channel " << who << " Starting acquisition " << gs.get_satellite() << ", Signal " << gs.get_signal_str();
+                        channels_[who]->set_signal(channels_[who]->get_signal());
+                        MarkAcquisitionAttempt(gs, receiver_time_s);
 
 #if ENABLE_FPGA
-                    if (enable_fpga_offloading_)
-                        {
-                            // create a task for the FPGA such that it doesn't stop the flow
-                            std::thread tmp_thread(&ChannelInterface::start_acquisition, channels_[who]);
-                            tmp_thread.detach();
-                        }
-                    else
-                        {
-                            channels_[who]->start_acquisition();
-                        }
+                        if (enable_fpga_offloading_)
+                            {
+                                // create a task for the FPGA such that it doesn't stop the flow
+                                std::thread tmp_thread(&ChannelInterface::start_acquisition, channels_[who]);
+                                tmp_thread.detach();
+                            }
+                        else
+                            {
+                                channels_[who]->start_acquisition();
+                            }
 #else
-                    channels_[who]->start_acquisition();
+                        channels_[who]->start_acquisition();
 #endif
-                }
-            else
-                {
-                    channels_state_[who] = 0;
-                    LOG(INFO) << "Channel " << who << " Idle state";
-                    if (sat == 0)
-                        {
-                            push_back_signal(channels_[who]->get_signal());
-                        }
-                }
+                    }
+                else
+                    {
+                        channels_state_[who] = 0;
+                        LOG(INFO) << "Channel " << who << " Idle state";
+                        if (sat == 0)
+                            {
+                                push_back_signal(channels_[who]->get_signal());
+                            }
+                    }
+            }
             break;
         case 10:  // request standby mode
             for (size_t n = 0; n < channels_.size(); n++)
@@ -2051,6 +2066,22 @@ void GNSSFlowgraph::priorize_satellites(const std::vector<std::pair<int, Gnss_Sa
                         }
                 }
         }
+}
+
+
+void GNSSFlowgraph::UpdateVisibilityReference(time_t utc_time, const std::array<float, 3>& LLH)
+{
+    if (!visibility_aware_search_enabled())
+        {
+            return;
+        }
+    {
+        std::lock_guard<std::mutex> lock(signal_list_mutex_);
+        double receiver_time_s = 0.0;
+        const Monitor_Pvt fix_status = channels_status_->get_current_status_pvt(&receiver_time_s);
+        satellite_visibility_->SetCommandReference(utc_time, LLH, fix_status, receiver_time_s);
+    }
+    MaybeUpdateVisibility();
 }
 
 
@@ -2483,19 +2514,13 @@ bool GNSSFlowgraph::is_multiband() const
                     multiband = true;
                 }
         }
-    if (configuration_->property("Channels_B1.count", 0) > 0)
+    const bool has_bds_b1 = configuration_->property("Channels_B1.count", 0) > 0 ||
+                            configuration_->property("Channels_1D.count", 0) > 0;
+    const bool has_bds_b3 = configuration_->property("Channels_B3.count", 0) > 0;
+    const bool has_bds_b2a = configuration_->property("Channels_5D.count", 0) > 0;
+    if ((has_bds_b1 && (has_bds_b3 || has_bds_b2a)) || (has_bds_b3 && has_bds_b2a))
         {
-            if (configuration_->property("Channels_B3.count", 0) > 0)
-                {
-                    multiband = true;
-                }
-        }
-    if (configuration_->property("Channels_1D.count", 0) > 0)
-        {
-            if (configuration_->property("Channels_B3.count", 0) > 0)
-                {
-                    multiband = true;
-                }
+            multiband = true;
         }
     if (configuration_->property("Channels_J1.count", 0) > 0)
         {
@@ -2523,6 +2548,13 @@ Gnss_Signal GNSSFlowgraph::search_next_signal(const std::string& searched_signal
     bool found_signal = false;
     std::vector<std::string> assist_signal_candidates;
     auto& available_signals = available_signals_map_.at(searched_signal);
+
+    // Time for the acquisition retry cooldown, fetched only if enabled
+    double cooldown_receiver_time_s = 0.0;
+    if (acquisition_retry_min_interval_s_ > 0.0)
+        {
+            channels_status_->get_current_status_pvt(&cooldown_receiver_time_s);
+        }
 
     if (available_signals.empty())
         {
@@ -2556,12 +2588,15 @@ Gnss_Signal GNSSFlowgraph::search_next_signal(const std::string& searched_signal
             assist_signal_candidates = {"B1", "1D"};
             break;
 
+        case evBDS_B2A:
+            assist_signal_candidates = {"B1", "1D", "B3"};
+            break;
+
         case evGPS_1C:
         case evGAL_1B:
         case evGLO_1G:
         case evBDS_B1:
         case evBDS_B1C:
-        case evBDS_B2A:
         case evQZS_J1:
         case evSBAS_1C:
             is_primary_frequency = true;
@@ -2577,6 +2612,15 @@ Gnss_Signal GNSSFlowgraph::search_next_signal(const std::string& searched_signal
 
     const bool any_assist_configured = std::any_of(assist_signal_candidates.begin(), assist_signal_candidates.end(),
         [&](const std::string& assist_signal) { return configuration_->property("Channels_" + assist_signal + ".count", 0) > 0; });
+
+    // A BeiDou band without an enabled assisting band must acquire on its
+    // own, even when another constellation makes the receiver multiband.
+    // In B3I+B2a, B3I starts first and then assists B2a.
+    if (!any_assist_configured && (searched_signal == "5D" || searched_signal == "B3"))
+        {
+            assist_signal_candidates.clear();
+            is_primary_frequency = true;
+        }
 
     if (any_assist_configured)
         {
@@ -2630,6 +2674,147 @@ Gnss_Signal GNSSFlowgraph::search_next_signal(const std::string& searched_signal
                                                 {
                                                     continue;
                                                 }
+                                            // GPS: skip satellites whose SV configuration (three LSBs of
+                                            // AS_status, the MSB is the A-S flag; IS-GPS-200, 20.3.3.5.1.4)
+                                            // predates L2C (< IIR-M) or L5 (< IIF). Unknown values stay
+                                            // permissive. Without this, a satellite lacking the signal is
+                                            // retried without pause.
+                                            if (enable_secondary_signal_status_gating_ && (mapStringValues_[searched_signal] == evGPS_L5 || mapStringValues_[searched_signal] == evGPS_2S))
+                                                {
+                                                    const auto pvt_ptr = get_pvt();
+                                                    if (pvt_ptr)
+                                                        {
+                                                            const auto gps_almanac_map = pvt_ptr->get_gps_almanac();
+                                                            const auto alm_it = gps_almanac_map.find(static_cast<int>(it2->get_satellite().get_PRN()));
+                                                            if (alm_it != gps_almanac_map.end() && alm_it->second.AS_status > 0)
+                                                                {
+                                                                    const int32_t sv_config = alm_it->second.AS_status & GPS_SV_CONFIG_CODE_MASK;
+                                                                    const int32_t required_config = (mapStringValues_[searched_signal] == evGPS_L5) ? GPS_SV_CONFIG_BLOCK_IIF : GPS_SV_CONFIG_BLOCK_IIR_M;
+                                                                    if (sv_config != GPS_SV_CONFIG_UNKNOWN && sv_config < required_config)
+                                                                        {
+                                                                            continue;
+                                                                        }
+                                                                }
+                                                        }
+                                                }
+                                            // Galileo: skip E5b if flagged unhealthy in the I/NAV data
+                                            // received on E1B (ephemeris first, then almanac). E5a is not
+                                            // gated: E5a_HS is only broadcast in F/NAV on E5a itself, so a
+                                            // stale value could block a recovered satellite indefinitely.
+                                            if (enable_secondary_signal_status_gating_ && mapStringValues_[searched_signal] == evGAL_7X)
+                                                {
+                                                    const auto pvt_ptr = get_pvt();
+                                                    if (pvt_ptr)
+                                                        {
+                                                            const int prn = static_cast<int>(it2->get_satellite().get_PRN());
+                                                            int32_t health = -1;
+                                                            const auto gal_eph_map = pvt_ptr->get_galileo_ephemeris();
+                                                            const auto eph_it = gal_eph_map.find(prn);
+                                                            if (eph_it != gal_eph_map.end())
+                                                                {
+                                                                    health = eph_it->second.E5b_HS;
+                                                                }
+                                                            else
+                                                                {
+                                                                    const auto gal_alm_map = pvt_ptr->get_galileo_almanac();
+                                                                    const auto alm_it = gal_alm_map.find(prn);
+                                                                    if (alm_it != gal_alm_map.end())
+                                                                        {
+                                                                            health = alm_it->second.E5b_HS;
+                                                                        }
+                                                                }
+                                                            if (health > 0)
+                                                                {
+                                                                    continue;
+                                                                }
+                                                        }
+                                                }
+                                            // BeiDou: skip B3I if SV_health is not zero (ephemeris first,
+                                            // then almanac).
+                                            if (enable_secondary_signal_status_gating_ && mapStringValues_[searched_signal] == evBDS_B3)
+                                                {
+                                                    const auto pvt_ptr = get_pvt();
+                                                    if (pvt_ptr)
+                                                        {
+                                                            const int prn = static_cast<int>(it2->get_satellite().get_PRN());
+                                                            int32_t health = -1;
+                                                            const auto bds_eph_map = pvt_ptr->get_beidou_dnav_ephemeris();
+                                                            const auto eph_it = bds_eph_map.find(prn);
+                                                            if (eph_it != bds_eph_map.end())
+                                                                {
+                                                                    health = eph_it->second.SV_health;
+                                                                }
+                                                            else
+                                                                {
+                                                                    const auto bds_alm_map = pvt_ptr->get_beidou_dnav_almanac();
+                                                                    const auto alm_it = bds_alm_map.find(prn);
+                                                                    if (alm_it != bds_alm_map.end())
+                                                                        {
+                                                                            health = alm_it->second.SV_health;
+                                                                        }
+                                                                }
+                                                            if (health > 0)
+                                                                {
+                                                                    continue;
+                                                                }
+                                                        }
+                                                }
+                                            // GLONASS: skip L2 if the Bn health word of the ephemeris is
+                                            // not zero.
+                                            if (enable_secondary_signal_status_gating_ && mapStringValues_[searched_signal] == evGLO_2G)
+                                                {
+                                                    const auto pvt_ptr = get_pvt();
+                                                    if (pvt_ptr)
+                                                        {
+                                                            // Not *it2: the FDMA pool match can be another slot sharing
+                                                            // the frequency channel.
+                                                            const int prn = static_cast<int>(tracked_prn);
+                                                            const auto glo_eph_map = pvt_ptr->get_glonass_ephemeris();
+                                                            const auto eph_it = glo_eph_map.find(prn);
+                                                            if (eph_it != glo_eph_map.end() && eph_it->second.d_B_n > 0)
+                                                                {
+                                                                    continue;
+                                                                }
+                                                        }
+                                                }
+                                            // QZSS: skip L5 if SV_health is not zero (ephemeris first, then
+                                            // almanac). QZSS LNAV data is stored in the GPS maps.
+                                            if (enable_secondary_signal_status_gating_ && mapStringValues_[searched_signal] == evQZS_J5)
+                                                {
+                                                    const auto pvt_ptr = get_pvt();
+                                                    if (pvt_ptr)
+                                                        {
+                                                            const int prn = static_cast<int>(it2->get_satellite().get_PRN());
+                                                            int32_t health = -1;
+                                                            const auto gps_eph_map = pvt_ptr->get_gps_ephemeris();
+                                                            const auto eph_it = gps_eph_map.find(prn);
+                                                            if (eph_it != gps_eph_map.end())
+                                                                {
+                                                                    health = eph_it->second.SV_health;
+                                                                }
+                                                            else
+                                                                {
+                                                                    const auto gps_alm_map = pvt_ptr->get_gps_almanac();
+                                                                    const auto alm_it = gps_alm_map.find(prn);
+                                                                    if (alm_it != gps_alm_map.end())
+                                                                        {
+                                                                            health = alm_it->second.SV_health;
+                                                                        }
+                                                                }
+                                                            if (health > 0)
+                                                                {
+                                                                    continue;
+                                                                }
+                                                        }
+                                                }
+                                            // Acquisition retry cooldown, checked on the signal that will be
+                                            // acquired: with FDMA, *it2 can be another slot on the same channel.
+                                            const bool other_glonass_slot = glonass_fdma && (it2->get_satellite().get_PRN() != tracked_prn);
+                                            const Gnss_Signal cooldown_signal = other_glonass_slot ? Gnss_Signal(Gnss_Satellite(std::string("Glonass"), tracked_prn), searched_signal) : *it2;
+                                            if (InAcquisitionCooldown(cooldown_signal, cooldown_receiver_time_s))
+                                                {
+                                                    continue;
+                                                }
                                             // Doppler observed on the assisting band, projected to the searched band
                                             estimated_doppler = static_cast<float>(project_doppler(searched_signal, assist_signal, current_status.second->Carrier_Doppler_hz));
                                             RX_time = current_status.second->RX_time;
@@ -2648,6 +2833,7 @@ Gnss_Signal GNSSFlowgraph::search_next_signal(const std::string& searched_signal
                                             available_signals.erase(it2);
                                             found_signal = true;
                                             assistance_available = true;
+                                            MarkAcquisitionAttempt(result, cooldown_receiver_time_s);
                                             break;
                                         }
                                 }
@@ -2687,7 +2873,7 @@ Gnss_Signal GNSSFlowgraph::search_next_signal(const std::string& searched_signal
             if (satellite_visibility_ && satellite_visibility_->enabled())
                 {
                     bool picked = false;
-                    result = pop_by_visibility(available_signals, searched_signal, picked);
+                    result = pop_by_visibility(available_signals, searched_signal, picked, cooldown_receiver_time_s);
                     if (!picked)
                         {
                             signal_available = false;
@@ -2696,8 +2882,17 @@ Gnss_Signal GNSSFlowgraph::search_next_signal(const std::string& searched_signal
                 }
             else
                 {
-                    result = available_signals.front();
-                    available_signals.pop_front();
+                    // Take the first entry that is not in acquisition cooldown
+                    auto it = std::find_if(available_signals.begin(), available_signals.end(),
+                        [&](const Gnss_Signal& gs) { return !InAcquisitionCooldown(gs, cooldown_receiver_time_s); });
+                    if (it == available_signals.end())
+                        {
+                            signal_available = false;
+                            return result;
+                        }
+                    result = *it;
+                    available_signals.erase(it);
+                    MarkAcquisitionAttempt(result, cooldown_receiver_time_s);
                 }
         }
 
@@ -2705,7 +2900,47 @@ Gnss_Signal GNSSFlowgraph::search_next_signal(const std::string& searched_signal
 }
 
 
-Gnss_Signal GNSSFlowgraph::pop_by_visibility(std::list<Gnss_Signal>& available_signals, const std::string& searched_signal, bool& picked)
+namespace
+{
+std::string acquisition_cooldown_key(const Gnss_Signal& gs)
+{
+    const auto sat = gs.get_satellite();
+    return sat.get_system_short() + std::to_string(sat.get_PRN()) + "_" + gs.get_signal_str();
+}
+}  // namespace
+
+
+bool GNSSFlowgraph::InAcquisitionCooldown(const Gnss_Signal& gs, double receiver_time_s) const
+{
+    if (acquisition_retry_min_interval_s_ <= 0.0)
+        {
+            return false;
+        }
+    const auto it = last_acquisition_attempt_rx_time_s_.find(acquisition_cooldown_key(gs));
+    if (it == last_acquisition_attempt_rx_time_s_.cend())
+        {
+            return false;
+        }
+    const double elapsed_s = receiver_time_s - it->second;
+    // The clock advances in steps: the tolerance avoids holding an interval
+    // that is a multiple of the step for one more step. Fail open if the
+    // elapsed time is negative.
+    constexpr double tolerance_s = 1e-3;
+    return elapsed_s >= 0.0 && (elapsed_s + tolerance_s) < acquisition_retry_min_interval_s_;
+}
+
+
+void GNSSFlowgraph::MarkAcquisitionAttempt(const Gnss_Signal& gs, double receiver_time_s)
+{
+    if (acquisition_retry_min_interval_s_ <= 0.0)
+        {
+            return;
+        }
+    last_acquisition_attempt_rx_time_s_[acquisition_cooldown_key(gs)] = receiver_time_s;
+}
+
+
+Gnss_Signal GNSSFlowgraph::pop_by_visibility(std::list<Gnss_Signal>& available_signals, const std::string& searched_signal, bool& picked, double cooldown_receiver_time_s)
 {
     picked = false;
 
@@ -2753,7 +2988,7 @@ Gnss_Signal GNSSFlowgraph::pop_by_visibility(std::list<Gnss_Signal>& available_s
     };
     auto find_bucket = [&](bool visible) {
         return std::find_if(available_signals.begin(), available_signals.end(),
-            [&](const Gnss_Signal& gs) { return is_searchable(gs) && satellite_visibility_->IsSearchVisible(gs.get_satellite()) == visible; });
+            [&](const Gnss_Signal& gs) { return is_searchable(gs) && !InAcquisitionCooldown(gs, cooldown_receiver_time_s) && satellite_visibility_->IsSearchVisible(gs.get_satellite()) == visible; });
     };
 
     auto it = find_bucket(want_visible);
@@ -2785,13 +3020,19 @@ Gnss_Signal GNSSFlowgraph::pop_by_visibility(std::list<Gnss_Signal>& available_s
 
     if (it == available_signals.end())
         {
-            // Only excluded entries remain: leave them queued and idle the channel. This
-            // is the CPU-saving case once a complete almanac/ephemeris places every
-            // untracked satellite below the mask.
-            LOG(INFO) << "[visibility] signal " << searched_signal << ": nothing searchable ("
-                      << remaining_excluded << " excluded entries queued, elevation known and not visible) -- channel stays idle"
-                      << " (further checks skipped until this changes)";
-            signals_with_nothing_searchable_.insert(searched_signal);
+            // Nothing can be picked now. Cache that only if every entry is excluded:
+            // a cooldown expires with no event to invalidate the cache.
+            const bool any_searchable_at_all = std::any_of(available_signals.begin(), available_signals.end(), is_searchable);
+            if (!any_searchable_at_all)
+                {
+                    // Only excluded entries remain: leave them queued and idle the channel. This
+                    // is the CPU-saving case once a complete almanac/ephemeris places every
+                    // untracked satellite below the mask.
+                    LOG(INFO) << "[visibility] signal " << searched_signal << ": nothing searchable ("
+                              << remaining_excluded << " excluded entries queued, elevation known and not visible) -- channel stays idle"
+                              << " (further checks skipped until this changes)";
+                    signals_with_nothing_searchable_.insert(searched_signal);
+                }
             return Gnss_Signal{};
         }
 
@@ -2799,6 +3040,7 @@ Gnss_Signal GNSSFlowgraph::pop_by_visibility(std::list<Gnss_Signal>& available_s
     const Gnss_Signal result = *it;
     const bool picked_visible = satellite_visibility_->IsSearchVisible(result.get_satellite());
     available_signals.erase(it);
+    MarkAcquisitionAttempt(result, cooldown_receiver_time_s);
     counter = (counter + 1) % (ratio + 1);
     if (picked_visible)
         {

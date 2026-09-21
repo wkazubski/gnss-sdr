@@ -36,7 +36,9 @@
 #include <gnuradio/blocks/null_sink.h>  // for null_sink
 #include <gnuradio/runtime_types.h>     // for basic_block_sptr, top_block_sptr
 #include <pmt/pmt.h>                    // for pmt_t
+#include <array>                        // for array
 #include <chrono>                       // for steady_clock
+#include <ctime>                        // for time_t
 #include <list>                         // for list
 #include <map>                          // for map
 #include <memory>                       // for for shared_ptr, dynamic_pointer_cast
@@ -170,6 +172,12 @@ public:
     void MaybeUpdateVisibility();
 
     /*!
+     * \brief Sets the telecommand position/time reference and immediately
+     * refreshes visibility. Called by the control thread.
+     */
+    void UpdateVisibilityReference(time_t utc_time, const std::array<float, 3>& LLH);
+
+    /*!
      * \brief Whether GNSS-SDR.enable_visibility_aware_search is on, so callers can
      * skip the legacy get_visible_sats()/priorize_satellites() startup reorder that
      * MaybeUpdateVisibility() supersedes.
@@ -249,7 +257,7 @@ private:
     // back to the other bucket when the selected one is empty; FIFO order is kept
     // within each bucket. Excluded entries are never picked but stay queued until
     // the next visibility recompute. Sets picked=false when nothing is searchable.
-    Gnss_Signal pop_by_visibility(std::list<Gnss_Signal>& available_signals, const std::string& searched_signal, bool& picked);
+    Gnss_Signal pop_by_visibility(std::list<Gnss_Signal>& available_signals, const std::string& searched_signal, bool& picked, double cooldown_receiver_time_s);
     void print_help();
     void check_desktop_conf_in_fpga_env();
 
@@ -304,6 +312,16 @@ private:
     // ~10 Hz and would otherwise flood the log.
     std::unordered_map<std::string, std::chrono::steady_clock::time_point> no_assist_log_throttle_;
 
+    // Acquisition retry cooldown per PRN and signal, set with
+    // GNSS-SDR.acquisition_max_retry_rate_hz (0 = disabled). Paced by the
+    // receiver time reported by the observables block, which keeps running
+    // without a PVT fix and follows the signal timeline in file replays.
+    // The map stores the receiver time of the last attempt.
+    double acquisition_retry_min_interval_s_;
+    std::unordered_map<std::string, double> last_acquisition_attempt_rx_time_s_;
+    bool InAcquisitionCooldown(const Gnss_Signal& gs, double receiver_time_s) const;
+    void MarkAcquisitionAttempt(const Gnss_Signal& gs, double receiver_time_s);
+
     enum StringValue
     {
         evGPS_1C,
@@ -345,6 +363,7 @@ private:
     bool enable_fpga_offloading_;
     bool enable_osnma_rx_;
     bool enable_e6_has_rx_;
+    bool enable_secondary_signal_status_gating_;
 };
 
 

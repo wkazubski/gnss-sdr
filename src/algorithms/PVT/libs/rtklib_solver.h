@@ -4,7 +4,7 @@
  *  data flow and structures
  * \authors <ul>
  *          <li> 2017, Javier Arribas
- *          <li> 2017-2023, Carles Fernandez
+ *          <li> 2017-2026, Carles Fernandez
  *          <li> 2007-2013, T. Takasu
  *          </ul>
  *
@@ -23,7 +23,7 @@
  * -----------------------------------------------------------------------------
  * Copyright (C) 2007-2013, T. Takasu
  * Copyright (C) 2017-2019, Javier Arribas
- * Copyright (C) 2017-2023, Carles Fernandez
+ * Copyright (C) 2017-2026, Carles Fernandez
  * All rights reserved.
  *
  * SPDX-License-Identifier: BSD-2-Clause
@@ -151,6 +151,16 @@ public:
     {
         return d_nav_data.ne > 0 && d_nav_data.nc > 0;
     }
+
+    //! true if the last call to get_PVT() had what it takes to compute a
+    //! solution, whether it succeeded or not; false if it returned without
+    //! trying (fewer than four satellites with ephemeris, or no fixed-base data
+    //! with the fallback to single-point positioning disabled)
+    inline bool solution_attempted() const
+    {
+        return d_solution_attempted;
+    }
+
     void store_has_data(const Galileo_HAS_data& new_has_data);
     void clear_has_corrections();
     void update_has_corrections(const std::map<int, Gnss_Synchro>& obs_map);
@@ -161,6 +171,20 @@ public:
     Galileo_Nav_Message_Type galileo_nav_message_type_for_pvt() const;
     bool is_galileo_signal_used_in_pvt(const std::string& signal) const;
     bool get_galileo_signal_health(uint32_t prn, const std::string& signal, uint32_t observation_tow, bool& healthy) const;
+
+    /*!
+     * \brief Broadcast health of one tracked signal, as reported by the navigation
+     * message that carries it: GPS/QZSS L1 C/A from the LNAV SV health (almanac
+     * when no ephemeris has been decoded yet), GPS/QZSS L2C and L5 from the CNAV
+     * per-signal health bits, Galileo per signal (see get_galileo_signal_health(),
+     * the almanac health status of the same signal when no ephemeris is available),
+     * GLONASS from the GNAV ln/Bn
+     * flags, BeiDou B1I/B3I from the DNAV SV health and B1C/B2a from the
+     * B-CNAV1/B-CNAV2 health status. Independent of PVT.use_unhealthy_sats.
+     * \return true if health information is available for that signal (healthy is then set)
+     */
+    bool get_broadcast_signal_health(char system, uint32_t prn, const std::string& signal, uint32_t observation_tow, bool& healthy) const;
+
     std::map<int, Galileo_Ephemeris> get_galileo_ephemeris_map_for_pvt() const;
     bool select_galileo_ephemeris(uint32_t prn, const std::string& signal, uint32_t observation_tow,
         Galileo_Ephemeris& ephemeris, bool& from_reduced_ced) const;
@@ -210,8 +234,7 @@ public:
     std::map<int, Bds3_B1c_PageData> beidou_cnav1_page_data_map;
 
 private:
-    friend class GalileoEphemerisSourceTest_E6SlotsFollowRtklibGalileoPolicy_Test;
-
+    void update_beidou_observation_wavelengths(const obsd_t& observation);
     bool save_matfile() const;
     bool prepare_fixed_base_observations(const Ntrip_Rtcm_Snapshot& fixed_base,
         int& rover_observation_count,
@@ -246,7 +269,7 @@ private:
 
     void reset_relative_filter();
 
-    std::array<obsd_t, MAXOBS * 2> d_obs_data{};
+    std::vector<obsd_t> d_obs_data = std::vector<obsd_t>(MAXOBS * 2);
     // per-epoch scratch of prepare_fixed_base_observations(); members so
     // their capacity is reused across epochs
     std::vector<obsd_t> d_fixed_base_rover_scratch;
@@ -291,6 +314,7 @@ private:
     bool d_fixed_base_initialized = false;
     bool d_fixed_base_was_applied = false;
     bool d_duplicated_rover_observations_logged = false;
+    bool d_solution_attempted = false;
     bool d_flag_dump_enabled;
     bool d_flag_dump_mat_enabled;
 };

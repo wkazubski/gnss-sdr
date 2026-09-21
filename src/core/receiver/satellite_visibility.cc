@@ -15,6 +15,7 @@
  */
 
 #include "satellite_visibility.h"
+#include "Beidou_CNAV2.h"
 #include "GLONASS_L1_L2_CA.h"    // for GLONASS_PRN
 #include "agnss_ref_location.h"  // for parse_agnss_ref_location
 #include "agnss_ref_time.h"      // for parse_agnss_ref_utc_time
@@ -116,7 +117,7 @@ SatelliteVisibility::SatelliteVisibility(const std::shared_ptr<ConfigurationInte
     static const std::map<std::string, std::vector<std::string>> system_signals{
         {"GPS", {"1C", "2S", "L5"}},
         {"Galileo", {"1B", "5X", "E6", "7X"}},
-        {"Beidou", {"B1", "1D", "B3"}},
+        {"Beidou", {"B1", "1D", "B3", "5D"}},
         {"Glonass", {"1G", "2G"}},
         {"QZSS", {"J1", "J5"}}};
     for (const auto& entry : system_signals)
@@ -295,42 +296,82 @@ std::vector<std::pair<int, Gnss_Satellite>> compute_visible_satellites(
                 }
         }
 
-    const std::map<int, Beidou_Dnav_Ephemeris> bds_eph_map = pvt_ptr->get_beidou_dnav_ephemeris();
+    // Classify each BeiDou satellite once, from the usable orbit closest to
+    // the query epoch. Equal-age records retain DNAV, then CNAV1, then CNAV2
+    // priority, independent of telemetry arrival order. Almanac remains the
+    // fallback when no fresh ephemeris is available.
+    std::map<uint32_t, eph_t> bds_eph_map;
+    const auto add_bds_ephemeris = [&](uint32_t prn, const eph_t& ephemeris) {
+        if (only_prns != nullptr && only_prns->count(std::make_pair(std::string("Beidou"), prn)) == 0)
+            {
+                return;
+            }
+        const double age = timediff(gps_gtime, ephemeris.toe);
+        if (!std::isfinite(age) || std::abs(age) > MAXDTOE_BDS ||
+            !std::isfinite(ephemeris.A) || ephemeris.A <= 0.0 ||
+            !std::isfinite(ephemeris.e) || ephemeris.e < 0.0 || ephemeris.e >= 1.0)
+            {
+                return;
+            }
+        const auto previous = bds_eph_map.find(prn);
+        if (previous == bds_eph_map.cend() ||
+            std::abs(age) < std::abs(timediff(gps_gtime, previous->second.toe)))
+            {
+                bds_eph_map[prn] = ephemeris;
+            }
+    };
+    for (const auto& entry : pvt_ptr->get_beidou_dnav_ephemeris())
+        {
+            add_bds_ephemeris(entry.second.PRN, eph_to_rtklib(entry.second));
+        }
+    const std::array<std::map<int, Beidou_Cnav1_Ephemeris>, 2> bds_cnav_maps{
+        {pvt_ptr->get_beidou_cnav1_ephemeris(), pvt_ptr->get_beidou_cnav2_ephemeris()}};
+    for (size_t source = 0; source < bds_cnav_maps.size(); ++source)
+        {
+            const int expected_source = source == 0 ? BDS_EPH_SOURCE_CNAV1 : BDS_EPH_SOURCE_CNAV2;
+            for (const auto& entry : bds_cnav_maps[source])
+                {
+                    const auto& ephemeris = entry.second;
+                    if (ephemeris.sig_type == expected_source &&
+                        (ephemeris.sat_type == 2 || ephemeris.sat_type == 3))
+                        {
+                            add_bds_ephemeris(ephemeris.PRN, eph_to_rtklib(ephemeris));
+                        }
+                }
+        }
     for (const auto& it : bds_eph_map)
         {
-            if (only_prns != nullptr && only_prns->count(std::make_pair(std::string("Beidou"), it.second.PRN)) == 0)
-                {
-                    continue;
-                }
-            const eph_t rtklib_eph = eph_to_rtklib(it.second);
-            const double age = timediff(gps_gtime, rtklib_eph.toe);
-            if (std::abs(age) > MAXDTOE_BDS)
-                {
-                    continue;  // stale -- treat as if no ephemeris exists; almanac may still classify it
-                }
-            note_freshness(age, MAXDTOE_BDS);
+            const eph_t& rtklib_eph = it.second;
             std::array<double, 3> r_sat{};
             double clock_bias_s;
             double sat_pos_variance_m2;
             eph2pos(gps_gtime, &rtklib_eph, r_sat.data(), &clock_bias_s,
                 &sat_pos_variance_m2);
+            if (!std::all_of(r_sat.cbegin(), r_sat.cend(), [](double value) { return std::isfinite(value); }))
+                {
+                    continue;
+                }
             double Az;
             double El;
             double dist_m;
             const arma::vec r_sat_eb_e = arma::vec{r_sat[0], r_sat[1], r_sat[2]};
             const arma::vec dx = r_sat_eb_e - r_eb_e;
             topocent(&Az, &El, &dist_m, r_eb_e, dx);
-            handled_bds.push_back(it.second.PRN);
-            if (El > elevation_mask_deg && it.second.SV_health == 0)
+            if (!std::isfinite(El))
                 {
-                    LOG(INFO) << "Using BeiDou Ephemeris: Sat " << it.second.PRN << " Az: " << Az << " El: " << El;
-                    available_satellites.emplace_back(floor(El),
-                        (Gnss_Satellite(std::string("Beidou"), it.second.PRN)));
+                    continue;
+                }
+            note_freshness(timediff(gps_gtime, rtklib_eph.toe), MAXDTOE_BDS);
+            handled_bds.push_back(it.first);
+            if (El > elevation_mask_deg && rtklib_eph.svh == 0)
+                {
+                    LOG(INFO) << "Using BeiDou Ephemeris (source " << rtklib_eph.code << "): Sat " << it.first << " Az: " << Az << " El: " << El;
+                    available_satellites.emplace_back(floor(El), Gnss_Satellite(std::string("Beidou"), it.first));
                 }
             else if (below_mask_out != nullptr)
                 {
-                    LOG(INFO) << "Using BeiDou Ephemeris (excluded): Sat " << it.second.PRN << " Az: " << Az << " El: " << El;
-                    below_mask_out->emplace_back(floor(El), Gnss_Satellite(std::string("Beidou"), it.second.PRN));
+                    LOG(INFO) << "Using BeiDou Ephemeris (source " << rtklib_eph.code << ", excluded): Sat " << it.first << " Az: " << Az << " El: " << El;
+                    below_mask_out->emplace_back(floor(El), Gnss_Satellite(std::string("Beidou"), it.first));
                 }
         }
 
@@ -566,9 +607,11 @@ bool SatelliteVisibility::DataChanged(const std::shared_ptr<PvtInterface>& pvt_p
 {
     // Fingerprint on (toe/toa, health) so a replaced entry counts as a
     // change, not only a new PRN.
-    std::map<std::tuple<std::string, std::string, uint32_t>, std::pair<double, int32_t>> current;
-    auto add = [&current](const char* system, const char* type, uint32_t prn, double ref_time, int32_t health) {
-        current.emplace(std::make_tuple(std::string(system), std::string(type), prn), std::make_pair(ref_time, health));
+    std::map<std::tuple<std::string, std::string, uint32_t>, NavigationFingerprint> current;
+    auto add = [&current](const char* system, const char* type, uint32_t prn, double ref_time, int32_t health,
+                   uint32_t iode = 0, uint32_t iodc = 0, int32_t sat_type = 0, int32_t signal_type = 0) {
+        current.emplace(std::make_tuple(std::string(system), std::string(type), prn),
+            std::make_tuple(ref_time, health, iode, iodc, sat_type, signal_type));
     };
     for (const auto& it : pvt_ptr->get_gps_ephemeris())
         {
@@ -581,6 +624,18 @@ bool SatelliteVisibility::DataChanged(const std::shared_ptr<PvtInterface>& pvt_p
     for (const auto& it : pvt_ptr->get_beidou_dnav_ephemeris())
         {
             add("Beidou", "EPH", it.second.PRN, it.second.WN * 604800.0 + it.second.toe, it.second.SV_health);
+        }
+    const std::array<std::map<int, Beidou_Cnav1_Ephemeris>, 2> bds_cnav_maps{
+        {pvt_ptr->get_beidou_cnav1_ephemeris(), pvt_ptr->get_beidou_cnav2_ephemeris()}};
+    for (size_t source = 0; source < bds_cnav_maps.size(); ++source)
+        {
+            for (const auto& it : bds_cnav_maps[source])
+                {
+                    const auto& ephemeris = it.second;
+                    add("Beidou", source == 0 ? "CNAV1" : "CNAV2", ephemeris.PRN,
+                        ephemeris.WN * 604800.0 + ephemeris.toe, ephemeris.hs,
+                        ephemeris.IODE, ephemeris.IODC, ephemeris.sat_type, ephemeris.sig_type);
+                }
         }
     for (const auto& it : pvt_ptr->get_gps_almanac())
         {
@@ -661,6 +716,24 @@ bool SatelliteVisibility::DataChanged(const std::shared_ptr<PvtInterface>& pvt_p
 }
 
 
+void SatelliteVisibility::SetCommandReference(time_t utc_time, const std::array<float, 3>& LLH,
+    const Monitor_Pvt& current_fix, double receiver_time_s)
+{
+    command_reference_utc_time_ = utc_time;
+    command_reference_llh_ = LLH;
+    command_reference_receiver_time_s_ = receiver_time_s;
+    command_previous_fix_time_s_ = -1.0;
+    if (current_fix.RX_time >= 0.0)
+        {
+            const auto epoch = gpst2time(static_cast<int>(current_fix.week), current_fix.RX_time);
+            command_previous_fix_time_s_ = static_cast<double>(epoch.time) + epoch.sec;
+        }
+    have_command_reference_ = true;
+    command_reference_changed_ = true;
+    ticks_since_data_check_ = kDataCheckEveryNTicks;
+}
+
+
 bool SatelliteVisibility::Tick(const std::shared_ptr<PvtInterface>& pvt_ptr, const Monitor_Pvt& fix_status,
     double receiver_time_s)
 {
@@ -669,13 +742,28 @@ bool SatelliteVisibility::Tick(const std::shared_ptr<PvtInterface>& pvt_ptr, con
             return false;
         }
 
-    const bool fix_valid = (fix_status.RX_time >= 0.0);
+    bool fix_valid = (fix_status.RX_time >= 0.0);
+    if (have_command_reference_ && fix_valid)
+        {
+            const auto epoch = gpst2time(static_cast<int>(fix_status.week), fix_status.RX_time);
+            // The status receiver keeps publishing the pre-command fix during
+            // an outage. Only a new PVT epoch may replace the supplied reference.
+            have_command_reference_ = (static_cast<double>(epoch.time) + epoch.sec == command_previous_fix_time_s_);
+        }
+    fix_valid = fix_valid && !have_command_reference_;
     const bool fix_became_valid = fix_valid && !last_fix_valid_;
     last_fix_valid_ = fix_valid;
 
     std::array<float, 3> LLH{};
     gtime_t gps_gtime{};
-    if (fix_valid)
+    if (have_command_reference_)
+        {
+            LLH = command_reference_llh_;
+            gtime_t utc_gtime{};
+            utc_gtime.time = command_reference_utc_time_;
+            gps_gtime = timeadd(utc2gpst(utc_gtime), std::max(0.0, receiver_time_s - command_reference_receiver_time_s_));
+        }
+    else if (fix_valid)
         {
             LLH[0] = static_cast<float>(fix_status.latitude);
             LLH[1] = static_cast<float>(fix_status.longitude);
@@ -733,7 +821,9 @@ bool SatelliteVisibility::Tick(const std::shared_ptr<PvtInterface>& pvt_ptr, con
 
     const bool expired = rx_time_s >= next_expiry_deadline_rx_time_;
 
-    if (!fix_became_valid && !data_changed && !interval_elapsed && !moved_significantly && !expired)
+    const bool reference_changed = command_reference_changed_;
+    command_reference_changed_ = false;
+    if (!reference_changed && !fix_became_valid && !data_changed && !interval_elapsed && !moved_significantly && !expired)
         {
             return false;
         }
@@ -741,7 +831,7 @@ bool SatelliteVisibility::Tick(const std::shared_ptr<PvtInterface>& pvt_ptr, con
     // Position/time/expiry triggers can change every satellite's elevation,
     // so they need a full sweep. data_changed alone only affects the PRNs in
     // changed_prns, so the recompute is scoped to them via only_prns.
-    const bool needs_full_recompute = fix_became_valid || interval_elapsed || moved_significantly || expired;
+    const bool needs_full_recompute = reference_changed || fix_became_valid || interval_elapsed || moved_significantly || expired;
 
     // Advance the full-sweep baselines only after a full sweep: resetting
     // them on targeted recomputes would starve the interval/displacement
@@ -877,13 +967,14 @@ bool SatelliteVisibility::Tick(const std::shared_ptr<PvtInterface>& pvt_ptr, con
 
         std::ostringstream oss;
         oss << "[visibility] recompute (triggered by:"
+            << (reference_changed ? " command_reference_changed" : "")
             << (fix_became_valid ? " fix_became_valid" : "")
             << (data_changed ? " data_changed" : "")
             << (interval_elapsed ? " interval_elapsed" : "")
             << (moved_significantly ? " moved_significantly" : "")
             << (expired ? " data_expired" : "")
             << "; " << (needs_full_recompute ? "full" : "targeted (" + std::to_string(changed_prns.size()) + " sat)")
-            << "; fix " << (fix_valid ? "valid" : "not valid, using AGNSS_ref_location")
+            << "; fix " << (have_command_reference_ ? "using telecommand reference" : (fix_valid ? "valid" : "not valid, using AGNSS_ref_location"))
             << ", LLH " << LLH[0] << " deg, " << LLH[1] << " deg, " << LLH[2] << " m, GPS time " << gps_gtime.time
             << ", mask " << elevation_mask_deg_ << " deg)\n"
             << "VISIBLE (" << visible_entries.size() << "): ";

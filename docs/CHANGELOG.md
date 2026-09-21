@@ -62,6 +62,15 @@ All notable changes to GNSS-SDR will be documented in this file.
 
 ### Improvements in Availability:
 
+- Added `Acquisition_XX.full_grid_search` (default: `false`) for acquisition
+  implementations using the CPU PCPS block. When enabled, each search stage
+  accumulates all `max_dwells` non-coherent integrations before accepting or
+  rejecting the strongest peak. This also applies to both stages of
+  `make_two_steps` and to the reduced grid used by `enable_doppler_narrowing`.
+  The default preserves early acceptance; `max_dwells=1` is unchanged.
+  `bit_transition_flag=true` takes precedence and still uses a single
+  double-length dwell. Waiting for all dwells increases acquisition latency.
+  Contributed by @joebre.
 - Improved TOW rollover handling in Telemetry Decoder blocks.
 - Galileo F/NAV and I/NAV ephemerides are now retained independently instead of
   overwriting each other when they have the same PRN. PVT automatically uses the
@@ -107,6 +116,25 @@ All notable changes to GNSS-SDR will be documented in this file.
   `Tracking_1C.bs_transition_window_epochs` (default: 4),
   `Tracking_1C.bs_transition_confidence` (default: 0.6), and
   `Tracking_1C.bs_tentative_events_required` (default: 2).
+- Added an optional frequency-refinement scan to help tracking lock onto signals
+  whose initial Doppler estimate is displaced by a navigation-bit or
+  secondary-code transition during acquisition, particularly Galileo E1. Enable
+  it per signal with `Tracking_<Sig>.f_error_step_num` (default: 0, disabled).
+  This selects the number of Doppler bins around the acquisition estimate; even
+  nonzero values are rounded up to an odd count. `f_error_doppler_step` sets
+  their spacing (default: 250 Hz), and `f_error_accumulation` sets the code
+  periods accumulated per bin (default: 20; zero is replaced with one, with a
+  warning). The scan adds a startup delay of one code period per accumulation
+  per bin and supports `high_dyn=true`. The `pull_in_time_s` and
+  `bit_synchronization_time_limit_s` budgets start after the scan, allowing the
+  tracking loops their full settling time. Contributed by @joebre.
+- Added a CSV dump of the frequency-refinement scan: the tested Doppler
+  frequencies, their correlation power, and the selected frequency are written
+  to `Tracking_<Sig>.f_error_dump_filename` (default: `./f_error_dump.csv`). Set
+  the filename to an empty value to disable this output. Channels sharing a
+  filename write to the same file, with scan, satellite and channel identifiers;
+  the first scan overwrites any previous file, and later scans in the same
+  receiver run append their results.
 
 ### Improvements in Efficiency:
 
@@ -256,11 +284,15 @@ All notable changes to GNSS-SDR will be documented in this file.
   identifier `5D`: PCPS acquisition (`BEIDOU_B2A_PCPS_Acquisition`), DLL+PLL
   tracking (`BEIDOU_B2A_DLL_PLL_Tracking`; BPSK(10), 1 ms primary code, data
   component only), and B-CNAV2 telemetry decoding
-  (`BEIDOU_B2A_Telemetry_Decoder`). The first cut takes the systematic 288
-  information bits after the 0xE24DE8 preamble (CRC-24Q, message types 10, 11
-  and 30) and does not yet implement 64-ary LDPC. GEO and BDS-2 satellites (PRN
-  1-18 and 59-63) are not assigned B2a channels and are not used in PVT. Sample
-  configuration files are provided at
+  (`BEIDOU_B2A_Telemetry_Decoder`), including soft-decision 64-ary LDPC(96,48)
+  decoding of the 576 coded bits into 288 information bits before CRC-24Q and
+  PRN validation. The decoder reuses the B1C GF(64) arithmetic and fixed-path
+  decoder, with a full-alphabet sum-product fallback for B2a. Carrier polarity
+  and tracking gain are normalized before decoding. The PVT engine uses B-CNAV2
+  ephemeris, clock, and group-delay corrections (TGD_B2ap / ISC_B2ad), and RINEX
+  4.02 navigation files contain native CNV2 records. GEO and BDS-2 satellites
+  (PRN 1-18 and 59-63) are not assigned B2a channels and are not used in PVT.
+  Sample configuration files are provided at
   `conf/File_input/Beidou/gnss-sdr_BDS_B2a_file.conf` and
   `conf/File_input/Beidou/gnss-sdr_BDS_B2a_cu_l5_if20k_fs18m.conf`. Contributed
   by @huangchuhan.
@@ -371,7 +403,8 @@ All notable changes to GNSS-SDR will be documented in this file.
   ionosphere-free combination), and a `used` flag telling whether it contributed
   to the reported fix. Satellites that were tracked but left out of the solution
   (below `PVT.elevation_mask`, or excluded by RAIM) are listed with
-  `used = false`. Contributed by @joebre.
+  `used = false`. Unhealthy satellites are listed with `healthy = false`.
+  Contributed by @joebre.
 
 ### Improvements in Maintainability:
 

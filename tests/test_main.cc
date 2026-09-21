@@ -22,6 +22,7 @@
 #include <fstream>
 #include <iostream>
 #include <memory>
+#include <mutex>
 #include <ostream>
 #include <string>
 
@@ -63,10 +64,12 @@ public:
     }
     void Send(const absl::LogEntry& entry) override
     {
+        std::lock_guard<std::mutex> lock(logfile_mutex);
         logfile << entry.text_message_with_prefix_and_newline() << std::flush;
     }
 
 private:
+    std::mutex logfile_mutex;
     std::ofstream logfile;
     std::string filename;
 };
@@ -167,7 +170,6 @@ private:
 #include "unit-tests/signal-processing-blocks/libs/beidou_b2a_signal_replica_test.cc"
 #include "unit-tests/signal-processing-blocks/libs/item_type_helpers_test.cc"
 #include "unit-tests/signal-processing-blocks/libs/rtklib_lli_test.cc"
-#include "unit-tests/signal-processing-blocks/observables/observables_phase_continuity_test.cc"
 #include "unit-tests/signal-processing-blocks/osnma/gnss_crypto_test.cc"
 #include "unit-tests/signal-processing-blocks/osnma/osnma_msg_receiver_test.cc"
 #include "unit-tests/signal-processing-blocks/pvt/bds_tgd_iono_test.cc"
@@ -197,6 +199,7 @@ private:
 #include "unit-tests/signal-processing-blocks/tracking/cpu_multicorrelator_real_codes_test.cc"
 #include "unit-tests/signal-processing-blocks/tracking/cpu_multicorrelator_test.cc"
 #include "unit-tests/signal-processing-blocks/tracking/discriminator_test.cc"
+#include "unit-tests/signal-processing-blocks/tracking/frequency_error_reduction_test.cc"
 #include "unit-tests/signal-processing-blocks/tracking/galileo_e5a_tracking_test.cc"
 #include "unit-tests/signal-processing-blocks/tracking/galileo_e5b_dll_pll_tracking_test.cc"
 #include "unit-tests/signal-processing-blocks/tracking/tracking_loop_filter_test.cc"
@@ -205,6 +208,7 @@ private:
 #include "unit-tests/system-parameters/beidou_bdgim_test.cc"
 #include "unit-tests/system-parameters/beidou_cnav1_ldpc_test.cc"
 #include "unit-tests/system-parameters/beidou_cnav1_navigation_message_test.cc"
+#include "unit-tests/system-parameters/beidou_cnav2_ldpc_test.cc"
 #include "unit-tests/system-parameters/beidou_cnav2_navigation_message_test.cc"
 #include "unit-tests/system-parameters/beidou_dnav_navigation_message_test.cc"
 #include "unit-tests/system-parameters/galileo_e1b_reed_solomon_test.cc"

@@ -23,6 +23,7 @@
 #ifndef GNSS_SDR_PVT_INTERFACE_H
 #define GNSS_SDR_PVT_INTERFACE_H
 
+#include "beidou_cnav1_ephemeris.h"
 #include "beidou_dnav_almanac.h"
 #include "beidou_dnav_ephemeris.h"
 #include "galileo_almanac.h"
@@ -60,9 +61,18 @@ public:
     virtual std::map<int, Glonass_Gnav_Ephemeris> get_glonass_ephemeris() const = 0;
     virtual std::map<int, Glonass_Gnav_Almanac> get_glonass_almanac() const = 0;
     virtual Glonass_Gnav_Utc_Model get_glonass_utc_model() const = 0;
+    // Warm start: drops the ephemeris only and keeps the almanac already in
+    // memory (almanac current, ephemeris unknown or stale). Unlike a
+    // clear_ephemeris() followed by an XML reload, this cannot replace a live,
+    // fresher almanac with a stale snapshot from disk.
+    virtual void clear_ephemeris_keep_almanac() = 0;
     virtual std::map<int, Gps_Ephemeris> get_gps_ephemeris() const = 0;
     virtual std::map<int, Galileo_Ephemeris> get_galileo_ephemeris() const = 0;
     virtual std::map<int, Beidou_Dnav_Ephemeris> get_beidou_dnav_ephemeris() const = 0;
+    // Optional navigation families: implementations without B-CNAV support
+    // retain the existing DNAV/almanac visibility path.
+    virtual std::map<int, Beidou_Cnav1_Ephemeris> get_beidou_cnav1_ephemeris() const { return {}; }
+    virtual std::map<int, Beidou_Cnav1_Ephemeris> get_beidou_cnav2_ephemeris() const { return {}; }
     virtual std::map<int, Gps_Almanac> get_gps_almanac() const = 0;
     virtual std::map<int, Galileo_Almanac> get_galileo_almanac() const = 0;
     virtual std::map<int, Beidou_Dnav_Almanac> get_beidou_dnav_almanac() const = 0;
