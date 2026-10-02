@@ -197,18 +197,6 @@ auto findRole(const ConfigurationInterface* configuration, const std::string& ba
     return role;
 };
 
-std::string get_role_name(const ConfigurationInterface* configuration, const std::string& role_prefix, const std::string& signal, int channel)
-{
-    const auto role_name = role_prefix + signal + std::to_string(channel);
-
-    if (configuration->is_present(role_name + impl_prop))
-        {
-            return role_name;
-        }
-
-    return role_prefix + signal;
-}
-
 const auto signal_mapping = std::vector<std::pair<std::string, std::string>>{
     {"1C", "GPS L1 C/A"},
     {"2S", "GPS L2C (M)"},
@@ -572,6 +560,10 @@ std::unique_ptr<AcquisitionInterface> get_acq_block(
         {
             return std::make_unique<PcpsAcquisitionAdapterFpga>(configuration, role, implementation, in_streams, out_streams, GAL_E5b);
         }
+    else if (implementation == "Galileo_E6_PCPS_Acquisition_FPGA")
+        {
+            return std::make_unique<PcpsAcquisitionAdapterFpga>(configuration, role, implementation, in_streams, out_streams, GAL_E6);
+        }
 #endif
 
     return nullptr;
@@ -691,6 +683,10 @@ std::unique_ptr<TrackingInterface> get_trk_block(
     else if (implementation == "Galileo_E5a_DLL_PLL_Tracking_FPGA")
         {
             return std::make_unique<DllPllTrackingAdapterFpga>(configuration, role, implementation, in_streams, out_streams, GAL_E5a);
+        }
+    else if (implementation == "Galileo_E6_DLL_PLL_Tracking_FPGA")
+        {
+            return std::make_unique<DllPllTrackingAdapterFpga>(configuration, role, implementation, in_streams, out_streams, GAL_E6);
         }
 #endif
 
@@ -968,8 +964,21 @@ std::unique_ptr<GNSSBlockInterface> get_block_force_impl(
 
 }  // namespace
 
+
 namespace block_factory
 {
+std::string get_role_name(const ConfigurationInterface* configuration, const std::string& role_prefix, const std::string& signal, int channel)
+{
+    const auto role_name = role_prefix + signal + std::to_string(channel);
+
+    if (configuration->is_present(role_name + impl_prop))
+        {
+            return role_name;
+        }
+
+    return role_prefix + signal;
+}
+
 
 std::unique_ptr<SignalSourceInterface> GetSignalSource(
     const ConfigurationInterface* configuration, Concurrent_Queue<pmt::pmt_t>* queue, int ID)

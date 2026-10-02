@@ -26,7 +26,7 @@ if(ENABLE_GLOG_AND_GFLAGS)
     target_link_libraries(gnss-sdr PRIVATE Gflags::gflags Glog::glog)
     target_compile_definitions(gnss-sdr PUBLIC -DUSE_GLOG_AND_GFLAGS=1)
 else()
-    target_link_libraries(gnss-sdr PRIVATE absl::flags absl::flags_parse absl::log absl::log_initialize absl::log_sink absl::log_sink_registry)
+    target_link_libraries(gnss-sdr PRIVATE absl::flags absl::flags_parse absl::log absl::log_initialize gnss_sdr_log_sink)
     target_link_libraries(gnss-sdr INTERFACE "$<LINK_LIBRARY:WHOLE_ARCHIVE,absl::log_flags>")
 endif()
 
@@ -41,6 +41,7 @@ if(ENABLE_CUDA)
         target_include_directories(gnss-sdr
             PUBLIC ${CMAKE_CUDA_TOOLKIT_INCLUDE_DIRECTORIES}
         )
+        target_link_libraries(gnss-sdr PUBLIC CUDA::cudart)
     else()
         target_link_libraries(gnss-sdr
             PUBLIC ${CUDA_LIBRARIES}
@@ -50,7 +51,7 @@ if(ENABLE_CUDA)
         )
     endif()
     set_target_properties(gnss-sdr PROPERTIES
-        CUDA_SEPARABLE_COMPILATION ON
+        CUDA_SEPARABLE_COMPILATION OFF
         POSITION_INDEPENDENT_CODE ON
     )
     target_compile_definitions(gnss-sdr PRIVATE -DCUDA_GPU_ACCEL=1)

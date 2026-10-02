@@ -26,6 +26,7 @@
 #include "tow_to_trk.h"
 #include <pmt/pmt.h>
 #include <pmt/pmt_sugar.h>
+#include <algorithm>
 #include <array>
 #include <cmath>
 #include <iomanip>
@@ -46,7 +47,9 @@ constexpr float SECOND_CODE[BEIDOU_B2A_SECONDARY_CODE_LENGTH] = {1.0F, 1.0F, 1.0
 // First CRC failure at the expected frame boundary drops sync immediately so
 // the next 1 ms samples resume a sliding preamble search. Waiting for several
 // consecutive CRC failures (the B1C long-file failure mode) would keep
-// publishing a coasted TOW on a slipped alignment.
+// publishing a coasted TOW on a slipped alignment. With the soft two-frame
+// preamble detector the search re-acquires the next preamble, so holding the
+// alignment would not recover more frames.
 }  // namespace
 
 
@@ -71,15 +74,6 @@ beidou_b2a_telemetry_decoder_gs::beidou_b2a_telemetry_decoder_gs(const Gnss_Sate
       d_tow_to_trk(conf.tow_to_trk)
 {
     configure_basic_outputs();
-    // kron(preamble antipodal, 5-chip data secondary code). 1 → −1, 0 → +1.
-    for (int32_t i = 0; i < BEIDOU_CNAV2_PREAMBLE_SYMBOLS; i++)
-        {
-            const float pbit = (BEIDOU_B2A_PREAMBLE_SYMBOLS_STR[i] == '1') ? -1.0F : 1.0F;
-            for (int32_t k = 0; k < BEIDOU_B2A_SECONDARY_CODE_LENGTH; k++)
-                {
-                    d_preamble_ms[static_cast<size_t>(i * BEIDOU_B2A_SECONDARY_CODE_LENGTH + k)] = pbit * SECOND_CODE[k];
-                }
-        }
     if (d_enable_navdata_monitor)
         {
             this->message_port_register_out(pmt::mp("Nav_msg_from_TLM"));
@@ -141,9 +135,15 @@ void beidou_b2a_telemetry_decoder_gs::publish_navigation(double cn0_db_hz)
             auto eph = std::make_shared<Beidou_Cnav1_Ephemeris>(d_nav.get_ephemeris());
             eph->PRN = d_satellite.get_PRN();
             message_port_pub(pmt::mp("telemetry"), pmt::make_any(eph));
+#if __cplusplus == 201103L
+            const int default_precision = std::cout.precision();
+#else
+            const auto default_precision{std::cout.precision()};
+#endif
             std::cout << TEXT_MAGENTA << "New BeiDou B-CNAV2 ephemeris in channel " << d_channel
                       << " from satellite " << d_satellite
-                      << " with CN0=" << std::setprecision(2) << cn0_db_hz << " dB-Hz" << TEXT_RESET << std::endl;
+                      << " with CN0=" << std::setprecision(2) << cn0_db_hz << std::setprecision(default_precision)
+                      << " dB-Hz" << TEXT_RESET << std::endl;
             LOG(INFO) << "New BeiDou B-CNAV2 ephemeris from PRN " << d_satellite.get_PRN();
         }
     if (d_enable_navdata_monitor && !d_nav.get_last_nav_bits().empty())
@@ -157,21 +157,24 @@ void beidou_b2a_telemetry_decoder_gs::publish_navigation(double cn0_db_hz)
 }
 
 
-int32_t beidou_b2a_telemetry_decoder_gs::preamble_correlation() const
+bool beidou_b2a_telemetry_decoder_gs::preamble_detected() const
 {
+    // Soft, scale-independent statistic on the 1 ms samples of the candidate
+    // frame start, combined with the preamble one frame earlier when available.
     if (d_symbol_history.size() < static_cast<size_t>(BEIDOU_CNAV2_FRAME_MS))
         {
-            return 0;
+            return false;
         }
-    auto it = d_symbol_history.end() - BEIDOU_CNAV2_FRAME_MS;
-    int32_t corr = 0;
-    for (int32_t i = 0; i < BEIDOU_CNAV2_PREAMBLE_MS; i++)
+    std::array<float, BEIDOU_CNAV2_PREAMBLE_MS> current{};
+    std::array<float, BEIDOU_CNAV2_PREAMBLE_MS> previous{};
+    std::copy_n(d_symbol_history.end() - BEIDOU_CNAV2_FRAME_MS, BEIDOU_CNAV2_PREAMBLE_MS, current.begin());
+    const bool have_previous = d_symbol_history.size() >= static_cast<size_t>(2 * BEIDOU_CNAV2_FRAME_MS);
+    if (have_previous)
         {
-            const float s = (*it >= 0.0F) ? 1.0F : -1.0F;
-            corr += static_cast<int32_t>(s * d_preamble_ms[static_cast<size_t>(i)]);
-            ++it;
+            std::copy_n(d_symbol_history.end() - 2 * BEIDOU_CNAV2_FRAME_MS, BEIDOU_CNAV2_PREAMBLE_MS, previous.begin());
         }
-    return corr;
+    return Beidou_Cnav2_Navigation_Message::preamble_detection_statistic(
+               current.data(), have_previous ? previous.data() : nullptr) >= BEIDOU_CNAV2_PREAMBLE_DETECTION_THRESHOLD;
 }
 
 
@@ -180,14 +183,6 @@ bool beidou_b2a_telemetry_decoder_gs::try_decode_frame()
     if (d_symbol_history.size() < static_cast<size_t>(BEIDOU_CNAV2_FRAME_MS))
         {
             return false;
-        }
-    if (!d_flag_frame_sync)
-        {
-            const int32_t corr = preamble_correlation();
-            if (std::abs(corr) <= BEIDOU_CNAV2_PREAMBLE_CORR_THRESHOLD)
-                {
-                    return false;
-                }
         }
 
     std::array<float, BEIDOU_CNAV2_FRAME_SYMBOLS> nav{};
@@ -234,20 +229,11 @@ int beidou_b2a_telemetry_decoder_gs::general_work(
 
             const bool history_ready =
                 d_symbol_history.size() >= static_cast<size_t>(BEIDOU_CNAV2_FRAME_MS);
-            bool try_now = false;
-            if (history_ready)
-                {
-                    if (!d_flag_frame_sync)
-                        {
-                            try_now = true;
-                        }
-                    else if ((d_sample_counter > d_preamble_index) &&
-                             ((d_sample_counter - d_preamble_index) %
-                                 static_cast<uint64_t>(BEIDOU_CNAV2_FRAME_MS)) == 0U)
-                        {
-                            try_now = true;
-                        }
-                }
+            const bool at_frame_boundary =
+                d_flag_frame_sync && (d_sample_counter > d_preamble_index) &&
+                ((d_sample_counter - d_preamble_index) % static_cast<uint64_t>(BEIDOU_CNAV2_FRAME_MS)) == 0U;
+            const bool try_now = history_ready &&
+                                 (at_frame_boundary || (!d_flag_frame_sync && preamble_detected()));
 
             if (try_now)
                 {

@@ -27,10 +27,10 @@ In the L1 band:
 - &#128752; GPS L1 C/A (centered at 1575.420 MHz) ✅
 - &#128752; Galileo E1b/c (centered at 1575.420 MHz) ✅
 - &#128752; BeiDou B1C (centered at 1575.420 MHz) ✅
-- &#128752; BeiDou B1I (centered at 1561.098 MHz) ✅
 - &#128752; QZSS L1 C/A and C/B, where available (centered at 1575.420 MHz) ✅
 - &#128752; SBAS L1 (EGNOS and WAAS, centered at 1575.420 MHz) — navigation
   message decoding only; SBAS satellites are not yet used as ranging sources
+- &#128752; BeiDou B1I (centered at 1561.098 MHz) ✅
 
 In the E6 band:
 
@@ -87,6 +87,7 @@ information about this open-source, software-defined GNSS receiver.
     - [Clone GNSS-SDR's Git repository](#clone-gnss-sdrs-git-repository)
     - [Build and install GNSS-SDR](#build-and-install-gnss-sdr)
       - [Build OSMOSDR support (OPTIONAL)](#build-osmosdr-support-optional)
+      - [Build BladeRF support (OPTIONAL)](#build-bladerf-support-optional)
       - [Build FMCOMMS2 based SDR Hardware support (OPTIONAL)](#build-fmcomms2-based-sdr-hardware-support-optional)
       - [Build OpenCL support (OPTIONAL)](#build-opencl-support-optional)
       - [Build CUDA support (OPTIONAL)](#build-cuda-support-optional)
@@ -318,9 +319,9 @@ $ sudo apt install libblas-dev liblapack-dev       # For Debian/Ubuntu/LinuxMint
 $ sudo yum install lapack-devel blas-devel         # For Fedora/RHEL
 $ sudo zypper install lapack-devel blas-devel      # For OpenSUSE
 $ sudo pacman -S blas lapack                       # For Arch Linux
-$ wget https://sourceforge.net/projects/arma/files/armadillo-15.4.0.tar.xz
-$ tar xvfz armadillo-15.4.0.tar.xz
-$ cd armadillo-15.4.0
+$ wget https://sourceforge.net/projects/arma/files/armadillo-15.6.0.tar.xz
+$ tar xvfz armadillo-15.6.0.tar.xz
+$ cd armadillo-15.6.0
 $ cmake .
 $ make
 $ sudo make install
@@ -721,12 +722,23 @@ $ sudo cmake --install build
 ```
 
 Of course, you will also need a GPU that
-[supports CUDA](https://developer.nvidia.com/cuda-gpus "CUDA GPUs").
+[supports CUDA](https://developer.nvidia.com/cuda-gpus "CUDA GPUs"). The target
+architecture is taken from `CMAKE_CUDA_ARCHITECTURES` if you set it (e.g.
+`-DCMAKE_CUDA_ARCHITECTURES=87` for Jetson Orin), detected from the device tree
+on NVIDIA Jetson modules, or `native` with CMake >= 3.24.
+
+With CUDA enabled, every PCPS acquisition block can evaluate its search grid on
+the GPU by setting `Acquisition_XX.use_cuda=true` (or
+`GNSS-SDR.use_cuda_acquisition=true` for all of them), and the experimental
+`GPS_L1_CA_DLL_PLL_Tracking_GPU` tracking block becomes available. See
+[docs/JETSON.md](./docs/JETSON.md) for a step-by-step guide on NVIDIA Jetson
+(Orin, Xavier, TX2, Nano), including how to run the unit tests and the
+CPU-vs-GPU acquisition benchmark.
 
 ## macOS
 
 GNSS-SDR can be built on macOS (or the former Mac OS X), starting from 10.9
-(Mavericks) and including 14 (Sonoma). If you still have not installed
+(Mavericks) and including 27 (Golden Gate). If you still have not installed
 [Xcode](https://developer.apple.com/xcode/ "Xcode"), do it now from the App
 Store (it's free). You will also need the Xcode Command Line Tools, which do not
 come by default in macOS versions older than Big Sur. If you are using an older
@@ -1712,6 +1724,7 @@ Acquisition_1C.doppler_max=5000 ; Maximum expected Doppler shift [Hz]
 Acquisition_1C.doppler_step=250 ; Doppler step in the grid search [Hz]
 Acquisition_1C.dump=false ; Enables internal data file logging [true] or [false]
 Acquisition_1C.dump_filename=./acq_dump.dat ; Log path and filename
+Acquisition_1C.use_cuda=false ; Evaluate the search grid on a CUDA GPU (requires -DENABLE_CUDA=ON)
 ```
 
 and, for Galileo E1B channels:

@@ -681,11 +681,24 @@ endif()
 # Unit testing
 ################################################################################
 if(ENABLE_UNIT_TESTING)
+    # The unit tests are #included into a few aggregate translation units
+    # (one per category) rather than into a single one, so that no single
+    # compilation unit becomes too large for the compiler.
+    set(RUN_TESTS_SOURCES
+        ${CMAKE_CURRENT_SOURCE_DIR}/test_main.cc
+        ${CMAKE_CURRENT_SOURCE_DIR}/unit_tests_core.cc
+        ${CMAKE_CURRENT_SOURCE_DIR}/unit_tests_system_parameters.cc
+        ${CMAKE_CURRENT_SOURCE_DIR}/unit_tests_acquisition.cc
+        ${CMAKE_CURRENT_SOURCE_DIR}/unit_tests_tracking.cc
+        ${CMAKE_CURRENT_SOURCE_DIR}/unit_tests_common_flags.cc
+        ${CMAKE_CURRENT_SOURCE_DIR}/unit_tests_pvt.cc
+        ${CMAKE_CURRENT_SOURCE_DIR}/unit_tests_osnma.cc
+    )
     if(USE_CMAKE_TARGET_SOURCES)
         add_executable(run_tests)
-        target_sources(run_tests PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/test_main.cc)
+        target_sources(run_tests PRIVATE ${RUN_TESTS_SOURCES})
     else()
-        add_executable(run_tests ${CMAKE_CURRENT_SOURCE_DIR}/test_main.cc)
+        add_executable(run_tests ${RUN_TESTS_SOURCES})
     endif()
 
     target_link_libraries(run_tests
@@ -727,7 +740,8 @@ if(ENABLE_UNIT_TESTING)
         target_link_libraries(run_tests PRIVATE Gflags::gflags Glog::glog)
         target_compile_definitions(run_tests PRIVATE -DUSE_GLOG_AND_GFLAGS=1)
     else()
-        target_link_libraries(run_tests PRIVATE absl::flags absl::flags_parse absl::log absl::log_initialize)
+        target_link_libraries(run_tests PRIVATE absl::flags absl::flags_parse absl::log absl::log_initialize gnss_sdr_log_sink)
+        target_sources(run_tests PRIVATE unit-tests/control-plane/gnss_sdr_log_sink_test.cc)
         target_link_libraries(run_tests INTERFACE "$<LINK_LIBRARY:WHOLE_ARCHIVE,absl::log_flags>")
     endif()
     target_include_directories(run_tests
@@ -876,7 +890,7 @@ if(ENABLE_FPGA)
         target_link_libraries(gps_l1_ca_dll_pll_tracking_test_fpga PRIVATE Gflags::gflags Glog::glog)
         target_compile_definitions(gps_l1_ca_dll_pll_tracking_test_fpga PRIVATE -DUSE_GLOG_AND_GFLAGS=1)
     else()
-        target_link_libraries(gps_l1_ca_dll_pll_tracking_test_fpga PRIVATE absl::flags absl::flags_parse absl::log absl::log_initialize)
+        target_link_libraries(gps_l1_ca_dll_pll_tracking_test_fpga PRIVATE absl::flags absl::flags_parse absl::log absl::log_initialize gnss_sdr_log_sink)
         target_link_libraries(gps_l1_ca_dll_pll_tracking_test_fpga INTERFACE "$<LINK_LIBRARY:WHOLE_ARCHIVE,absl::log_flags>")
     endif()
     target_include_directories(gps_l1_ca_dll_pll_tracking_test_fpga
@@ -1003,7 +1017,7 @@ if(ENABLE_SYSTEM_TESTING)
         if(ENABLE_GLOG_AND_GFLAGS)
             set(OPT_LIBS_ ${OPT_LIBS_} Gflags::gflags Glog::glog)
         else()
-            set(OPT_LIBS_ ${OPT_LIBS_} absl::flags_parse absl::log absl::log_initialize absl::log_sink absl::log_sink_registry)
+            set(OPT_LIBS_ ${OPT_LIBS_} absl::flags_parse absl::log absl::log_initialize gnss_sdr_log_sink)
         endif()
         add_system_test(position_test
             CMAKE_ARGS -DCMAKE_BUILD_TYPE=$<$<CONFIG:Debug>:Debug>$<$<CONFIG:Release>:Release>$<$<CONFIG:RelWithDebInfo>:RelWithDebInfo>$<$<CONFIG:MinSizeRel>:MinSizeRel>$<$<CONFIG:NoOptWithASM>:Debug>$<$<CONFIG:Coverage>:Debug>$<$<CONFIG:O2WithASM>:RelWithDebInfo>$<$<CONFIG:O3WithASM>:RelWithDebInfo>$<$<CONFIG:ASAN>:Debug>
@@ -1079,7 +1093,7 @@ if(NOT ENABLE_PACKAGING AND NOT ENABLE_FPGA)
         target_link_libraries(flowgraph_test PRIVATE Gflags::gflags Glog::glog)
         target_compile_definitions(flowgraph_test PRIVATE -DUSE_GLOG_AND_GFLAGS=1)
     else()
-        target_link_libraries(flowgraph_test PRIVATE absl::flags absl::flags_parse absl::log absl::log_initialize)
+        target_link_libraries(flowgraph_test PRIVATE absl::flags absl::flags_parse absl::log absl::log_initialize gnss_sdr_log_sink)
         target_link_libraries(flowgraph_test INTERFACE "$<LINK_LIBRARY:WHOLE_ARCHIVE,absl::log_flags>")
     endif()
 
@@ -1138,7 +1152,7 @@ if(NOT ENABLE_PACKAGING AND NOT ENABLE_FPGA)
         target_link_libraries(gnss_block_test PRIVATE Gflags::gflags Glog::glog)
         target_compile_definitions(gnss_block_test PRIVATE -DUSE_GLOG_AND_GFLAGS=1)
     else()
-        target_link_libraries(gnss_block_test PRIVATE absl::flags absl::flags_parse absl::log absl::log_initialize)
+        target_link_libraries(gnss_block_test PRIVATE absl::flags absl::flags_parse absl::log absl::log_initialize gnss_sdr_log_sink)
         target_link_libraries(gnss_block_test INTERFACE "$<LINK_LIBRARY:WHOLE_ARCHIVE,absl::log_flags>")
     endif()
 
@@ -1199,7 +1213,7 @@ if(NOT ENABLE_PACKAGING AND NOT ENABLE_FPGA)
         target_link_libraries(gnuradio_block_test PRIVATE Gflags::gflags Glog::glog)
         target_compile_definitions(gnuradio_block_test PRIVATE -DUSE_GLOG_AND_GFLAGS=1)
     else()
-        target_link_libraries(gnuradio_block_test PRIVATE absl::flags absl::flags_parse absl::log absl::log_initialize)
+        target_link_libraries(gnuradio_block_test PRIVATE absl::flags absl::flags_parse absl::log absl::log_initialize gnss_sdr_log_sink)
         target_link_libraries(gnuradio_block_test INTERFACE "$<LINK_LIBRARY:WHOLE_ARCHIVE,absl::log_flags>")
     endif()
 
@@ -1236,7 +1250,7 @@ if(ENABLE_GLOG_AND_GFLAGS)
     target_link_libraries(matio_test PRIVATE Gflags::gflags Glog::glog)
     target_compile_definitions(matio_test PRIVATE -DUSE_GLOG_AND_GFLAGS=1)
 else()
-    target_link_libraries(matio_test PRIVATE absl::flags absl::flags_parse absl::log absl::log_initialize)
+    target_link_libraries(matio_test PRIVATE absl::flags absl::flags_parse absl::log absl::log_initialize gnss_sdr_log_sink)
     target_link_libraries(matio_test INTERFACE "$<LINK_LIBRARY:WHOLE_ARCHIVE,absl::log_flags>")
 endif()
 
@@ -1258,6 +1272,7 @@ if(NOT ENABLE_PACKAGING AND NOT ENABLE_FPGA)
         ${CMAKE_CURRENT_SOURCE_DIR}/single_test_main.cc
         ${CMAKE_CURRENT_SOURCE_DIR}/unit-tests/signal-processing-blocks/acquisition/gps_l1_ca_pcps_acquisition_test.cc
         ${CMAKE_CURRENT_SOURCE_DIR}/unit-tests/signal-processing-blocks/acquisition/pcps_acquisition_doppler_narrowing_test.cc
+        ${CMAKE_CURRENT_SOURCE_DIR}/unit-tests/signal-processing-blocks/acquisition/pcps_acquisition_fractional_dwell_test.cc
     )
     if(USE_CMAKE_TARGET_SOURCES)
         add_executable(acq_test)
@@ -1278,8 +1293,11 @@ if(NOT ENABLE_PACKAGING AND NOT ENABLE_FPGA)
             Matio::matio
             Volkgnsssdr::volkgnsssdr
             signal_generator_gr_blocks
+            signal_generator_adapters
             signal_source_gr_blocks
             signal_source_libs
+            signal_source_adapters
+            input_filter_adapters
             acquisition_adapters
             algorithms_libs
             signal_processing_testing_lib
@@ -1289,7 +1307,7 @@ if(NOT ENABLE_PACKAGING AND NOT ENABLE_FPGA)
         target_link_libraries(acq_test PRIVATE Gflags::gflags Glog::glog)
         target_compile_definitions(acq_test PRIVATE -DUSE_GLOG_AND_GFLAGS=1)
     else()
-        target_link_libraries(acq_test PRIVATE absl::flags absl::flags_parse absl::log absl::log_initialize)
+        target_link_libraries(acq_test PRIVATE absl::flags absl::flags_parse absl::log absl::log_initialize gnss_sdr_log_sink)
         target_link_libraries(acq_test INTERFACE "$<LINK_LIBRARY:WHOLE_ARCHIVE,absl::log_flags>")
     endif()
     target_include_directories(acq_test
@@ -1381,7 +1399,7 @@ if(NOT ENABLE_PACKAGING AND NOT ENABLE_FPGA)
         target_link_libraries(trk_test PRIVATE Gflags::gflags Glog::glog)
         target_compile_definitions(trk_test PRIVATE -DUSE_GLOG_AND_GFLAGS=1)
     else()
-        target_link_libraries(trk_test PRIVATE absl::flags absl::flags_parse absl::log absl::log_initialize)
+        target_link_libraries(trk_test PRIVATE absl::flags absl::flags_parse absl::log absl::log_initialize gnss_sdr_log_sink)
         target_link_libraries(trk_test INTERFACE "$<LINK_LIBRARY:WHOLE_ARCHIVE,absl::log_flags>")
     endif()
     if(USE_GENERIC_LAMBDAS)
@@ -1446,7 +1464,7 @@ if(NOT ENABLE_PACKAGING AND NOT ENABLE_FPGA)
         target_link_libraries(control_thread_test PRIVATE Gflags::gflags Glog::glog)
         target_compile_definitions(control_thread_test PRIVATE -DUSE_GLOG_AND_GFLAGS=1)
     else()
-        target_link_libraries(control_thread_test PRIVATE absl::flags absl::flags_parse absl::log absl::log_initialize)
+        target_link_libraries(control_thread_test PRIVATE absl::flags absl::flags_parse absl::log absl::log_initialize gnss_sdr_log_sink)
         target_link_libraries(control_thread_test INTERFACE "$<LINK_LIBRARY:WHOLE_ARCHIVE,absl::log_flags>")
     endif()
 

@@ -37,6 +37,18 @@ public:
 
     void SetFromConfiguration(const ConfigurationInterface *configuration, const std::string &role, double chip_rate, double opt_freq);
 
+    /*!
+     * \brief Number of samples processed per dwell: floor(sampled_ms * resampled_fs / 1000),
+     * with the window doubled before flooring if bit_transition_flag is set.
+     * Computed with integer arithmetic, so it is exact for any resampled_fs.
+     */
+    uint32_t GetSamplesPerDwell() const;
+
+    /*!
+     * \brief Fraction of a sample per dwell dropped by GetSamplesPerDwell(), in [0, 1).
+     */
+    double GetDwellResidualSamples() const;
+
     /* PCPS Acquisition configuration */
     std::string item_type{"gr_complex"};
     std::string dump_filename;
@@ -74,31 +86,18 @@ public:
     bool make_2_steps{false};
     bool use_automatic_resampler{false};
     bool enable_monitor_output{false};
-    // When Doppler is assisted (doppler_uncertainty == 0), collapse the search to
-    // the known bin + one reference bin instead of the full grid. Off by default;
-    // enable per-implementation in the .conf (e.g.
-    // Acquisition_5X.enable_doppler_narrowing = true).
-    //
-    // Applies to any acquisition implementation built on pcps_acquisition (the vast
-    // majority of them); FPGA-offloaded acquisitions use a separate implementation
-    // that never calls set_doppler_uncertainty(), so this has no effect there.
-    //
-    // Only takes effect when the caller also passes doppler_uncertainty == 0 to
-    // set_doppler_uncertainty() -- in practice, this means
-    // GNSS-SDR.assist_dual_frequency_acq must also be enabled and a Doppler
-    // projection from the satellite's already-tracked primary frequency must have
-    // succeeded (see GNSSFlowgraph::acquisition_manager()). With
-    // assist_dual_frequency_acq off, or when no projection is available yet, this
-    // flag has no effect and the full configured Doppler grid is always searched.
-    bool enable_doppler_narrowing{false};
+    // CFAR reference separation target, in correlation sidelobes (~1/T Hz).
+    // Determines whether a full grid needs extra reference rows. References stay
+    // within doppler_max: the filter response beyond it can bias noise estimates.
+    uint32_t reference_bin_min_sidelobes{4U};
 
-    // Accumulate through the full max_dwells before deciding accept/reject, instead
-    // of exiting as soon as any single dwell's (possibly still noisy, partially
-    // accumulated) grid crosses threshold -- a later dwell's fuller integration can
-    // reveal a different, genuinely stronger peak elsewhere in the grid that an early
-    // exit never gets the chance to compare against. Opt-in: off by default, enable
-    // per-implementation in the .conf (e.g. Acquisition_1B.full_grid_search = true).
+    // Opt-in accumulation through max_dwells before thresholding, allowing a
+    // later, stronger peak to win (Acquisition_<signal>.full_grid_search).
     bool full_grid_search{false};
+
+    // Evaluate the PCPS grid on a CUDA GPU (requires ENABLE_CUDA at build time)
+    bool use_cuda{false};
+    int32_t cuda_device{-1};  // CUDA device ordinal, -1 = default device
 
     // Specific to some implementations
     bool acquire_pilot{false};
@@ -115,6 +114,9 @@ public:
 
 private:
     void SetDerivedParams();
+
+    // True dwell length in samples, multiplied by 1000 (exact integer).
+    uint64_t GetDwellSamplesTimes1000() const;
 
     void ConfigureAutomaticResampler(double opt_freq);
 };

@@ -82,7 +82,7 @@ void Acq_Conf::SetFromConfiguration(const ConfigurationInterface *configuration,
         }
     make_2_steps = configuration->property(role + ".make_two_steps", make_2_steps);
     blocking_on_standby = configuration->property(role + ".blocking_on_standby", blocking_on_standby);
-    enable_doppler_narrowing = configuration->property(role + ".enable_doppler_narrowing", enable_doppler_narrowing);
+    reference_bin_min_sidelobes = configuration->property(role + ".reference_bin_min_sidelobes", reference_bin_min_sidelobes);
     full_grid_search = configuration->property(role + ".full_grid_search", full_grid_search);
 
     if (pfa <= 0.0)
@@ -92,6 +92,21 @@ void Acq_Conf::SetFromConfiguration(const ConfigurationInterface *configuration,
         }
 
     enable_monitor_output = configuration->property("AcquisitionMonitor.enable_monitor", false);
+
+    // GPU offload of the search grid. A global GNSS-SDR.use_cuda_acquisition
+    // switch can be overridden per acquisition block with <role>.use_cuda
+    use_cuda = configuration->property("GNSS-SDR.use_cuda_acquisition", use_cuda);
+    use_cuda = configuration->property(role + ".use_cuda", use_cuda);
+    cuda_device = configuration->property("GNSS-SDR.cuda_device", cuda_device);
+    cuda_device = configuration->property(role + ".cuda_device", cuda_device);
+#if !CUDA_GPU_ACCEL
+    if (use_cuda)
+        {
+            LOG(WARNING) << "Parameter " << role << ".use_cuda is set but this build has no CUDA support "
+                         << "(configure with -DENABLE_CUDA=ON). Falling back to the CPU implementation.";
+            use_cuda = false;
+        }
+#endif
 
     SetDerivedParams();
 }
@@ -115,6 +130,24 @@ void Acq_Conf::ConfigureAutomaticResampler(double opt_freq)
             // --- Find number of samples per spreading code -------------------
             SetDerivedParams();
         }
+}
+
+
+uint64_t Acq_Conf::GetDwellSamplesTimes1000() const
+{
+    return static_cast<uint64_t>(sampled_ms) * (bit_transition_flag ? 2ULL : 1ULL) * static_cast<uint64_t>(resampled_fs);
+}
+
+
+uint32_t Acq_Conf::GetSamplesPerDwell() const
+{
+    return static_cast<uint32_t>(GetDwellSamplesTimes1000() / 1000ULL);
+}
+
+
+double Acq_Conf::GetDwellResidualSamples() const
+{
+    return static_cast<double>(GetDwellSamplesTimes1000() % 1000ULL) / 1000.0;
 }
 
 

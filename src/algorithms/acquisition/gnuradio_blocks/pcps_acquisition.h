@@ -46,6 +46,9 @@
 #include "acq_conf.h"
 #include "channel_fsm.h"
 #include "gnss_sdr_fft.h"
+#if CUDA_GPU_ACCEL
+#include "cuda_pcps_engine.h"
+#endif
 #include <armadillo>
 #include <gnuradio/block.h>
 #include <gnuradio/gr_complex.h>              // for gr_complex
@@ -153,14 +156,45 @@ public:
     void set_doppler_center(int32_t doppler_center);
 
     /*!
-     * \brief Set Doppler uncertainty for the grid search. It will refresh the Doppler grid.
-     * A doppler_uncertainty of 0 means the Doppler is exactly known (as when this
-     * acquisition is assisted by an already-tracked primary frequency): the search
-     * is restricted to a single Doppler bin centered on set_doppler_center(). Any
-     * other value restores the full configured Doppler search range.
-     * \param doppler_uncertainty - 0 to search a single bin, nonzero for the full range.
+     * \brief Sets how many Doppler bins to search, centered on set_doppler_center().
+     * One unified mechanism for every degree of Doppler uncertainty: a regular,
+     * unassisted search and a primary-frequency-assisted single-bin search (the
+     * Doppler is exactly known, from an already-tracked primary frequency or a
+     * visibility-aware prediction) go through this same call, differing only in
+     * what num_doppler_bins they pass -- there is no separate "narrowed" code
+     * path. Refreshes the Doppler grid and, since the detection threshold is
+     * itself a function of how many bins are being searched (see
+     * compute_threshold()), recalculates it for the new bin count.
+     * \param num_doppler_bins - number of candidate Doppler bins to search, or 0
+     * to (re)search the full configured Doppler range (computed from
+     * doppler_max/doppler_step) -- the only case a caller can't just supply the
+     * bin count directly, since that full-grid count is otherwise private to
+     * this class. Any other value is the literal candidate bin count: 1 for an
+     * exactly-known Doppler, or any N in between to accommodate a search with
+     * partial uncertainty.
      */
-    void set_doppler_uncertainty(uint32_t doppler_uncertainty);
+    void set_doppler_num_bins(uint32_t num_doppler_bins);
+
+    //! Whether the CUDA engine is available. Inspect only while acquisition is stopped.
+    inline bool cuda_ready() const
+    {
+#if CUDA_GPU_ACCEL
+        return d_cuda_engine != nullptr;
+#else
+        return false;
+#endif
+    }
+
+    //! Completed CUDA grids over the block's lifetime, excluding warm-up.
+    //! Inspect only while acquisition is stopped.
+    inline uint64_t cuda_grid_count() const
+    {
+#if CUDA_GPU_ACCEL
+        return d_cuda_grid_count;
+#else
+        return 0;
+#endif
+    }
 
     /*!
      * \brief Parallel Code Phase Search Acquisition signal processing.
@@ -182,10 +216,21 @@ private:
         bool positive_acq{false};
     };
 
+    // Narrowed grids always need reference rows; full grids need them only
+    // for CFAR when wraparound separation is insufficient.
+    // Call after construction: d_use_CFAR_algorithm_flag is initialized later.
+    bool needs_extra_reference_row(uint32_t candidate_bins) const;
+
     void update_local_carrier(own::span<gr_complex> carrier_vector, float freq) const;
     void update_grid_doppler_wipeoffs();
     void update_grid_doppler_wipeoffs_step2();
     void doppler_grid(const gr_complex* in);
+    void doppler_grid_cpu(const gr_complex* in);
+#if CUDA_GPU_ACCEL
+    void init_cuda_engine();
+    void cuda_upload_wipeoffs(CudaPcpsEngine::GridId grid);
+    bool doppler_grid_cuda(const gr_complex* in);
+#endif
     AcquisitionResult compute_statistics();
     void update_synchro(const AcquisitionResult& result);
     void handle_threshold_reached(AcquisitionResult& result);
@@ -204,13 +249,8 @@ private:
     const float* magnitude_grid_data(uint32_t doppler_index) const;
     bool is_fdma();
     float get_threshold() const;
-    // candidate_count: number of computed grid rows eligible to be selected as the
-    // acquisition result -- narrowed mode computes 2 rows (known bin + noise
-    // reference) but only bin 0 is a real candidate, so candidate_count is 1 there.
-    // max_to_input_power_statistic additionally takes num_doppler_bins (>=
-    // candidate_count), the full computed row count, for its CFAR "opposite bin"
-    // reference lookup -- first_vs_second_peak_statistic has no such reference
-    // concept, so it only needs candidate_count.
+    // candidate_count excludes trailing noise-reference rows.
+    // CFAR also takes the total computed row count for reference lookup.
     AcquisitionResult first_vs_second_peak_statistic(uint32_t candidate_count, int32_t doppler_max, int32_t doppler_step);
     AcquisitionResult max_to_input_power_statistic(uint32_t num_doppler_bins, uint32_t candidate_count, int32_t doppler_max, int32_t doppler_step);
     void wait_if_active();
@@ -221,24 +261,25 @@ private:
     const uint32_t d_samplesPerChip;
     const uint32_t d_doppler_step;
     const uint32_t d_samples_to_consume;
+    // Exact (true) dwell length minus d_samples_to_consume, in [0, 1) samples.
+    const double d_dwell_residual_samples;
     const uint32_t d_fft_size;
     const uint32_t d_effective_fft_size;
     const uint32_t d_magnitude_grid_stride;
     const uint32_t d_doppler_wipeoffs_stride;
     const uint32_t d_num_doppler_bins;
-    // Narrowed acquisition always computes two rows (candidate + noise
-    // reference), even when the configured full grid contains only one bin.
-    const uint32_t d_num_doppler_bins_step1_capacity;
     const uint32_t d_num_doppler_bins_step2;
     const uint32_t d_dump_channel;
-    const float d_threshold;
-    // Same PFA target as d_threshold, but calibrated for a single Doppler-bin's
-    // worth of code-phase hypotheses instead of the full grid's d_num_doppler_bins --
-    // reusing d_threshold in narrowed mode would under-detect, since compute_threshold()
-    // folds the candidate count into the false-alarm probability (e.g. a requested
-    // pfa=0.01 becomes far stricter than 0.01 once inflated by a ~80-bin full grid's
-    // worth of hypotheses that narrowed mode isn't actually searching).
-    const float d_threshold_narrowed;
+    // CFAR reference separation target (Hz): (sidelobes + 0.5) / integration time.
+    // Selects extra reference rows; never extends them beyond d_doppler_max.
+    const float d_min_reference_separation_hz;
+    // Full-grid CFAR wraparound separation is insufficient.
+    // Computed from conf_ during construction, before the runtime flag exists.
+    const bool d_full_grid_reference_needs_extra_row;
+    // Full-grid candidate count plus reference rows; restored by set_doppler_num_bins(0).
+    const uint32_t d_num_doppler_bins_full_grid_active;
+    // Capacity includes two reference rows, even when only narrowed grids need them.
+    const uint32_t d_num_doppler_bins_capacity;
     const float d_threshold_step_two;
     const bool d_cshort;
     const bool d_use_CFAR_algorithm_flag;
@@ -252,16 +293,20 @@ private:
     int32_t d_state;
     int32_t d_doppler_center;
     int32_t d_doppler_bias;
-    // Number of step-1 Doppler bins actually searched: equals d_num_doppler_bins,
-    // or 2 (known bin + reference bin) when d_doppler_search_narrowed is true.
+    // Active candidate and reference rows; bounded by d_num_doppler_bins_capacity.
     uint32_t d_num_doppler_bins_active;
-    // Explicit narrowed-mode flag, set directly by set_doppler_uncertainty() --
-    // deliberately NOT inferred from "d_num_doppler_bins_active < d_num_doppler_bins".
-    // A narrowed request computes 2 rows regardless of whether the configured full
-    // grid has 1, 2, or more bins; d_num_doppler_bins_step1_capacity guarantees
-    // storage for both rows, while the explicit flag avoids the 2 == 2 ambiguity.
-    bool d_doppler_search_narrowed;
+    // Trailing noise-reference rows: 0 if unnecessary, 1 at center + doppler_max
+    // for a single candidate, otherwise 2 at center +/- doppler_max.
+    // CFAR uses the reference opposite the winning candidate.
+    uint32_t d_num_reference_rows_active;
+    // CFAR threshold for active candidates, excluding reference rows.
+    // Recompute when the candidate count changes to preserve the requested PFA.
+    float d_threshold_active;
     uint32_t d_buffer_sample_count;
+    // DDA/Bresenham accumulator keeping stream consumption aligned with the
+    // true dwell boundary; see general_work() case 0/1.
+    double d_dwell_residual_accum;
+    uint32_t d_pending_skip_samples;
     uint32_t d_channel;
     uint32_t d_resampler_latency_samples;
     uint64_t d_sample_count;
@@ -286,6 +331,10 @@ private:
     volk_gnsssdr::vector<std::complex<float>> d_grid_doppler_wipeoffs;
     volk_gnsssdr::vector<std::complex<float>> d_fft_codes;
     std::unique_ptr<gnss_fft_complex_fwd> d_fft_if;
+#if CUDA_GPU_ACCEL
+    std::unique_ptr<CudaPcpsEngine> d_cuda_engine;  // null => CPU path
+    uint64_t d_cuda_grid_count{0};
+#endif
 };
 
 

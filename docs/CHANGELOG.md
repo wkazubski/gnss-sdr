@@ -66,11 +66,10 @@ All notable changes to GNSS-SDR will be documented in this file.
   implementations using the CPU PCPS block. When enabled, each search stage
   accumulates all `max_dwells` non-coherent integrations before accepting or
   rejecting the strongest peak. This also applies to both stages of
-  `make_two_steps` and to the reduced grid used by `enable_doppler_narrowing`.
-  The default preserves early acceptance; `max_dwells=1` is unchanged.
-  `bit_transition_flag=true` takes precedence and still uses a single
-  double-length dwell. Waiting for all dwells increases acquisition latency.
-  Contributed by @joebre.
+  `make_two_steps` and to narrowed Doppler searches. The default preserves early
+  acceptance; `max_dwells=1` is unchanged. `bit_transition_flag=true` takes
+  precedence and still uses a single double-length dwell. Waiting for all dwells
+  increases acquisition latency. Contributed by @joebre.
 - Improved TOW rollover handling in Telemetry Decoder blocks.
 - Galileo F/NAV and I/NAV ephemerides are now retained independently instead of
   overwriting each other when they have the same PRN. PVT automatically uses the
@@ -128,13 +127,18 @@ All notable changes to GNSS-SDR will be documented in this file.
   per bin and supports `high_dyn=true`. The `pull_in_time_s` and
   `bit_synchronization_time_limit_s` budgets start after the scan, allowing the
   tracking loops their full settling time. Contributed by @joebre.
-- Added a CSV dump of the frequency-refinement scan: the tested Doppler
+- Added an optional CSV dump of the frequency-refinement scan, enabled with
+  `Tracking_<Sig>.f_error_dump=true` (default: `false`). The tested Doppler
   frequencies, their correlation power, and the selected frequency are written
-  to `Tracking_<Sig>.f_error_dump_filename` (default: `./f_error_dump.csv`). Set
-  the filename to an empty value to disable this output. Channels sharing a
-  filename write to the same file, with scan, satellite and channel identifiers;
-  the first scan overwrites any previous file, and later scans in the same
-  receiver run append their results.
+  to `Tracking_<Sig>.f_error_dump_filename` (default: `./f_error_dump.csv`).
+  Channels sharing a filename write to the same file, with scan, satellite and
+  channel identifiers; the first scan overwrites any previous file, and later
+  scans in the same receiver run append their results. The Octave scripts
+  `load_f_error_dump.m`, `find_f_error_scans.m` and `plot_f_error_scan.m` (in
+  `utils/matlab/libs`) and `plot_all_f_error_scans.m` (in `utils/matlab`) load
+  and plot the dumped scans, and `utils/matlab/libs/f_error_sim.m` provides a
+  Monte Carlo simulation of the scan for sizing `f_error_step_num`,
+  `f_error_accumulation` and `f_error_doppler_step` without a live capture.
 
 ### Improvements in Efficiency:
 
@@ -147,19 +151,18 @@ All notable changes to GNSS-SDR will be documented in this file.
   to 572 ms (32% less time, 1.48x throughput). Results are mathematically
   equivalent to the previous implementation within normal floating-point
   behavior.
-- New configuration parameter `Acquisition_XX.enable_doppler_narrowing`
-  (default: `false`): when dual-frequency assistance provides an exactly-known
-  Doppler (`GNSS-SDR.assist_dual_frequency_acq=true` and the same satellite is
-  already tracked in the primary band), the PCPS acquisition searches a single
-  Doppler bin at the assisted center, plus one noise-reference bin, instead of
-  the full configured grid, and recalibrates the detection threshold to the
-  reduced hypothesis count when `pfa` is set. Acquisition `.mat` dumps now
-  always include two new `int32` variables, `doppler_center` and
-  `doppler_narrowed`. Narrowed dumps store a 2-column `acq_grid` encoded with
-  `doppler_max = 0` and `doppler_step` set to the configured `doppler_max`, so
-  the generic rule
-  `doppler(col) = -doppler_max + doppler_center + doppler_step * col` decodes
-  both full and narrowed grids. Contributed by @joebre.
+- When dual-frequency assistance provides the Doppler of a satellite already
+  tracked in the primary band (`GNSS-SDR.assist_dual_frequency_acq=true`), the
+  PCPS acquisition in the secondary band now searches a single Doppler bin
+  instead of the full grid, and recalibrates the `pfa`-based threshold to the
+  number of bins searched. New parameter
+  `Acquisition_XX.reference_bin_min_sidelobes` (default: `4`) sets the Doppler
+  separation, in correlation sidelobes, that decides whether a full-grid CFAR
+  search needs dedicated noise-reference bins. Acquisition `.mat` dumps include
+  `doppler_center`, `doppler_narrowed`, and `doppler_num_candidates`: the first
+  `doppler_num_candidates` columns of `acq_grid` are Doppler bins at
+  `doppler_center - doppler_max + doppler_step * col`, and any remaining columns
+  are noise-reference bins. Contributed by @joebre.
 - Added an optional visibility-aware acquisition search, enabled with
   `GNSS-SDR.enable_visibility_aware_search=true` (default `false`, which leaves
   the existing search order untouched). Once a receiver position is available,
@@ -179,6 +182,30 @@ All notable changes to GNSS-SDR will be documented in this file.
   days). A satellite that is already being tracked is never released because of
   this classification, and `PVT.elevation_mask` still decides which observations
   enter the navigation solution. Contributed by @joebre.
+- Added opt-in almanac/ephemeris Doppler prediction for secondary signals with
+  `Acquisition_<signal>.alm_ephe_assisted_doppler_narrowing=true` (default
+  `false`, also supported per channel). To acquire secondary signals without
+  waiting for a tracked primary band, set
+  `GNSS-SDR.assist_dual_frequency_acq=false`. Pre-fix prediction additionally
+  requires `GNSS-SDR.doppler_prediction_before_fix=true`, an
+  `AGNSS_ref_location` (and `AGNSS_ref_utc_time` for replay), and explicit,
+  finite, nonnegative values for both `GNSS-SDR.clock_frequency_max_error_ppm`
+  and `GNSS-SDR.receiver_max_velocity_m_s`. Missing or invalid bounds preserve
+  the full Doppler search; explicit zero bounds assert no uncertainty in that
+  component. The predicted center uses `GNSS-SDR.clock_frequency_offset_ppm`
+  (default 0) and zero receiver velocity before a fix. Search widening honors
+  `--doppler_max` and `--doppler_step` overrides, and falls back to the regular
+  full search centered at 0 Hz when the uncertainty window is not narrower than
+  the configured Doppler grid. Live-fix prediction refreshes its timestamp
+  before both idle and channel-event acquisition attempts.
+- New CUDA acquisition engine: with `-DENABLE_CUDA=ON`, any PCPS acquisition
+  block can evaluate its Doppler x code-phase search grid on the GPU with
+  batched cuFFTs by setting `Acquisition_XX.use_cuda=true` (or
+  `GNSS-SDR.use_cuda_acquisition=true`). Peak search and detection statistics
+  are unchanged, so results match the CPU implementation; the block falls back
+  to the CPU if the device cannot be initialized. Added `benchmark_pcps_grid`
+  (CPU baseline vs. GPU) and unit tests checking the GPU grid against the CPU
+  reference and running the full GPS L1 C/A adapter on a real capture.
 
 ### Improvements in Interoperability:
 
@@ -424,6 +451,14 @@ All notable changes to GNSS-SDR will be documented in this file.
 - Refactored Python interpreter detection and improved CMake portability and
   robustness across dependency discovery, distro detection, and
   cross-compilation handling.
+- The CUDA build (`-DENABLE_CUDA=ON`) works again with current toolkits and on
+  NVIDIA Jetson: removed the hardcoded `sm_30` (Kepler) architecture, which
+  CUDA >= 11 rejects; `CMAKE_CUDA_ARCHITECTURES` is now honored and detected
+  automatically on Jetson (Orin -> 87, Xavier -> 72, TX2 -> 62, Nano -> 53) or
+  set to `native` with CMake >= 3.24; the CUDA language standard follows the
+  host C++ standard (C++17); imported `CUDA::cudart`/`CUDA::cufft` targets are
+  linked explicitly; `-Wno-psabi` is no longer passed to `nvcc`.
+- Added `docs/JETSON.md`, a build/verify/benchmark guide for NVIDIA Jetson.
 
 ### Improvements in Reliability:
 
@@ -445,6 +480,13 @@ All notable changes to GNSS-SDR will be documented in this file.
   wall-clock GST alignment check for OSNMA tag processing, enabling replay of
   previously captured Galileo signals while keeping all other OSNMA verification
   steps active.
+- `GPS_L1_CA_DLL_PLL_Tracking_GPU`: fixed a cross-block data race in the CUDA
+  multi-correlator kernel (the carrier wipe-off and the correlation were in the
+  same launch, synchronized only with `__syncthreads()`), fixed the
+  `cudaHostAlloc` flags (`cudaHostAllocMapped || cudaHostAllocWriteCombined`
+  evaluated to `cudaHostAllocPortable`), stopped calling `cudaDeviceReset()`
+  from a per-channel destructor (it tore down the context under the other
+  channels), and stopped `cudaFree()`-ing device aliases of host-mapped buffers.
 
 ### Improvements in Usability:
 
@@ -510,6 +552,10 @@ All notable changes to GNSS-SDR will be documented in this file.
 - The PVT Monitor now reports per-signal details for satellites used in the
   position solution, including PRN, constellation, signal, azimuth, elevation,
   and whether multiple signals were combined. Contributed by @joebre.
+- Abseil logging now creates a unique timestamp/PID logfile for each run,
+  preserving previous logs across the receiver, calibration tool, and test
+  runners. On POSIX systems, an atomically updated relative symlink points to
+  the latest logfile.
 
 See the definitions of concepts and metrics at
 https://gnss-sdr.org/design-forces/

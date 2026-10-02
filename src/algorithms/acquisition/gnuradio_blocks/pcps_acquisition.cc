@@ -40,6 +40,7 @@
 #include <iostream>
 #include <limits>
 #include <map>
+#include <vector>
 
 #if USE_GLOG_AND_GFLAGS
 #include <glog/logging.h>
@@ -125,17 +126,23 @@ pcps_acquisition::pcps_acquisition(const Acq_Conf& conf_)
       d_doppler_max(conf_.doppler_max),
       d_samplesPerChip(conf_.samples_per_chip),
       d_doppler_step(conf_.doppler_step),
-      d_samples_to_consume(conf_.sampled_ms * conf_.samples_per_ms * (conf_.bit_transition_flag ? 2.0 : 1.0)),
+      d_samples_to_consume(conf_.GetSamplesPerDwell()),
+      d_dwell_residual_samples(conf_.GetDwellResidualSamples()),
       d_fft_size(conf_.sampled_ms == conf_.ms_per_code ? d_samples_to_consume : d_samples_to_consume * 2),
       d_effective_fft_size(conf_.bit_transition_flag ? (d_fft_size / 2) : d_fft_size),
       d_magnitude_grid_stride(aligned_row_stride<float>(d_effective_fft_size)),
       d_doppler_wipeoffs_stride(aligned_row_stride<gr_complex>(d_fft_size)),
       d_num_doppler_bins(static_cast<uint32_t>(std::ceil(static_cast<double>(2 * d_doppler_max) / static_cast<double>(d_doppler_step)))),
-      d_num_doppler_bins_step1_capacity(std::max(d_num_doppler_bins, 2U)),
       d_num_doppler_bins_step2(conf_.num_doppler_bins_step2),
       d_dump_channel(conf_.dump_channel),
-      d_threshold(conf_.pfa > 0.0 ? compute_threshold(conf_.pfa, d_effective_fft_size, d_num_doppler_bins, conf_.bit_transition_flag ? 1 : conf_.max_dwells) : conf_.threshold),
-      d_threshold_narrowed(conf_.pfa > 0.0 ? compute_threshold(conf_.pfa, d_effective_fft_size, 1U, conf_.bit_transition_flag ? 1 : conf_.max_dwells) : conf_.threshold),
+      d_min_reference_separation_hz((static_cast<float>(conf_.reference_bin_min_sidelobes) + 0.5F) / (static_cast<float>(conf_.sampled_ms) / 1000.0F)),
+      // Inline, not via needs_extra_reference_row(candidate_bins) -- that
+      // helper reads d_use_CFAR_algorithm_flag, declared (so initialized)
+      // later in this same list; see its own doc comment in the header.
+      d_full_grid_reference_needs_extra_row(conf_.use_CFAR_algorithm_flag && (static_cast<float>(d_num_doppler_bins / 2) * static_cast<float>(d_doppler_step) < d_min_reference_separation_hz)),
+      // Reserve two reference rows for a full grid that needs them.
+      d_num_doppler_bins_full_grid_active(d_num_doppler_bins + (d_full_grid_reference_needs_extra_row ? (d_num_doppler_bins > 1U ? 2U : 1U) : 0U)),
+      d_num_doppler_bins_capacity(d_num_doppler_bins + 2U),
       d_threshold_step_two(conf_.pfa2 > 0.0 ? compute_threshold(conf_.pfa2, d_effective_fft_size, d_num_doppler_bins_step2, conf_.bit_transition_flag ? 1 : conf_.max_dwells) : conf_.threshold),
       d_cshort(conf_.it_size != sizeof(gr_complex)),
       d_use_CFAR_algorithm_flag(conf_.use_CFAR_algorithm_flag),
@@ -145,9 +152,12 @@ pcps_acquisition::pcps_acquisition(const Acq_Conf& conf_)
       d_state(0),
       d_doppler_center(0),
       d_doppler_bias(0),
-      d_num_doppler_bins_active(d_num_doppler_bins),
-      d_doppler_search_narrowed(false),
+      d_num_doppler_bins_active(d_num_doppler_bins_full_grid_active),
+      d_num_reference_rows_active(d_full_grid_reference_needs_extra_row ? (d_num_doppler_bins > 1U ? 2U : 1U) : 0U),
+      d_threshold_active(conf_.pfa > 0.0 ? compute_threshold(conf_.pfa, d_effective_fft_size, d_num_doppler_bins, conf_.bit_transition_flag ? 1 : conf_.max_dwells) : conf_.threshold),
       d_buffer_sample_count(0),
+      d_dwell_residual_accum(0.0),
+      d_pending_skip_samples(0),
       d_channel(0),
       d_resampler_latency_samples(conf_.resampler_latency_samples),
       d_sample_count(0),
@@ -158,12 +168,12 @@ pcps_acquisition::pcps_acquisition(const Acq_Conf& conf_)
       d_dump_number(0),
       d_input_power(0),
       d_doppler_center_step_two(0),
-      d_magnitude_grid(std::max(d_num_doppler_bins_step1_capacity, d_num_doppler_bins_step2) * d_magnitude_grid_stride),
+      d_magnitude_grid(std::max(d_num_doppler_bins_capacity, d_num_doppler_bins_step2) * d_magnitude_grid_stride),
       d_tmp_buffer(d_effective_fft_size),
       d_input_signal(d_fft_size),
       d_grid_doppler_wipeoffs_step_two(d_acq_parameters.make_2_steps ? d_num_doppler_bins_step2 * d_doppler_wipeoffs_stride : 0),
       d_ifft(gnss_fft_rev_make_unique(d_fft_size)),
-      d_grid_doppler_wipeoffs(d_num_doppler_bins_step1_capacity * d_doppler_wipeoffs_stride),
+      d_grid_doppler_wipeoffs(d_num_doppler_bins_capacity * d_doppler_wipeoffs_stride),
       d_fft_codes(d_fft_size),
       d_fft_if(gnss_fft_fwd_make_unique(d_fft_size))
 {
@@ -196,17 +206,80 @@ pcps_acquisition::pcps_acquisition(const Acq_Conf& conf_)
 
     update_grid_doppler_wipeoffs();
 
-    // While idle (not actively searching), general_work() only drains its input to avoid
-    // stalling the upstream block, producing no output. Without a batching hint the TPB
-    // scheduler wakes this block's thread for every small burst of new input, which is
-    // pure scheduling overhead. Requiring a larger noutput_items granularity forces the
-    // scheduler to accumulate more input per wakeup, cutting call frequency without
-    // changing behavior (production while idle is still always 0 either way).
-    // One PRN code period at this signal's own decimated rate is the natural
-    // lower bound: the algorithm never does anything meaningful below that granularity.
+#if CUDA_GPU_ACCEL
+    if (d_acq_parameters.use_cuda)
+        {
+            init_cuda_engine();
+        }
+#endif
+
+    // Batch idle input by one millisecond at the decimated rate to reduce
+    // scheduler wakeups; idle acquisition produces no output.
     const auto output_multiple_samples = std::max<uint32_t>(1U, static_cast<uint32_t>(std::lround(conf_.samples_per_ms)));
     this->set_output_multiple(output_multiple_samples);
 }
+
+
+#if CUDA_GPU_ACCEL
+void pcps_acquisition::init_cuda_engine()
+{
+    const uint32_t max_bins = std::max(d_num_doppler_bins_capacity, d_num_doppler_bins_step2);
+    auto engine = std::make_unique<CudaPcpsEngine>(d_fft_size, d_effective_fft_size, max_bins, d_acq_parameters.cuda_device);
+    if (!engine->is_valid())
+        {
+            LOG(WARNING) << "CUDA acquisition engine could not be initialized (" << engine->last_error()
+                         << "). Falling back to the CPU implementation.";
+            return;
+        }
+    d_cuda_engine = std::move(engine);
+    LOG(INFO) << "PCPS acquisition grid will be computed on CUDA device " << d_cuda_engine->device_name()
+              << " (FFT size " << d_fft_size << ", up to " << max_bins << " Doppler bins, "
+              << d_cuda_engine->device_bytes() / 1024 << " KiB device memory)";
+    cuda_upload_wipeoffs(CudaPcpsEngine::MAIN_GRID);
+}
+
+
+void pcps_acquisition::cuda_upload_wipeoffs(CudaPcpsEngine::GridId grid)
+{
+    if (!d_cuda_engine)
+        {
+            return;
+        }
+    const bool step2 = (grid == CudaPcpsEngine::STEP2_GRID);
+    const uint32_t bins = step2 ? d_num_doppler_bins_step2 : d_num_doppler_bins_active;
+    if (bins == 0U || (step2 && d_grid_doppler_wipeoffs_step_two.empty()))
+        {
+            return;
+        }
+    std::vector<const std::complex<float>*> rows(bins);
+    for (uint32_t k = 0; k < bins; k++)
+        {
+            rows[k] = step2 ? doppler_wipeoff_step_two_data(k) : doppler_wipeoff_data(k);
+        }
+    if (!d_cuda_engine->set_doppler_wipeoffs(grid, rows.data(), bins))
+        {
+            LOG(WARNING) << "CUDA acquisition: failed to upload Doppler grid (" << d_cuda_engine->last_error()
+                         << "). Falling back to the CPU implementation.";
+            d_cuda_engine.reset();
+        }
+}
+
+
+bool pcps_acquisition::doppler_grid_cuda(const gr_complex* in)
+{
+    const auto bin_count = d_step_two ? d_num_doppler_bins_step2 : d_num_doppler_bins_active;
+    const auto grid_id = d_step_two ? CudaPcpsEngine::STEP2_GRID : CudaPcpsEngine::MAIN_GRID;
+    const uint32_t offset = (d_acq_parameters.bit_transition_flag ? d_effective_fft_size : 0);
+    const bool accumulate = (d_num_noncoherent_integrations_counter != 1);
+
+    std::vector<float*> rows(bin_count);
+    for (uint32_t k = 0; k < bin_count; k++)
+        {
+            rows[k] = magnitude_grid_data(k);
+        }
+    return d_cuda_engine->compute_grid(in, grid_id, bin_count, offset, accumulate, rows.data());
+}
+#endif
 
 
 pcps_acquisition::~pcps_acquisition() noexcept
@@ -280,6 +353,14 @@ void pcps_acquisition::set_local_code(std::complex<float>* code)
 
     d_fft_if->execute();  // We need the FFT of local code
     volk_32fc_conjugate_32fc(d_fft_codes.data(), d_fft_if->get_outbuf(), d_fft_size);
+#if CUDA_GPU_ACCEL
+    if (d_cuda_engine && !d_cuda_engine->set_fft_codes(d_fft_codes.data()))
+        {
+            LOG(WARNING) << "CUDA acquisition: failed to upload local code (" << d_cuda_engine->last_error()
+                         << "). Falling back to the CPU implementation.";
+            d_cuda_engine.reset();
+        }
+#endif
 }
 
 
@@ -315,22 +396,28 @@ void pcps_acquisition::update_local_carrier(own::span<gr_complex> carrier_vector
 
 void pcps_acquisition::update_grid_doppler_wipeoffs()
 {
-    if (d_doppler_search_narrowed)
+    // Center all candidate grids on d_doppler_center, including single-bin searches.
+    const uint32_t candidate_count = d_num_doppler_bins_active - d_num_reference_rows_active;
+    const auto half_span = static_cast<int32_t>((candidate_count - 1U) / 2U);
+    for (uint32_t doppler_index = 0; doppler_index < candidate_count; doppler_index++)
         {
-            // Assisted acquisition: the Doppler is exactly known from an already-tracked
-            // primary frequency. Search just that bin, plus one reference bin offset by
-            // the full configured Doppler half-width -- the same separation the full grid
-            // search uses for its "opposite" bin -- so max_to_input_power_statistic can
-            // keep using it as a noise-only reference without any change to its logic.
-            update_local_carrier(own::span<gr_complex>(doppler_wipeoff_data(0), d_fft_size), static_cast<float>(d_doppler_bias + d_doppler_center));
-            update_local_carrier(own::span<gr_complex>(doppler_wipeoff_data(1), d_fft_size), static_cast<float>(d_doppler_bias + d_doppler_center + static_cast<int32_t>(d_doppler_max)));
-            return;
-        }
-    for (uint32_t doppler_index = 0; doppler_index < d_num_doppler_bins_active; doppler_index++)
-        {
-            const int32_t doppler = -static_cast<int32_t>(d_doppler_max) + d_doppler_center + d_doppler_step * doppler_index;
+            const int32_t doppler = d_doppler_center + (static_cast<int32_t>(doppler_index) - half_span) * static_cast<int32_t>(d_doppler_step);
             update_local_carrier(own::span<gr_complex>(doppler_wipeoff_data(doppler_index), d_fft_size), static_cast<float>(d_doppler_bias + doppler));
         }
+    if (d_num_reference_rows_active > 0U)
+        {
+            // Keep references at center +/- doppler_max; extending beyond the validated
+            // passband can bias noise estimates. Use both sides for multiple candidates
+            // so CFAR can select the reference opposite the winning peak.
+            update_local_carrier(own::span<gr_complex>(doppler_wipeoff_data(candidate_count), d_fft_size), static_cast<float>(d_doppler_bias + d_doppler_center + static_cast<int32_t>(d_doppler_max)));
+            if (d_num_reference_rows_active > 1U)
+                {
+                    update_local_carrier(own::span<gr_complex>(doppler_wipeoff_data(candidate_count + 1U), d_fft_size), static_cast<float>(d_doppler_bias + d_doppler_center - static_cast<int32_t>(d_doppler_max)));
+                }
+        }
+#if CUDA_GPU_ACCEL
+    cuda_upload_wipeoffs(CudaPcpsEngine::MAIN_GRID);
+#endif
 }
 
 
@@ -343,6 +430,9 @@ void pcps_acquisition::update_grid_doppler_wipeoffs_step2()
             // stage, so the FDMA frequency offset must be added back to the wipeoff
             update_local_carrier(own::span<gr_complex>(doppler_wipeoff_step_two_data(doppler_index), d_fft_size), static_cast<float>(d_doppler_bias) + d_doppler_center_step_two + doppler);
         }
+#if CUDA_GPU_ACCEL
+    cuda_upload_wipeoffs(CudaPcpsEngine::STEP2_GRID);
+#endif
 }
 
 
@@ -425,22 +515,22 @@ void pcps_acquisition::dump_results(const AcquisitionResult& result)
             std::array<size_t, 2> dims_1d{1, 1};
             std::array<size_t, 2> dims_2d{d_effective_fft_size, d_num_doppler_bins_active};
 
-            // In narrowed mode, acq_grid is only d_num_doppler_bins_active (2) columns
-            // wide -- column 0 is the known/aided Doppler, column 1 the noise-reference
-            // bin at +doppler_max from it. doppler_max/doppler_step are given the same
-            // {0, d_doppler_max} encoding compute_statistics() uses internally, so
-            // doppler(col) = -doppler_max + doppler_center + doppler_step*col still
-            // decodes both columns correctly; doppler_narrowed flags which encoding is
-            // in effect for offline post-processing.
-            const bool dump_narrowed = d_doppler_search_narrowed;
-            const int32_t dump_doppler_max = dump_narrowed ? 0 : static_cast<int32_t>(d_doppler_max);
-            const int32_t dump_doppler_step = dump_narrowed ? static_cast<int32_t>(d_doppler_max) : static_cast<int32_t>(d_doppler_step);
+            // Encode candidate k as center + (k - half_span) * step for dump readers.
+            // Narrowing describes the candidate count, independently of reference rows.
+            const uint32_t dump_candidate_count = d_num_doppler_bins_active - d_num_reference_rows_active;
+            const bool dump_narrowed = dump_candidate_count < d_num_doppler_bins;
+            const auto dump_half_span = static_cast<int32_t>((dump_candidate_count - 1U) / 2U);
+            const int32_t dump_doppler_max = dump_half_span * static_cast<int32_t>(d_doppler_step);
+            const auto dump_doppler_step = static_cast<int32_t>(d_doppler_step);
 
             write_matlab_var<2>("acq_grid", d_grid.memptr(), matfp, dims_2d);
             write_matlab_var<1>("doppler_max", dump_doppler_max, matfp, dims_1d);
             write_matlab_var<1>("doppler_step", dump_doppler_step, matfp, dims_1d);
             write_matlab_var<1>("doppler_center", d_doppler_center, matfp, dims_1d);
             write_matlab_var<1>("doppler_narrowed", static_cast<int32_t>(dump_narrowed ? 1 : 0), matfp, dims_1d);
+            // Trailing columns are noise references at center +/- configured doppler_max;
+            // readers must exclude them from the linear candidate axis.
+            write_matlab_var<1>("doppler_num_candidates", static_cast<int32_t>(dump_candidate_count), matfp, dims_1d);
             write_matlab_var<1>("positive_acq", static_cast<int32_t>(result.positive_acq ? 1 : 0), matfp, dims_1d);
             write_matlab_var<1>("acq_doppler_hz", static_cast<float>(d_gnss_synchro->Acq_doppler_hz), matfp, dims_1d);
             write_matlab_var<1>("acq_delay_samples", static_cast<float>(d_gnss_synchro->Acq_delay_samples), matfp, dims_1d);
@@ -468,10 +558,7 @@ void pcps_acquisition::dump_results(const AcquisitionResult& result)
 
 void pcps_acquisition::ensure_dump_grid_allocated()
 {
-    // Sized to the currently *active* bin count (2 when narrowed), not the full
-    // configured d_num_doppler_bins -- matches what copy_magnitude_grid_to_dump_grid()
-    // actually writes each cycle, and this size check doubles as the resize trigger
-    // whenever narrowed/full mode changes between dumps (either direction).
+    // Resize the dump grid when the active row count changes.
     if ((d_grid.n_rows != d_effective_fft_size) || (d_grid.n_cols != d_num_doppler_bins_active))
         {
             d_grid.zeros(d_effective_fft_size, d_num_doppler_bins_active);
@@ -554,9 +641,26 @@ pcps_acquisition::AcquisitionResult pcps_acquisition::max_to_input_power_statist
 
     if (!d_step_two)
         {
-            const auto index_opp = (index_doppler + num_doppler_bins / 2) % num_doppler_bins;
-            const auto* magnitude_grid = magnitude_grid_data(index_opp);
-            d_input_power = static_cast<float>(std::accumulate(magnitude_grid, magnitude_grid + d_effective_fft_size, static_cast<float>(0.0)) / d_effective_fft_size / 2.0 / d_num_noncoherent_integrations_counter);
+            if (d_num_reference_rows_active > 0U)
+                {
+                    // Use a dedicated noise reference opposite the winning candidate to avoid
+                    // its sidelobes. Reference rows follow the candidate rows.
+                    uint32_t reference_index = candidate_count;
+                    if (d_num_reference_rows_active > 1U)
+                        {
+                            const int32_t winner_offset = -doppler_max + doppler_step * static_cast<int32_t>(index_doppler);
+                            reference_index = (winner_offset >= 0) ? (candidate_count + 1U) : candidate_count;
+                        }
+                    const auto* magnitude_grid = magnitude_grid_data(reference_index);
+                    d_input_power = static_cast<float>(std::accumulate(magnitude_grid, magnitude_grid + d_effective_fft_size, static_cast<float>(0.0)) / d_effective_fft_size / 2.0 / d_num_noncoherent_integrations_counter);
+                }
+            else
+                {
+                    // The full-grid wraparound distance satisfies the reference-separation target.
+                    const auto index_opp = (index_doppler + num_doppler_bins / 2) % num_doppler_bins;
+                    const auto* magnitude_grid = magnitude_grid_data(index_opp);
+                    d_input_power = static_cast<float>(std::accumulate(magnitude_grid, magnitude_grid + d_effective_fft_size, static_cast<float>(0.0)) / d_effective_fft_size / 2.0 / d_num_noncoherent_integrations_counter);
+                }
             result.doppler = -static_cast<int32_t>(doppler_max) + d_doppler_center + doppler_step * static_cast<int32_t>(index_doppler);
         }
     else
@@ -653,6 +757,25 @@ pcps_acquisition::AcquisitionResult pcps_acquisition::first_vs_second_peak_stati
 
 void pcps_acquisition::doppler_grid(const gr_complex* in)
 {
+#if CUDA_GPU_ACCEL
+    if (d_cuda_engine)
+        {
+            if (doppler_grid_cuda(in))
+                {
+                    ++d_cuda_grid_count;
+                    return;
+                }
+            LOG(WARNING) << "CUDA acquisition failed in channel " << d_channel << " (" << d_cuda_engine->last_error()
+                         << "). Falling back to the CPU implementation.";
+            d_cuda_engine.reset();
+        }
+#endif
+    doppler_grid_cpu(in);
+}
+
+
+void pcps_acquisition::doppler_grid_cpu(const gr_complex* in)
+{
     const auto bin_count = d_step_two ? d_num_doppler_bins_step2 : d_num_doppler_bins_active;
     const auto* grid_doppler_wipeoffs = d_step_two ? d_grid_doppler_wipeoffs_step_two.data() : d_grid_doppler_wipeoffs.data();
 
@@ -692,23 +815,13 @@ void pcps_acquisition::doppler_grid(const gr_complex* in)
 pcps_acquisition::AcquisitionResult pcps_acquisition::compute_statistics()
 {
     const auto bin_count = d_step_two ? d_num_doppler_bins_step2 : d_num_doppler_bins_active;
-    // Assisted acquisition (Doppler exactly known from an already-tracked primary
-    // frequency): bin 0 is the known Doppler and bin 1 is the reference bin offset
-    // by d_doppler_max (see update_grid_doppler_wipeoffs()). Passing doppler_max=0,
-    // doppler_step=d_doppler_max makes the generic "-doppler_max + center +
-    // doppler_step * index" decoding below map those two bins back to the right
-    // Doppler values, same formula as the full grid search uses.
-    const bool assisted = (!d_step_two) && d_doppler_search_narrowed;
-    const auto doppler_step = d_step_two ? d_acq_parameters.doppler_step2 : (assisted ? static_cast<int32_t>(d_doppler_max) : d_doppler_step);
-    const auto doppler_max = d_step_two ? static_cast<int32_t>(d_doppler_center_step_two - (static_cast<float>(bin_count) / 2.0) * doppler_step) : (assisted ? 0 : static_cast<int32_t>(d_doppler_max));
-    // In assisted mode, bin_count computed rows exist (known bin + noise reference)
-    // but only bin 0 is a real Doppler candidate -- the reference bin must never be
-    // selected as the acquisition result (see the two statistic functions).
-    const auto candidate_count = assisted ? 1U : bin_count;
+    // Reference rows contribute to statistics but cannot win acquisition.
+    const auto candidate_count = d_step_two ? bin_count : (bin_count - d_num_reference_rows_active);
+    // Use the centered grid's half-span to decode candidate indices into Doppler.
+    const auto half_span = static_cast<int32_t>((candidate_count - 1U) / 2U);
+    const auto doppler_step = d_step_two ? d_acq_parameters.doppler_step2 : d_doppler_step;
+    const auto doppler_max = d_step_two ? static_cast<int32_t>(d_doppler_center_step_two - (static_cast<float>(bin_count) / 2.0) * doppler_step) : half_span * static_cast<int32_t>(d_doppler_step);
 
-    // The reference/"opposite" bin used by max_to_input_power_statistic as a
-    // noise-only estimate works the same way whether the grid has the full
-    // configured bin count or just the 2 bins built above for assisted mode.
     if (d_use_CFAR_algorithm_flag)
         {
             return max_to_input_power_statistic(bin_count, candidate_count, doppler_max, doppler_step);
@@ -821,12 +934,7 @@ void pcps_acquisition::acquisition_core(uint64_t sample_count)
         {
             if (d_acq_parameters.full_grid_search)
                 {
-                    // Search the entire acquisition grid (accumulate through the full max_dwells)
-                    // before deciding accept/reject, instead of exiting as soon as any single dwell's
-                    // (possibly still noisy, partially non-coherently accumulated) grid crosses
-                    // threshold -- a later dwell's fuller integration can reveal a different, genuinely
-                    // stronger peak elsewhere in the same grid that an early exit never gets the chance
-                    // to compare against.
+                    // Accumulate all dwells before thresholding so a later, stronger peak can win.
                     if (d_num_noncoherent_integrations_counter == d_acq_parameters.max_dwells)
                         {
                             if (result.test_statistics > get_threshold())
@@ -890,11 +998,19 @@ void pcps_acquisition::acquisition_core(uint64_t sample_count)
 
 float pcps_acquisition::get_threshold() const
 {
-    if (d_step_two)
+    return d_step_two ? d_threshold_step_two : d_threshold_active;
+}
+
+
+bool pcps_acquisition::needs_extra_reference_row(uint32_t candidate_bins) const
+{
+    if (candidate_bins < d_num_doppler_bins)
         {
-            return d_threshold_step_two;
+            // Narrowed grids always retain reference rows, including in peak-ratio mode.
+            return true;
         }
-    return d_doppler_search_narrowed ? d_threshold_narrowed : d_threshold;
+    // Full grids need extra references only for CFAR with insufficient wraparound separation.
+    return d_use_CFAR_algorithm_flag && (static_cast<float>(candidate_bins / 2) * static_cast<float>(d_doppler_step) < d_min_reference_separation_hz);
 }
 
 
@@ -910,17 +1026,23 @@ void pcps_acquisition::set_doppler_center(int32_t doppler_center)
 }
 
 
-void pcps_acquisition::set_doppler_uncertainty(uint32_t doppler_uncertainty)
+void pcps_acquisition::set_doppler_num_bins(uint32_t num_doppler_bins)
 {
     gr::thread::scoped_lock lock(d_setlock);  // require mutex with work function called by the scheduler
-    const bool narrow = (doppler_uncertainty == 0) && d_acq_parameters.enable_doppler_narrowing;
-    const uint32_t num_doppler_bins_active = narrow ? 2U : d_num_doppler_bins;
-    if (narrow != d_doppler_search_narrowed || num_doppler_bins_active != d_num_doppler_bins_active)
+    // Zero restores the full grid; positive counts request explicit search widths.
+    uint32_t candidate_bins = (num_doppler_bins == 0U) ? d_num_doppler_bins : num_doppler_bins;
+    candidate_bins = std::min(candidate_bins, d_num_doppler_bins);
+    // One reference for a single candidate, otherwise a pair on opposite sides.
+    const uint32_t num_reference_rows = needs_extra_reference_row(candidate_bins) ? (candidate_bins > 1U ? 2U : 1U) : 0U;
+    const uint32_t num_doppler_bins_active = candidate_bins + num_reference_rows;
+    if (num_reference_rows != d_num_reference_rows_active || num_doppler_bins_active != d_num_doppler_bins_active)
         {
-            d_doppler_search_narrowed = narrow;
+            d_num_reference_rows_active = num_reference_rows;
             d_num_doppler_bins_active = num_doppler_bins_active;
+            // Recalibrate PFA for candidate bins only, excluding noise references.
+            d_threshold_active = d_acq_parameters.pfa > 0.0 ? compute_threshold(d_acq_parameters.pfa, d_effective_fft_size, candidate_bins, d_acq_parameters.bit_transition_flag ? 1 : d_acq_parameters.max_dwells) : d_acq_parameters.threshold;
             update_grid_doppler_wipeoffs();
-            DLOG(INFO) << " Doppler uncertainty for Channel: " << d_channel << " => active Doppler bins: " << d_num_doppler_bins_active << ", Doppler center: " << d_doppler_center;
+            DLOG(INFO) << " Doppler bin count for Channel: " << d_channel << " => active Doppler bins: " << d_num_doppler_bins_active << ", Doppler center: " << d_doppler_center;
         }
 }
 
@@ -984,10 +1106,23 @@ int pcps_acquisition::general_work(int noutput_items __attribute__((unused)),
                 d_gnss_synchro->Acq_doppler_step = 0U;
                 d_state = 1;
                 d_buffer_sample_count = 0U;
+                d_dwell_residual_accum = 0.0;
+                d_pending_skip_samples = 0U;
                 break;
             }
         case 1:
             {
+                if (d_pending_skip_samples > 0U)
+                    {
+                        // Discard (do not buffer) samples to keep consumption
+                        // aligned with the true dwell boundary; see below.
+                        const auto skip_now = std::min(d_pending_skip_samples, static_cast<uint32_t>(ninput_items[0]));
+                        d_sample_count += static_cast<uint64_t>(skip_now);
+                        consume_each(skip_now);
+                        d_pending_skip_samples -= skip_now;
+                        break;
+                    }
+
                 const auto fit_in_buffer = (ninput_items[0] + d_buffer_sample_count) <= d_samples_to_consume;
                 const uint32_t samples_to_copy = fit_in_buffer ? ninput_items[0] : d_samples_to_consume - d_buffer_sample_count;
 
@@ -1009,6 +1144,16 @@ int pcps_acquisition::general_work(int noutput_items __attribute__((unused)),
                 if (d_buffer_sample_count == d_samples_to_consume)  // Buffer is full
                     {
                         d_state = 2;
+                        // d_samples_to_consume samples are always short of a true
+                        // dwell by d_dwell_residual_samples; once that drift
+                        // reaches a full sample, skip one extra so it never
+                        // accumulates across dwells (DDA/Bresenham).
+                        d_dwell_residual_accum += d_dwell_residual_samples;
+                        if (d_dwell_residual_accum >= 1.0)
+                            {
+                                d_pending_skip_samples += 1U;
+                                d_dwell_residual_accum -= 1.0;
+                            }
                     }
 
                 break;

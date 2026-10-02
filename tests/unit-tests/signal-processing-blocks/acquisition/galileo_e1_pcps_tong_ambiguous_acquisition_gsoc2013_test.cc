@@ -16,6 +16,7 @@
  * -----------------------------------------------------------------------------
  */
 
+#include "acquisition_interface.h"
 #include "concurrent_queue.h"
 #include "configuration_interface.h"
 #include "fir_filter.h"
@@ -366,8 +367,6 @@ void GalileoE1PcpsTongAmbiguousAcquisitionGSoC2013Test::wait_message()
 
     while (!stop)
         {
-            acquisition->reset();
-
             start = std::chrono::system_clock::now();
 
             channel_internal_queue.wait_and_pop(message);
@@ -378,6 +377,11 @@ void GalileoE1PcpsTongAmbiguousAcquisitionGSoC2013Test::wait_message()
             mean_acq_time_us += elapsed_seconds.count() * 1e6;
 
             process_message();
+
+            if (!stop)
+                {
+                    acquisition->reset();  // arm the next realization
+                }
         }
 }
 

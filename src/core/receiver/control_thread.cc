@@ -276,6 +276,7 @@ void ControlThread::telecommand_listener()
 
 void ControlThread::event_dispatcher(bool &valid_event, pmt::pmt_t &msg)
 {
+    bool visibility_updated = false;
     if (valid_event)
         {
             processed_control_messages_++;
@@ -287,6 +288,9 @@ void ControlThread::event_dispatcher(bool &valid_event, pmt::pmt_t &msg)
                             const auto new_event = wht::any_cast<channel_event_sptr>(pmt::any_ref(msg));
                             DLOG(INFO) << "New channel event rx from ch id: " << new_event->channel_id
                                        << " what: " << new_event->event_type;
+                            // Channel events can start acquisition synchronously.
+                            flowgraph_->MaybeUpdateVisibility();
+                            visibility_updated = true;
                             flowgraph_->apply_action(new_event->channel_id, new_event->event_type);
                         }
                 }
@@ -314,26 +318,24 @@ void ControlThread::event_dispatcher(bool &valid_event, pmt::pmt_t &msg)
                     DLOG(INFO) << "Control Queue: unknown object type!\n";
                 }
         }
-    else
-        {
-            if (receiver_on_standby_ == false)
-                {
-                    // perform non-priority tasks
-                    flowgraph_->acquisition_manager(0);  // start acquisition of untracked satellites
-                }
-        }
 
-    // Run on every event, not only in the idle branch above: acquisition
-    // churn through the "maybe visible" pool (pick, acquire, fail, re-pick)
-    // keeps the 100 ms timed_wait_and_pop() from timing out, so the idle
-    // branch would starve exactly when reclassification is needed to reduce
-    // that churn. Safe unconditionally: Tick() throttles the recompute.
+    // Refresh on idle ticks and after commands too (including leaving standby).
+    // Channel events already refreshed before apply_action() could acquire.
     if (receiver_on_standby_ == false)
         {
-            flowgraph_->MaybeUpdateVisibility();  // no-op unless GNSS-SDR.enable_visibility_aware_search=true
+            if (!visibility_updated)
+                {
+                    flowgraph_->MaybeUpdateVisibility();
+                }
             // A duplicated satellite breaks every PVT solution until one of
             // the two channels is stopped, so do not wait for an idle tick.
             flowgraph_->stop_duplicated_satellite_channels();
+        }
+
+    if (!valid_event && receiver_on_standby_ == false)
+        {
+            // perform non-priority tasks
+            flowgraph_->acquisition_manager(0);  // start acquisition of untracked satellites
         }
 }
 
@@ -376,10 +378,7 @@ int ControlThread::run()
     flowgraph_->start();
     if (flowgraph_->visibility_aware_search_enabled())
         {
-            // Channel assignments made at connect() time predate any
-            // visibility classification: standby returns them to the search
-            // pool to be re-picked once the first classification exists. With
-            // the feature disabled, connect()-time acquisitions run untouched.
+            // Requeue connect()-time assignments before the first visibility sweep.
             flowgraph_->apply_action(0, 10);
         }
     if (flowgraph_->running())
@@ -391,13 +390,11 @@ int ControlThread::run()
             return 0;
         }
 
-    // launch GNSS assistance process AFTER the flowgraph is running because the GNU Radio asynchronous queues must be already running to transport msgs
+    // Assistance messages require the running flowgraph.
     assist_GNSS();
-    // No MaybeUpdateVisibility() here: assist_GNSS() already ran the first
-    // classification if GNSS-SDR.AGNSS_ref_location is set, and
-    // event_dispatcher() runs it within ~100 ms otherwise; its idle-branch
-    // acquisition_manager() is what restarts acquisition on idle channels.
-// start the keyboard_listener thread
+    // assist_GNSS() classifies the AGNSS reference; event_dispatcher() handles
+    // later updates and restarts idle acquisition.
+    // Start the keyboard listener.
 #if USE_GLOG_AND_GFLAGS
     if (FLAGS_keyboard)
 #else
@@ -432,10 +429,7 @@ int ControlThread::run()
     flowgraph_->disconnect();
 
 #ifdef ENABLE_FPGA
-    // trigger a HW reset
-    // The HW reset causes any HW accelerator module that is waiting for more samples to complete its calculations
-    // to trigger an interrupt and finish its signal processing tasks immediately. In this way all SW threads that
-    // are waiting for interrupts in the HW can exit in a normal way.
+    // Reset hardware to release accelerator interrupts and waiting threads.
     flowgraph_->perform_hw_reset();
     fpga_helper_thread_.try_join_until(boost::chrono::steady_clock::now() + boost::chrono::milliseconds(1000));
 #endif
@@ -534,7 +528,12 @@ bool ControlThread::read_assistance_from_XML()
 
     std::cout << "Trying to read GNSS ephemeris from XML file(s)...\n";
 
-    if ((configuration_->property("Channels_1C.count", 0) > 0) || (configuration_->property("Channels_J1.count", 0) > 0))
+    // Load shared GPS/QZSS UTC, iono, and almanac data for all enabled bands.
+    // J5-only receivers need XML almanacs because L5 CNAV supplies none.
+    // L1 LNAV ephemeris loading is harmless without L1; CNAV is loaded below.
+    if ((configuration_->property("Channels_1C.count", 0) > 0) || (configuration_->property("Channels_J1.count", 0) > 0) ||
+        (configuration_->property("Channels_2S.count", 0) > 0) || (configuration_->property("Channels_L5.count", 0) > 0) ||
+        (configuration_->property("Channels_J5.count", 0) > 0))
         {
             if (supl_client_ephemeris_.load_ephemeris_xml(eph_xml_filename) == true)
                 {
@@ -574,7 +573,8 @@ bool ControlThread::read_assistance_from_XML()
                         gps_alm_iter != supl_client_ephemeris_.gps_almanac_map.cend();
                         gps_alm_iter++)
                         {
-                            std::cout << "From XML file: Read GPS almanac for satellite " << Gnss_Satellite("GPS", gps_alm_iter->second.PRN) << '\n';
+                            const std::string system = (gps_alm_iter->second.PRN >= MINPRNQZS && gps_alm_iter->second.PRN <= MAXPRNQZS) ? "QZSS" : "GPS";
+                            std::cout << "From XML file: Read " << system << " almanac for satellite " << Gnss_Satellite(system, gps_alm_iter->second.PRN) << '\n';
                             const std::shared_ptr<Gps_Almanac> tmp_obj = std::make_shared<Gps_Almanac>(gps_alm_iter->second);
                             tmp_obj->from_startup_load = true;
                             flowgraph_->send_telemetry_msg(pmt::make_any(tmp_obj));
@@ -648,7 +648,10 @@ bool ControlThread::read_assistance_from_XML()
                 }
         }
 
-    if ((configuration_->property("Channels_2S.count", 0) > 0) || (configuration_->property("Channels_L5.count", 0) > 0))
+    // QZSS L5 CNAV ephemerides are stored in the same PRN-keyed CNAV map (and saved to
+    // the same XML file) as the GPS ones, so J5 channels need this block too.
+    if ((configuration_->property("Channels_2S.count", 0) > 0) || (configuration_->property("Channels_L5.count", 0) > 0) ||
+        (configuration_->property("Channels_J5.count", 0) > 0))
         {
             if (supl_client_ephemeris_.load_cnav_ephemeris_xml(eph_cnav_xml_filename) == true)
                 {
@@ -657,7 +660,8 @@ bool ControlThread::read_assistance_from_XML()
                         gps_cnav_eph_iter != supl_client_ephemeris_.gps_cnav_ephemeris_map.cend();
                         gps_cnav_eph_iter++)
                         {
-                            std::cout << "From XML file: Read CNAV ephemeris for satellite " << Gnss_Satellite("GPS", gps_cnav_eph_iter->second.PRN) << '\n';
+                            const std::string system = (gps_cnav_eph_iter->second.PRN >= MINPRNQZS && gps_cnav_eph_iter->second.PRN <= MAXPRNQZS) ? "QZSS" : "GPS";
+                            std::cout << "From XML file: Read CNAV ephemeris for satellite " << Gnss_Satellite(system, gps_cnav_eph_iter->second.PRN) << '\n';
                             const std::shared_ptr<Gps_CNAV_Ephemeris> tmp_obj = std::make_shared<Gps_CNAV_Ephemeris>(gps_cnav_eph_iter->second);
                             flowgraph_->send_telemetry_msg(pmt::make_any(tmp_obj));
                         }
@@ -753,7 +757,7 @@ void ControlThread::assist_GNSS()
             supl_client_ephemeris_.server_port = configuration_->property("GNSS-SDR.SUPL_gps_ephemeris_port", 7275);
             supl_client_acquisition_.server_port = configuration_->property("GNSS-SDR.SUPL_gps_acquisition_port", 7275);
             supl_mcc_ = configuration_->property("GNSS-SDR.SUPL_MCC", 244);
-            supl_mns_ = configuration_->property("GNSS-SDR.SUPL_MNC ", 5);
+            supl_mns_ = configuration_->property("GNSS-SDR.SUPL_MNC", 5);
 
             const std::string default_lac("0x59e2");
             const std::string default_ci("0x31b0");
@@ -956,11 +960,7 @@ void ControlThread::assist_GNSS()
 
             // Set the receiver in Standby mode
             flowgraph_->apply_action(0, 10);
-            // With the visibility-aware search enabled, this is the first
-            // classification (from the AGNSS reference time/position) and it
-            // supersedes the legacy get_visible_sats()/priorize_satellites()
-            // pass, which would recompute the same elevations. Acquisition
-            // restarts at the next idle tick via acquisition_manager().
+            // Classify the AGNSS reference once; idle ticks restart acquisition.
             if (flowgraph_->visibility_aware_search_enabled())
                 {
                     flowgraph_->MaybeUpdateVisibility();
@@ -1007,10 +1007,7 @@ void ControlThread::apply_action(unsigned int what)
             break;
         case 12:
             LOG(INFO) << "Receiver action HOTSTART";
-            // Mirror assist_GNSS(): with the visibility-aware search enabled,
-            // MaybeUpdateVisibility() supersedes the legacy one-shot reorder,
-            // so a TC hotstart classifies satellites as startup did and keeps
-            // the continuously-maintained visibility buckets.
+            // Refresh visibility on hot start, as at initial startup.
             if (flowgraph_->visibility_aware_search_enabled())
                 {
                     flowgraph_->MaybeUpdateVisibility();
@@ -1026,10 +1023,7 @@ void ControlThread::apply_action(unsigned int what)
             break;
         case 13:
             LOG(INFO) << "Receiver action WARMSTART";
-            // Warm start: almanac current, ephemeris unknown or stale. Drop the
-            // ephemeris only and keep the almanac already in memory, which cannot
-            // be staler than the XML assistance files the receiver started from,
-            // so those are deliberately not reloaded here.
+            // Discard ephemerides but retain the current almanacs on warm start.
             pvt_ptr = flowgraph_->get_pvt();
             pvt_ptr->clear_ephemeris_keep_almanac();
             // Keep the supplied position/time active in the visibility tracker

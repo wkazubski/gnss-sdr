@@ -19,6 +19,7 @@
 #include "Galileo_E6.h"
 #include "concurrent_queue.h"
 #include "fir_filter.h"
+#include "gen_signal_source.h"
 #include "gnss_block_interface.h"
 #include "gnss_sdr_valve.h"
 #include "gnss_synchro.h"
@@ -239,8 +240,6 @@ void GalileoE6PcpsAcquisitionTest::wait_message()
 
     while (!stop)
         {
-            acquisition->reset();
-
             start = std::chrono::system_clock::now();
 
             channel_internal_queue.wait_and_pop(message);
@@ -251,6 +250,11 @@ void GalileoE6PcpsAcquisitionTest::wait_message()
             mean_acq_time_us += elapsed_seconds.count() * 1e6;
 
             process_message();
+
+            if (!stop)
+                {
+                    acquisition->reset();  // arm the next realization
+                }
         }
 }
 
