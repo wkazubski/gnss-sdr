@@ -115,6 +115,7 @@ jobs:
         run: |
           cmake -S . -B build -GNinja \
             -DPython3_EXECUTABLE="$GNURADIO_PYTHON" \
+            -DENABLE_UHD=OFF \
             -DCMAKE_COMPILE_WARNING_AS_ERROR=ON
       - name: Build
         run: cmake --build build
@@ -128,6 +129,7 @@ jobs:
           cmake -S . -B build \
             -GNinja \
             -DPython3_EXECUTABLE="$GNURADIO_PYTHON" \
+            -DENABLE_UHD=OFF \
             -DENABLE_SYSTEM_TESTING_EXTRA=ON \
             -DENABLE_UNIT_TESTING_EXTRA=OFF \
             -DCMAKE_COMPILE_WARNING_AS_ERROR=ON
@@ -213,7 +215,8 @@ jobs:
       - name: Configure
         run: |
           cmake -S . -B build -GXcode \
-            -DPython3_EXECUTABLE="$GNURADIO_PYTHON"
+            -DPython3_EXECUTABLE="$GNURADIO_PYTHON" \
+            -DENABLE_UHD=OFF
       - name: Build
         run: cmake --build build --config Release
       - name: Check
@@ -226,6 +229,7 @@ jobs:
           cmake -S . -B build \
             -GXcode \
             -DPython3_EXECUTABLE="$GNURADIO_PYTHON" \
+            -DENABLE_UHD=OFF \
             -DENABLE_SYSTEM_TESTING_EXTRA=ON \
             -DENABLE_UNIT_TESTING_EXTRA=OFF
 
@@ -437,7 +441,7 @@ jobs:
           set -uo pipefail
           echo "🔍 Checking for lines with >512 characters ..."
           FLAG_FILE=$(mktemp) > "$FLAG_FILE"
-          find . \( -name "*.c" -o -name "*.cpp" -o -name "*.cc" -o -name "*.h" -o -name "*.hpp" -o -name "*.py" -o -name "*.txt" -o -name "*.sh" -o -name "*.proto" -o -name "*.yml" \) -print0 \
+          find . \( -name "*.c" -o -name "*.cpp" -o -name "*.cc" -o -name "*.h" -o -name "*.hpp" -o -name "*.py" -o -name "*.txt" -o -name "*.sh" -o -name "*.proto" -o -name "*.yml" -o -name "*.dox" \) -print0 \
             | while IFS= read -r -d '' file; do
               awk -v fname="$file" 'length($0) > 512 {
                 gsub(/^\.\/?/, "", fname)
