@@ -289,11 +289,42 @@ double getiscl5q(int sat, const nav_t *nav)
     return 0.0;
 }
 
+/* band pair read by prange() for a satellite --------------------------------*/
+void prange_band_pair(const obsd_t *obs, int *i, int *j)
+{
+    *i = 0;
+    *j = 1;
+    const int sys = satsys(obs->sat, nullptr);
+
+    /* L1-L2 for GPS/GLO/QZS, L1-L5 for GAL/SBS;
+     * BDS: select from the measured bands, preferring B2a as the IF partner. */
+    if (sys == SYS_GAL || sys == SYS_SBS)
+        {
+            *j = 2;
+        }
+    else if (sys == SYS_BDS)
+        {
+            bds_observation_slots(obs, i, j);
+        }
+    else if (sys == SYS_GPS || sys == SYS_GLO || sys == SYS_QZS)
+        {
+            if (obs->code[1] != CODE_NONE)
+                {
+                    *j = 1;
+                }
+            else if (obs->code[2] != CODE_NONE)
+                {
+                    *j = 2;
+                }
+        }
+}
+
 /* psendorange with code bias correction -------------------------------------
- * iono_scale (O) is the multiplier the caller must apply to the modeled L1
- * ionospheric delay so that it is consistent with the returned pseudorange:
- * 1.0 for L1-referenced measurements, (f_L1/f_band)^2 for single-band
- * measurements on another band, 0.0 for ionosphere-free combinations  */
+ * iono_scale (O) is the multiplier the caller must apply to the ionospheric
+ * delay expressed at the first band of prange_band_pair() so that it is
+ * consistent with the returned pseudorange: 1.0 when that band is measured,
+ * (f_first/f_second)^2 when only the second band is, 0.0 for ionosphere-free
+ * combinations  */
 double prange(const obsd_t *obs, const nav_t *nav, const double *azel,
     int iter, const prcopt_t *opt, double *var, double *iono_scale)
 {
@@ -323,27 +354,7 @@ double prange(const obsd_t *obs, const nav_t *nav, const double *azel,
             return 0.0;
         }
 
-    /* L1-L2 for GPS/GLO/QZS, L1-L5 for GAL/SBS;
-     * BDS: select from the measured bands, preferring B2a as the IF partner. */
-    if (sys == SYS_GAL || sys == SYS_SBS)
-        {
-            j = 2;
-        }
-    else if (sys == SYS_BDS)
-        {
-            bds_observation_slots(obs, &i, &j);
-        }
-    else if (sys == SYS_GPS || sys == SYS_GLO || sys == SYS_QZS)
-        {
-            if (obs->code[1] != CODE_NONE)
-                {
-                    j = 1;
-                }
-            else if (obs->code[2] != CODE_NONE)
-                {
-                    j = 2;
-                }
-        }
+    prange_band_pair(obs, &i, &j);
 
     if (lam[i] == 0.0 || lam[j] == 0.0)
         {
@@ -463,6 +474,15 @@ double prange(const obsd_t *obs, const nav_t *nav, const double *azel,
                     P2 -= gettgd_bds_by_obs_code(obs->sat, nav, obs->code[j]);
                     PC = (gamma_ * P1 - P2) / (gamma_ - 1.0);
                 }
+            else if (sys == SYS_GPS &&
+                     (obs->code[i] == CODE_L1L || obs->code[i] == CODE_L1S || obs->code[i] == CODE_L1X) &&
+                     (obs->code[j] == CODE_L2S || obs->code[j] == CODE_L2L || obs->code[j] == CODE_L2X))
+                {
+                    /* L1C + L2C, IS-GPS-800J 3.5.3.9.2: isc[0] carries the
+                       tracked L1C component's ISC. Apply both ISCs before
+                       combining, then remove the common TGD correction. */
+                    PC = (P2 + ISCl2 - gamma_ * (P1 + ISCl1)) / (1.0 - gamma_) - P1_P2;
+                }
             else if ((sys == SYS_GPS || sys == SYS_QZS) && obs->code[j] == CODE_L5X)
                 {
                     /* L1 C/A + L5 dual-frequency correction, IS-GPS-705 20.3.3.3.1.2.2:
@@ -498,6 +518,13 @@ double prange(const obsd_t *obs, const nav_t *nav, const double *azel,
                             /* B3I is the DNAV timing reference; no TGD1 applied */
                             PC = P1;
                         }
+                    else if ((sys == SYS_GPS || sys == SYS_QZS) &&
+                             (obs->code[i] == CODE_L1L || obs->code[i] == CODE_L1S || obs->code[i] == CODE_L1X))
+                        {
+                            /* L1C single frequency, IS-GPS-800J 3.5.3.9.1:
+                               (dt_SV)L1CP = dt_SV - TGD + ISC_L1CP */
+                            PC = P1 - P1_P2 + ISCl1;
+                        }
                     else
                         {
                             P1 += P1_C1; /* C1->P1 */
@@ -506,8 +533,9 @@ double prange(const obsd_t *obs, const nav_t *nav, const double *azel,
                 }
             else if (obs->code[i] == CODE_NONE && obs->code[j] != CODE_NONE)
                 {
-                    /* single-band measurement on the second band: the modeled
-                       L1 iono delay must be scaled by (f_L1/f_band)^2 */
+                    /* single-band measurement on the second band: the iono
+                       delay at the first band must be scaled by
+                       (f_first/f_second)^2 */
                     if (gamma_ > 0.0)
                         {
                             *iono_scale = gamma_;
@@ -533,8 +561,11 @@ double prange(const obsd_t *obs, const nav_t *nav, const double *azel,
                         {
                             P2 += P2_C2; /* C2->P2 */
                             // Galileo OS SIS ICD, Eq. 19: E5a/E5b uses
-                            // (f_E1/f_E5)^2 times its corresponding BGD.
-                            PC = uses_galileo_bgd ? P2 - gamma_ * P1_P2 : P2 - gamma_ * P1_P2 / (1.0 - gamma_);
+                            // (f_E1/f_E5)^2 times its corresponding BGD. Slot 0
+                            // does not hold E1 in GPS L5 + Galileo E5b receivers,
+                            // so gamma_ cannot be used here.
+                            const double gamma_e1 = std::pow(lam[j] / LAM_CARR[0], 2.0);
+                            PC = uses_galileo_bgd ? P2 - gamma_e1 * P1_P2 : P2 - gamma_e1 * P1_P2 / (1.0 - gamma_e1);
                         }
                     else if (sys == SYS_GLO)
                         {
@@ -757,15 +788,13 @@ int rescode(int iter, const obsd_t *obs, int n, const double *rs,
                     continue;
                 }
 
-            /* ionospheric corrections — use first available observation code/band */
+            /* ionospheric corrections — use first available observation code */
             unsigned char iono_code = CODE_NONE;
-            int iono_band = 0;
             for (j = 0; j < NFREQ; j++)
                 {
                     if (obs[i].code[j] != CODE_NONE && obs[i].P[j] != 0.0)
                         {
                             iono_code = obs[i].code[j];
-                            iono_band = j;
                             break;
                         }
                 }
@@ -776,8 +805,14 @@ int rescode(int iter, const obsd_t *obs, int n, const double *rs,
                     continue;
                 }
 
-            /* Scale broadcast iono (L1 reference) to the observed carrier. */
-            if ((lam_L1 = nav->lam[obs[i].sat - 1][iono_band]) > 0.0)
+            /* The modeled delay is referenced to GPS L1. Express it at the first
+               band of the pair read by prange(); iono_scale then carries it to
+               the band actually measured, so the two factors compose to
+               (f_L1/f_measured)^2 whatever wavelength slot 0 holds. */
+            int first_band = 0;
+            int second_band = 0;
+            prange_band_pair(obs + i, &first_band, &second_band);
+            if ((lam_L1 = nav->lam[obs[i].sat - 1][first_band]) > 0.0)
                 {
                     /* iono delay scales with f^-2, its variance with f^-4 */
                     const double freq_factor = std::pow(lam_L1 / LAM_CARR[0], 2.0);

@@ -53,6 +53,21 @@ class SignalSourceInterface : public GNSSBlockInterface
 public:
     virtual size_t getRfChannels() const = 0;
 
+    /*!
+     * \brief True if samples arrive at the pace of a clock, as from a radio
+     * front end or a throttled replay. False if the receiver sets the pace, as
+     * in an unthrottled replay of a recording.
+     */
+    virtual bool is_real_time() const { return true; }
+
+    /*!
+     * \brief True if the source can wait for the blocks that read it without
+     * losing samples, as a replay of a recording, throttled or not. False if
+     * samples are lost when the receiver does not keep up, as with a radio
+     * front end.
+     */
+    virtual bool can_wait() const { return !is_real_time(); }
+
 protected:
     SignalSourceInterface()
     {

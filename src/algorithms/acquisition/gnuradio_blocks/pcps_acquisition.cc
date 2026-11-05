@@ -109,6 +109,27 @@ uint32_t aligned_row_stride(uint32_t row_size)
         }
     return stride;
 }
+
+// Offset of a dwell from the start of a window of consecutive dwells. Each
+// dwell is samples_per_dwell long, and one more sample is skipped whenever the
+// dropped fraction adds up to a full sample, as general_work() does when it
+// reads dwells from the stream (DDA/Bresenham).
+uint64_t dwell_offset(uint32_t samples_per_dwell, double residual, uint32_t dwell)
+{
+    uint64_t offset = 0;
+    double accum = 0.0;
+    for (uint32_t k = 0; k < dwell; k++)
+        {
+            offset += samples_per_dwell;
+            accum += residual;
+            if (accum >= 1.0)
+                {
+                    offset += 1;
+                    accum -= 1.0;
+                }
+        }
+    return offset;
+}
 }  // namespace
 
 pcps_acquisition_sptr pcps_make_acquisition(const Acq_Conf& conf_)
@@ -147,6 +168,7 @@ pcps_acquisition::pcps_acquisition(const Acq_Conf& conf_)
       d_cshort(conf_.it_size != sizeof(gr_complex)),
       d_use_CFAR_algorithm_flag(conf_.use_CFAR_algorithm_flag),
       d_dump(!d_dump_filename.empty()),
+      d_refine_doppler(conf_.refine_doppler && !conf_.bit_transition_flag && conf_.sampled_ms == conf_.ms_per_code),
       d_worker(nullptr),
       d_gnss_synchro(nullptr),
       d_state(0),
@@ -171,10 +193,17 @@ pcps_acquisition::pcps_acquisition(const Acq_Conf& conf_)
       d_magnitude_grid(std::max(d_num_doppler_bins_capacity, d_num_doppler_bins_step2) * d_magnitude_grid_stride),
       d_tmp_buffer(d_effective_fft_size),
       d_input_signal(d_fft_size),
+      d_refine_dwells(d_refine_doppler ? static_cast<size_t>(std::max(1U, conf_.max_dwells)) * d_samples_to_consume : 0),
+      d_refine_wipeoff(d_refine_doppler ? d_samples_to_consume : 0),
       d_grid_doppler_wipeoffs_step_two(d_acq_parameters.make_2_steps ? d_num_doppler_bins_step2 * d_doppler_wipeoffs_stride : 0),
       d_ifft(gnss_fft_rev_make_unique(d_fft_size)),
       d_grid_doppler_wipeoffs(d_num_doppler_bins_capacity * d_doppler_wipeoffs_stride),
       d_fft_codes(d_fft_size),
+      d_local_code(d_refine_doppler ? d_samples_to_consume : 0),
+      // Allocate the buffer only when we need it. Buffering may be skipped in case of blocking operation
+      // or when the number of non-coherent integrations is 1, as samples may be copied directly to d_input_signal
+      // The window includes the samples skipped between dwells to stay aligned with the true dwell boundary.
+      d_data_buffer_size((d_acq_parameters.blocking || d_acq_parameters.max_dwells <= 1) ? 0 : dwell_offset(d_samples_to_consume, d_dwell_residual_samples, d_acq_parameters.max_dwells - 1) + d_samples_to_consume),
       d_fft_if(gnss_fft_fwd_make_unique(d_fft_size))
 {
     this->message_port_register_out(pmt::mp("events"));
@@ -213,10 +242,28 @@ pcps_acquisition::pcps_acquisition(const Acq_Conf& conf_)
         }
 #endif
 
-    // Batch idle input by one millisecond at the decimated rate to reduce
-    // scheduler wakeups; idle acquisition produces no output.
-    const auto output_multiple_samples = std::max<uint32_t>(1U, static_cast<uint32_t>(std::lround(conf_.samples_per_ms)));
-    this->set_output_multiple(output_multiple_samples);
+    // Batch input by one dwell (at least one millisecond at the decimated rate)
+    // to reduce scheduler wakeups; idle acquisition produces no output.
+    // general_work() relies on each call seeing at least one dwell of new samples.
+    // As pcps_acquisition is not inherited from gr::sync_block, This doesn't prevent us
+    // from producing exactly 1 sample (or even 0 samples) in the general_work
+    this->set_output_multiple(std::max<uint32_t>(1U, d_samples_to_consume));
+    if (d_data_buffer_size)
+        {
+            // Keep the rest of the window as history, so that a search can start
+            // from samples that have already arrived. The window buffer itself is
+            // allocated when a search starts (see general_work()).
+            set_history(d_data_buffer_size - d_samples_to_consume + 1);
+        }
+
+    // A search needs its window beyond its progress (GNSS-SDR.deterministic=true).
+    // Blocking searches publish progress at every dwell. With the acquisition
+    // resampler, sample counts are at the decimated rate, as in update_synchro().
+    if (d_acq_parameters.use_automatic_resampler)
+        {
+            d_det.set_decimation(static_cast<uint64_t>(std::lround(d_acq_parameters.resampler_ratio)));
+        }
+    d_det.require_span((d_data_buffer_size != 0 ? d_data_buffer_size : d_samples_to_consume) + 1);
 }
 
 
@@ -282,20 +329,29 @@ bool pcps_acquisition::doppler_grid_cuda(const gr_complex* in)
 #endif
 
 
-pcps_acquisition::~pcps_acquisition() noexcept
+bool pcps_acquisition::stop()
 {
     try
         {
+            {
+                gr::thread::scoped_lock lock(d_setlock);  // require mutex with work function called by the scheduler
+                d_active = false;
+                worker_cv.notify_one();
+            }
             wait_if_active();
+            gr::thread::scoped_lock lock(d_setlock);
+            d_state = 0;
+            release_data_buffer();
         }
     catch (const std::exception& e)
         {
-            LOG(WARNING) << "Exception while waiting for the acquisition worker in destructor: " << e.what();
+            LOG(WARNING) << "Exception while waiting for the acquisition worker to terminate: " << e.what();
         }
     catch (...)
         {
-            LOG(WARNING) << "Unknown exception while waiting for the acquisition worker in destructor";
+            LOG(WARNING) << "Unknown exception while waiting for the acquisition worker to terminate";
         }
+    return acquisition_impl_interface::stop();
 }
 
 
@@ -304,12 +360,33 @@ void pcps_acquisition::set_active(bool active)
     {
         gr::thread::scoped_lock lock(d_setlock);  // require mutex with work function called by the scheduler
         d_active = active;
+        if (!active)
+            {
+                worker_cv.notify_one();
+            }
+        else
+            {
+                // GNSS-SDR.deterministic=true: a lookahead after the event that caused it
+                d_det.activate(d_sample_count, d_channel);
+            }
     }
 
     if (!active)
         {
             wait_if_active();
+            // The channel leaves acquisition: drop the search, so that the next
+            // activation starts a new one, and give the window buffer back.
+            gr::thread::scoped_lock lock(d_setlock);
+            d_state = 0;
+            release_data_buffer();
         }
+}
+
+
+void pcps_acquisition::release_data_buffer()
+{
+    // swap() frees the memory; clear() would keep the capacity
+    volk_gnsssdr::vector<std::complex<float>>().swap(d_data_buffer);
 }
 
 
@@ -343,6 +420,10 @@ void pcps_acquisition::set_local_code(std::complex<float>* code)
             if (d_acq_parameters.sampled_ms == d_acq_parameters.ms_per_code)
                 {
                     std::copy(code, code + d_samples_to_consume, d_fft_if->get_inbuf());
+                    if (d_refine_doppler)
+                        {
+                            std::copy(code, code + d_samples_to_consume, d_local_code.data());
+                        }
                 }
             else
                 {
@@ -457,6 +538,7 @@ void pcps_acquisition::send_positive_acquisition(const AcquisitionResult& result
     if (!d_channel_fsm.expired())
         {
             // the channel FSM is set, so, notify it directly the positive acquisition to minimize delays
+            const DeterministicClock::Scope cause(d_det.clock_sample(result.sample_count));
             d_channel_fsm.lock()->Event_valid_acquisition();
         }
     else
@@ -479,6 +561,13 @@ void pcps_acquisition::send_positive_acquisition(const AcquisitionResult& result
 void pcps_acquisition::send_negative_acquisition(const AcquisitionResult& result)
 {
     log_acquisition(result);
+
+    if (d_det.enabled())
+        {
+            // Applied by dispatch_deterministic_events(), without the lock held
+            d_det.raise(DeterministicClock::ACQ_NEGATIVE, result.sample_count);
+            return;
+        }
 
     // Declare negative acquisition using a message port
     // 0=STOP_CHANNEL 1=ACQ_SUCCEES 2=ACQ_FAIL
@@ -867,8 +956,10 @@ void pcps_acquisition::handle_threshold_reached(AcquisitionResult& result)
             if (d_step_two)
                 {
                     result.positive_acq = true;
+                    refine_doppler(result);
                     send_positive_acquisition(result);
                     d_active = false;
+                    release_data_buffer();  // the channel goes to tracking
                 }
             else
                 {
@@ -882,14 +973,80 @@ void pcps_acquisition::handle_threshold_reached(AcquisitionResult& result)
     else
         {
             result.positive_acq = true;
+            refine_doppler(result);
             send_positive_acquisition(result);
             d_active = false;
+            release_data_buffer();  // the channel goes to tracking
         }
+}
+
+
+void pcps_acquisition::refine_doppler(AcquisitionResult& result)
+{
+    // The search window is not aligned with the code epoch, so a secondary-code or data
+    // sign transition at the epoch inside it (60 % of the windows for the GPS L5 I5 NH10
+    // code) splits the correlation peak away from the true Doppler, up to +-0.74/T for a
+    // transition at mid window. The code phase is still right, and each side of the epoch
+    // is free of transitions: correlate both sides with the aligned replica, combine them
+    // under both sign hypotheses, and add the dwells non-coherently.
+    if (!d_refine_doppler)
+        {
+            return;
+        }
+    const uint32_t n = d_samples_to_consume;
+    const uint32_t k = result.index_time % n;  // code epoch inside the window
+    const uint32_t num_dwells = std::min(d_num_noncoherent_integrations_counter, std::max(1U, d_acq_parameters.max_dwells));
+
+    // despread each dwell in place: input[i] * conj(code[(i - k) mod n])
+    for (uint32_t dwell = 0; dwell < num_dwells; dwell++)
+        {
+            auto* window = d_refine_dwells.data() + static_cast<size_t>(dwell) * n;
+            volk_32fc_x2_multiply_conjugate_32fc(window, window, d_local_code.data() + (n - k), k);
+            volk_32fc_x2_multiply_conjugate_32fc(window + k, window + k, d_local_code.data(), n - k);
+        }
+
+    // candidates: half the grid step (at most 1/(4T)), over the main lobe (+-1/T) around the grid peak
+    const auto fs = static_cast<float>(d_acq_parameters.use_automatic_resampler ? d_acq_parameters.resampled_fs : d_acq_parameters.fs_in);
+    const float inv_t_hz = fs / static_cast<float>(n);
+    const float step_hz = std::min((d_step_two ? d_acq_parameters.doppler_step2 : static_cast<float>(d_doppler_step)) / 2.0F, inv_t_hz / 4.0F);
+    const auto half_span = static_cast<int32_t>(std::ceil(inv_t_hz / step_hz));
+    auto best_doppler = static_cast<float>(result.doppler);
+    float best_power = -1.0F;
+    for (int32_t i = -half_span; i <= half_span; i++)
+        {
+            const float doppler = static_cast<float>(result.doppler) + static_cast<float>(i) * step_hz;
+            update_local_carrier(own::span<gr_complex>(d_refine_wipeoff.data(), n), static_cast<float>(d_doppler_bias) + doppler);
+            float power = 0.0F;
+            for (uint32_t dwell = 0; dwell < num_dwells; dwell++)
+                {
+                    const auto* window = d_refine_dwells.data() + static_cast<size_t>(dwell) * n;
+                    gr_complex before{};
+                    gr_complex after{};
+                    volk_32fc_x2_dot_prod_32fc(&before, window, d_refine_wipeoff.data(), k);
+                    volk_32fc_x2_dot_prod_32fc(&after, window + k, d_refine_wipeoff.data() + k, n - k);
+                    power += std::max(std::norm(after + before), std::norm(after - before));
+                }
+            if (power > best_power)
+                {
+                    best_power = power;
+                    best_doppler = doppler;
+                }
+        }
+
+    if (std::fabs(best_doppler - static_cast<float>(result.doppler)) > static_cast<float>(d_doppler_step))
+        {
+            LOG(INFO) << "Acquisition Doppler refined from " << result.doppler << " Hz to " << best_doppler
+                      << " Hz in channel " << d_channel << " for satellite " << d_gnss_synchro->System << " " << d_gnss_synchro->PRN
+                      << " (sign transition at the code epoch, sample " << k << " of " << n << ", " << num_dwells << " dwell(s))";
+        }
+    result.doppler = static_cast<int32_t>(std::lround(best_doppler));
+    d_gnss_synchro->Acq_doppler_hz = static_cast<double>(best_doppler);
 }
 
 
 void pcps_acquisition::handle_integration_done(const AcquisitionResult& result)
 {
+    // Keep the window buffer: the channel usually searches the next satellite at once
     if (d_state != 0)
         {
             send_negative_acquisition(result);
@@ -904,38 +1061,95 @@ void pcps_acquisition::handle_integration_done(const AcquisitionResult& result)
 void pcps_acquisition::acquisition_core(uint64_t sample_count)
 {
     gr::thread::scoped_lock lk(d_setlock);
+    const bool is_buffering = d_data_buffer_size != 0;
 
-    d_num_noncoherent_integrations_counter++;
-
-    DLOG(INFO) << "Channel: " << d_channel
-               << " , doing acquisition of satellite: " << d_gnss_synchro->System << " " << d_gnss_synchro->PRN
-               << " , sample stamp: " << sample_count
-               << ", threshold: " << get_threshold()
-               << ", doppler_max: " << d_doppler_max
-               << ", doppler_step: " << d_doppler_step
-               << ", use_CFAR_algorithm_flag: " << (d_use_CFAR_algorithm_flag ? "true" : "false");
-
-    lk.unlock();
-
-    // Doppler frequency grid loop, only access variables that doesn't need a lock
-    doppler_grid(d_input_signal.data());
-    if (should_dump_channel())
+    do
         {
-            copy_magnitude_grid_to_dump_grid();
-        }
-    auto result = compute_statistics();
-    result.sample_count = sample_count;
-
-    lk.lock();
-
-    update_synchro(result);
-
-    if (!d_acq_parameters.bit_transition_flag)
-        {
-            if (d_acq_parameters.full_grid_search)
+            if (is_buffering)
                 {
-                    // Accumulate all dwells before thresholding so a later, stronger peak can win.
-                    if (d_num_noncoherent_integrations_counter == d_acq_parameters.max_dwells)
+                    const auto offset = dwell_offset(d_samples_to_consume, d_dwell_residual_samples, d_num_noncoherent_integrations_counter);
+                    // Wait until general_work() has buffered this dwell
+                    while (d_active && offset + d_samples_to_consume > d_buffer_sample_count)
+                        {
+                            worker_cv.wait(lk);
+                        }
+                    // Handle termination request. Drop the search, so that the next
+                    // activation starts a new one instead of resuming this one.
+                    if (!d_active)
+                        {
+                            d_state = 0;
+                            d_worker_active = false;
+                            return;
+                        }
+                    std::copy(d_data_buffer.data() + offset,
+                        d_data_buffer.data() + offset + d_samples_to_consume,
+                        d_input_signal.data());
+                }
+            d_num_noncoherent_integrations_counter++;
+
+            DLOG(INFO) << "Channel: " << d_channel
+                       << " , doing acquisition of satellite: " << d_gnss_synchro->System << " " << d_gnss_synchro->PRN
+                       << " , sample stamp: " << sample_count
+                       << ", threshold: " << get_threshold()
+                       << ", doppler_max: " << d_doppler_max
+                       << ", doppler_step: " << d_doppler_step
+                       << ", use_CFAR_algorithm_flag: " << (d_use_CFAR_algorithm_flag ? "true" : "false");
+
+            lk.unlock();
+
+            // Doppler frequency grid loop, only access variables that doesn't need a lock
+            doppler_grid(d_input_signal.data());
+            if (d_refine_doppler && d_num_noncoherent_integrations_counter <= std::max(1U, d_acq_parameters.max_dwells))
+                {
+                    // keep this dwell for refine_doppler()
+                    std::copy_n(d_input_signal.data(), d_samples_to_consume,
+                        d_refine_dwells.data() + static_cast<size_t>(d_num_noncoherent_integrations_counter - 1) * d_samples_to_consume);
+                }
+            if (should_dump_channel())
+                {
+                    copy_magnitude_grid_to_dump_grid();
+                }
+            auto result = compute_statistics();
+            result.sample_count = sample_count;
+
+            lk.lock();
+
+            // Handle termination request (see above)
+            if (!d_active)
+                {
+                    d_state = 0;
+                    d_worker_active = false;
+                    return;
+                }
+
+            update_synchro(result);
+
+            if (!d_acq_parameters.bit_transition_flag)
+                {
+                    if (d_acq_parameters.full_grid_search)
+                        {
+                            // Accumulate all dwells before thresholding so a later, stronger peak can win.
+                            if (d_num_noncoherent_integrations_counter == d_acq_parameters.max_dwells)
+                                {
+                                    if (result.test_statistics > get_threshold())
+                                        {
+                                            handle_threshold_reached(result);
+                                        }
+                                    else
+                                        {
+                                            handle_integration_done(result);
+                                        }
+                                }
+                            else
+                                {
+                                    if (d_acq_parameters.blocking)
+                                        {
+                                            d_buffer_sample_count = 0;
+                                            d_state = 1;
+                                        }
+                                }
+                        }
+                    else
                         {
                             if (result.test_statistics > get_threshold())
                                 {
@@ -943,13 +1157,17 @@ void pcps_acquisition::acquisition_core(uint64_t sample_count)
                                 }
                             else
                                 {
+                                    if (d_acq_parameters.blocking)
+                                        {
+                                            d_buffer_sample_count = 0;
+                                            d_state = 1;
+                                        }
+                                }
+
+                            if (d_num_noncoherent_integrations_counter == d_acq_parameters.max_dwells)
+                                {
                                     handle_integration_done(result);
                                 }
-                        }
-                    else
-                        {
-                            d_buffer_sample_count = 0;
-                            d_state = 1;
                         }
                 }
             else
@@ -960,39 +1178,52 @@ void pcps_acquisition::acquisition_core(uint64_t sample_count)
                         }
                     else
                         {
-                            d_buffer_sample_count = 0;
-                            d_state = 1;
-                        }
-
-                    if (d_num_noncoherent_integrations_counter == d_acq_parameters.max_dwells)
-                        {
                             handle_integration_done(result);
                         }
                 }
-        }
-    else
-        {
-            if (result.test_statistics > get_threshold())
-                {
-                    handle_threshold_reached(result);
-                }
-            else
-                {
-                    handle_integration_done(result);
-                }
-        }
 
-    if ((d_num_noncoherent_integrations_counter == d_acq_parameters.max_dwells) || (result.positive_acq) || (d_acq_parameters.bit_transition_flag))
-        {
-            // Record results to file if required
-            if (should_dump_channel())
+            if ((d_num_noncoherent_integrations_counter == d_acq_parameters.max_dwells) || (result.positive_acq) || (d_acq_parameters.bit_transition_flag))
                 {
-                    pcps_acquisition::dump_results(result);
+                    // Record results to file if required
+                    if (should_dump_channel())
+                        {
+                            pcps_acquisition::dump_results(result);
+                        }
+                    break;
                 }
-            d_num_noncoherent_integrations_counter = 0U;
         }
-
+    while (d_state && !d_acq_parameters.blocking && d_num_noncoherent_integrations_counter < d_acq_parameters.max_dwells);
     d_worker_active = false;
+}
+
+
+void pcps_acquisition::acquisition_worker(uint64_t sample_count)
+{
+    acquisition_core(sample_count);
+    dispatch_deterministic_events();
+}
+
+
+bool pcps_acquisition::align_to_deterministic_start(int available_items)
+{
+    // The window starts at the oldest item of the input buffer
+    int n_consume = 0;
+    const int new_items = std::max(available_items - static_cast<int>(history() - 1), 0);
+    if (d_det.ready_to_start(d_sample_count, history() - 1, 1, new_items, n_consume, d_channel))
+        {
+            return false;
+        }
+    d_sample_count += static_cast<uint64_t>(n_consume);
+    consume_each(n_consume);
+    // The search starts at a later call, with its first sample in front
+    return true;
+}
+
+
+void pcps_acquisition::dispatch_deterministic_events()
+{
+    // A repeated search restarts this block, which takes the lock
+    d_det.dispatch(d_channel, [this](int event) { this->message_port_pub(pmt::mp("events"), pmt::from_long(event)); });
 }
 
 
@@ -1049,6 +1280,7 @@ void pcps_acquisition::set_doppler_num_bins(uint32_t num_doppler_bins)
 
 void pcps_acquisition::wait_if_active()
 {
+    gr::thread::scoped_lock lk(d_wait_mutex);
     std::unique_ptr<gr::thread::thread> worker;
 
     {
@@ -1067,7 +1299,23 @@ void pcps_acquisition::wait_if_active()
 }
 
 
-int pcps_acquisition::general_work(int noutput_items __attribute__((unused)),
+int pcps_acquisition::general_work(int noutput_items,
+    gr_vector_int& ninput_items,
+    gr_vector_const_void_star& input_items,
+    gr_vector_void_star& output_items)
+{
+    const int produced = process_input(noutput_items, ninput_items, input_items, output_items);
+    if (d_det.enabled())
+        {
+            dispatch_deterministic_events();
+            gr::thread::scoped_lock lock(d_setlock);
+            d_det.publish(d_sample_count, d_active, d_channel);
+        }
+    return produced;
+}
+
+
+int pcps_acquisition::process_input(int noutput_items __attribute__((unused)),
     gr_vector_int& ninput_items,
     gr_vector_const_void_star& input_items,
     gr_vector_void_star& output_items)
@@ -1085,98 +1333,183 @@ int pcps_acquisition::general_work(int noutput_items __attribute__((unused)),
     gr::thread::scoped_lock lk(d_setlock);
     if (!d_active || d_worker_active)
         {
-            // do not consume samples while performing a non-coherent integration
-            const bool consume_samples = ((!d_active) || (d_worker_active && (d_num_noncoherent_integrations_counter == d_acq_parameters.max_dwells)));
-            if ((!d_acq_parameters.blocking_on_standby) && consume_samples)
+            // we can consume samples while performing a non-coherent integration as all required data is already buffered
+            if (!d_acq_parameters.blocking_on_standby)
                 {
-                    d_sample_count += static_cast<uint64_t>(ninput_items[0]);
-                    consume_each(ninput_items[0]);
+                    // Consume all new samples in one call. GNU Radio keeps the last
+                    // history() - 1 of them, so the next search can start from them.
+                    const auto n_consume = std::max(ninput_items[0] - static_cast<int>(history() - 1), 0);
+                    d_sample_count += static_cast<uint64_t>(n_consume);
+                    consume_each(n_consume);
                 }
             return 0;
         }
 
-    switch (d_state)
+    if (d_det.enabled() && d_state == 0 && align_to_deterministic_start(ninput_items[0]))
         {
-        case 0:
-            {
-                // Restart acquisition variables
-                d_gnss_synchro->Acq_delay_samples = 0.0;
-                d_gnss_synchro->Acq_doppler_hz = 0.0;
-                d_gnss_synchro->Acq_samplestamp_samples = 0ULL;
-                d_gnss_synchro->Acq_doppler_step = 0U;
-                d_state = 1;
-                d_buffer_sample_count = 0U;
-                d_dwell_residual_accum = 0.0;
-                d_pending_skip_samples = 0U;
-                break;
-            }
-        case 1:
-            {
-                if (d_pending_skip_samples > 0U)
-                    {
-                        // Discard (do not buffer) samples to keep consumption
-                        // aligned with the true dwell boundary; see below.
-                        const auto skip_now = std::min(d_pending_skip_samples, static_cast<uint32_t>(ninput_items[0]));
-                        d_sample_count += static_cast<uint64_t>(skip_now);
-                        consume_each(skip_now);
-                        d_pending_skip_samples -= skip_now;
-                        break;
-                    }
+            return 0;
+        }
 
-                const auto fit_in_buffer = (ninput_items[0] + d_buffer_sample_count) <= d_samples_to_consume;
-                const uint32_t samples_to_copy = fit_in_buffer ? ninput_items[0] : d_samples_to_consume - d_buffer_sample_count;
+    // New non-coherent integration started
+    if (d_state == 0)
+        {
+            // Restart acquisition variables
+            d_gnss_synchro->Acq_delay_samples = 0.0;
+            d_gnss_synchro->Acq_doppler_hz = 0.0;
+            d_gnss_synchro->Acq_samplestamp_samples = 0ULL;
+            d_gnss_synchro->Acq_doppler_step = 0U;
+            d_state = 1;
+            d_buffer_sample_count = 0U;
+            d_dwell_residual_accum = 0.0;
+            d_pending_skip_samples = 0U;
+            d_num_noncoherent_integrations_counter = 0U;
+            // Allocate the window buffer at the first search after activation. It is
+            // kept until the channel leaves acquisition (see release_data_buffer()).
+            d_data_buffer.resize(d_data_buffer_size);
+        }
+    // Sample stamp of the end of the window being searched. Tracking aligns the code
+    // phase found in any of its dwells to this stamp.
+    uint64_t window_stamp = d_sample_count;
+    if (d_state == 1 && d_pending_skip_samples > 0U)
+        {
+            // Discard (do not buffer) samples to keep consumption
+            // aligned with the true dwell boundary; see below.
+            const auto skip_now = std::min(d_pending_skip_samples, static_cast<uint32_t>(ninput_items[0]));
+            d_sample_count += static_cast<uint64_t>(skip_now);
+            consume_each(skip_now);
+            d_pending_skip_samples -= skip_now;
+        }
+    // Initial buffering
+    else if (d_state == 1)
+        {
+            // Check if we are buffering the whole window
+            const bool is_buffering = d_data_buffer_size != 0;
+            // Expected number of samples to copy
+            const auto buffer_size = is_buffering ? d_data_buffer_size : d_samples_to_consume;
+            // offset of first valid sample in input buffer
+            const uint32_t input_offset = history() - 1 <= d_sample_count ? 0 : history() - 1 - d_sample_count;
+            // Samples in buffer
+            const uint32_t in_buffer = ninput_items[0] - input_offset;
+            // New samples in buffer
+            const uint32_t new_samples = ninput_items[0] - history() + 1;
+            // Clip to remaining space in a buffer
+            const auto fit_in_buffer = (in_buffer + d_buffer_sample_count) <= buffer_size;
+            const uint32_t samples_to_copy = fit_in_buffer ? in_buffer : buffer_size - d_buffer_sample_count;
+            // copy destination
+            gr_complex* buffer_ptr = is_buffering ? d_data_buffer.data() : d_input_signal.data();
 
-                if (d_cshort)
-                    {
-                        const auto* in = reinterpret_cast<const lv_16sc_t*>(input_items[0]);  // Get the input samples pointer
-                        volk_gnsssdr_16ic_convert_32fc(d_input_signal.data() + d_buffer_sample_count, in, samples_to_copy);
-                    }
-                else
-                    {
-                        const auto* in = reinterpret_cast<const gr_complex*>(input_items[0]);  // Get the input samples pointer
-                        std::copy(in, in + samples_to_copy, d_input_signal.begin() + d_buffer_sample_count);
-                    }
+            if (d_cshort)
+                {
+                    const auto* in = reinterpret_cast<const lv_16sc_t*>(input_items[0]);  // Get the input samples pointer
+                    volk_gnsssdr_16ic_convert_32fc(buffer_ptr + d_buffer_sample_count, in + input_offset, samples_to_copy);
+                }
+            else
+                {
+                    const auto* in = reinterpret_cast<const gr_complex*>(input_items[0]);  // Get the input samples pointer
+                    std::copy(in + input_offset, in + input_offset + samples_to_copy, buffer_ptr + d_buffer_sample_count);
+                }
 
-                d_buffer_sample_count += samples_to_copy;
-                d_sample_count += static_cast<uint64_t>(samples_to_copy);
-                consume_each(samples_to_copy);
+            d_buffer_sample_count += samples_to_copy;
+            // The window starts at the oldest valid sample in the input buffer: stream
+            // index 0 until history() - 1 samples have been consumed. Stamp the end of
+            // its last dwell, or of its first one while it starts at index 0, so that the
+            // stamp is a dwell boundary and never ahead of the consumed samples.
+            const uint64_t window_start = d_sample_count + input_offset - (history() - 1);
+            window_stamp = window_start + (input_offset ? d_samples_to_consume : buffer_size);
+            d_det.begin_window(window_start);
+            // Consume the dwell that completes the window (all new samples while the
+            // history is not full yet); later samples are consumed while the worker runs.
+            auto n_consume = input_offset ? new_samples : d_samples_to_consume;
+            d_sample_count += static_cast<uint64_t>(n_consume);
+            consume_each(n_consume);
 
-                if (d_buffer_sample_count == d_samples_to_consume)  // Buffer is full
-                    {
-                        d_state = 2;
-                        // d_samples_to_consume samples are always short of a true
-                        // dwell by d_dwell_residual_samples; once that drift
-                        // reaches a full sample, skip one extra so it never
-                        // accumulates across dwells (DDA/Bresenham).
-                        d_dwell_residual_accum += d_dwell_residual_samples;
-                        if (d_dwell_residual_accum >= 1.0)
-                            {
-                                d_pending_skip_samples += 1U;
-                                d_dwell_residual_accum -= 1.0;
-                            }
-                    }
+            if (d_buffer_sample_count >= d_samples_to_consume)  // just enough to start processing
+                {
+                    d_state = 3;
+                    if (!is_buffering)
+                        {
+                            // d_samples_to_consume samples are always short of a true
+                            // dwell by d_dwell_residual_samples; once that drift
+                            // reaches a full sample, skip one extra so it never
+                            // accumulates across dwells (DDA/Bresenham). Buffered
+                            // windows apply the same rule through dwell_offset().
+                            d_dwell_residual_accum += d_dwell_residual_samples;
+                            if (d_dwell_residual_accum >= 1.0)
+                                {
+                                    d_pending_skip_samples += 1U;
+                                    d_dwell_residual_accum -= 1.0;
+                                }
+                        }
+                }
+        }
+    // Background buffering
+    if (d_state == 2)
+        {
+            // Expected number of samples to copy
+            const auto buffer_size = d_data_buffer_size;
+            // offset of first valid sample in input buffer
+            const uint32_t input_offset = history() - 1;
+            // Samples in buffer
+            const uint32_t in_buffer = ninput_items[0] - input_offset;
+            // Clip to remaining space in a buffer
+            const auto fit_in_buffer = (in_buffer + d_buffer_sample_count) <= buffer_size;
+            const uint32_t samples_to_copy = fit_in_buffer ? in_buffer : buffer_size - d_buffer_sample_count;
+            // copy destination
+            gr_complex* buffer_ptr = d_data_buffer.data();
 
-                break;
-            }
-        case 2:
-            {
-                if (d_acq_parameters.blocking)
-                    {
-                        lk.unlock();
-                        acquisition_core(d_sample_count);
-                    }
-                else
-                    {
-                        lk.unlock();
-                        wait_if_active();
-                        lk.lock();
-                        d_worker = std::make_unique<gr::thread::thread>(&pcps_acquisition::acquisition_core, this, d_sample_count);
-                        d_worker_active = true;
-                    }
-                consume_each(0);
-                d_buffer_sample_count = 0U;
-                break;
-            }
+            if (d_cshort)
+                {
+                    const auto* in = reinterpret_cast<const lv_16sc_t*>(input_items[0]);  // Get the input samples pointer
+                    volk_gnsssdr_16ic_convert_32fc(buffer_ptr + d_buffer_sample_count, in + input_offset, samples_to_copy);
+                }
+            else
+                {
+                    const auto* in = reinterpret_cast<const gr_complex*>(input_items[0]);  // Get the input samples pointer
+                    std::copy(in + input_offset, in + input_offset + samples_to_copy, buffer_ptr + d_buffer_sample_count);
+                }
+
+            d_buffer_sample_count += samples_to_copy;
+            // Consume what was copied
+            auto n_consume = samples_to_copy;
+            d_sample_count += static_cast<uint64_t>(n_consume);
+            consume_each(n_consume);
+            if (d_buffer_sample_count == d_data_buffer_size)  // finished buffering
+                {
+                    d_worker_active = true;
+                }
+            worker_cv.notify_one();
+        }
+    // Actual acquisition_core call
+    if (d_state == 3)
+        {
+            if (d_acq_parameters.blocking)
+                {
+                    lk.unlock();
+                    acquisition_core(window_stamp);
+                }
+            else
+                {
+                    lk.unlock();
+                    wait_if_active();
+                    lk.lock();
+                    // set_active(false) may have dropped this search while we waited
+                    if (d_active && d_state == 3)
+                        {
+                            d_worker = std::make_unique<gr::thread::thread>(&pcps_acquisition::acquisition_worker, this, window_stamp);
+                            if (d_buffer_sample_count >= d_data_buffer_size)
+                                {
+                                    d_worker_active = true;
+                                }
+                            else
+                                {
+                                    d_state = 2;
+                                }
+                        }
+                    else
+                        {
+                            d_state = 0;
+                        }
+                }
         }
 
     // Send outputs to the monitor

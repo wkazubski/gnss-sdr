@@ -25,6 +25,9 @@ In the L1 band:
 
 - &#128752; GLONASS L1 C/A (centered at 1602.000 MHz) ✅
 - &#128752; GPS L1 C/A (centered at 1575.420 MHz) ✅
+- &#128752; GPS L1C (GPS III satellites, centered at 1575.420 MHz) —
+  acquisition, tracking and CNAV-2 decoding; not yet used for positioning, since
+  the CNAV-2 message broadcast as of October 2026 carries no navigation data
 - &#128752; Galileo E1b/c (centered at 1575.420 MHz) ✅
 - &#128752; BeiDou B1C (centered at 1575.420 MHz) ✅
 - &#128752; QZSS L1 C/A and C/B, where available (centered at 1575.420 MHz) ✅
@@ -646,18 +649,21 @@ second RX channel is not yet exposed).
 Install the [libiio](https://github.com/analogdevicesinc/libiio.git) (>=v0.11),
 [libad9361](https://github.com/analogdevicesinc/libad9361-iio.git) (>=v0.1-1)
 libraries and [gr-iio](https://github.com/analogdevicesinc/gr-iio.git) (>v0.3)
-gnuradio block:
+gnuradio block. GNSS-SDR requires the libiio v0.x API, so libiio v1.x is not
+supported: build libiio and libad9361 from their `libiio-v0` and
+`libad9361-iio-v0` branches, since their default branches now target libiio
+v1.x:
 
 ```
-$ sudo apt install libxml2-dev bison flex
-$ git clone https://github.com/analogdevicesinc/libiio.git
+$ sudo apt install libxml2-dev libaio-dev libusb-1.0-0-dev libavahi-client-dev bison flex
+$ git clone -b libiio-v0 https://github.com/analogdevicesinc/libiio.git
 $ cd libiio
 $ mkdir build
 $ cd build
 $ cmake ..
 $ make && sudo make install && sudo ldconfig
 $ cd ../..
-$ git clone https://github.com/analogdevicesinc/libad9361-iio.git
+$ git clone -b libad9361-iio-v0 https://github.com/analogdevicesinc/libad9361-iio.git
 $ cd libad9361-iio
 $ mkdir build
 $ cd build
@@ -1603,6 +1609,7 @@ identifiers:
 | **Signal**     | **Identifier** |
 | :------------- | :------------: |
 | GPS L1 C/A     |       1C       |
+| GPS L1C        |       1S       |
 | Galileo E1b/c  |       1B       |
 | Glonass L1 C/A |       1G       |
 | Beidou B1I     |       B1       |

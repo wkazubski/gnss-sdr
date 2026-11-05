@@ -483,8 +483,7 @@ if(ENABLE_UNIT_TESTING_EXTRA OR ENABLE_SYSTEM_TESTING_EXTRA OR ENABLE_FPGA)
         if(CMAKE_VERSION VERSION_GREATER 3.17.0)
             set(GNSSTK_PATCH_COMMAND
                 cd ${GNSSSDR_BINARY_DIR}/thirdparty/gnsstk-${GNSSSDR_GNSSTK_LOCAL_VERSION} &&
-                ${Patch_EXECUTABLE} ${GNSSSDR_BINARY_DIR}/thirdparty/gnsstk-${GNSSSDR_GNSSTK_LOCAL_VERSION}/CMakeLists.txt < ${GNSSSDR_SOURCE_DIR}/utils/patches/gnsstk_static15.patch &&
-                ${Patch_EXECUTABLE} ${GNSSSDR_BINARY_DIR}/thirdparty/gnsstk-${GNSSSDR_GNSSTK_LOCAL_VERSION}/core/lib/NewNav/GLOCNavHeader.hpp < ${GNSSSDR_SOURCE_DIR}/utils/patches/gnsstk_gcc15.patch
+                ${Patch_EXECUTABLE} ${GNSSSDR_BINARY_DIR}/thirdparty/gnsstk-${GNSSSDR_GNSSTK_LOCAL_VERSION}/CMakeLists.txt < ${GNSSSDR_SOURCE_DIR}/utils/patches/gnsstk_static15.patch
             )
         else()
             set(GNSSTK_PATCH_COMMAND
@@ -499,7 +498,7 @@ if(ENABLE_UNIT_TESTING_EXTRA OR ENABLE_SYSTEM_TESTING_EXTRA OR ENABLE_FPGA)
         endif()
         if(CMAKE_VERSION VERSION_LESS 3.2)
             ExternalProject_Add(gnsstk-${GNSSSDR_GNSSTK_LOCAL_VERSION}
-                GIT_REPOSITORY https://github.com/SGL-UT/gnsstk
+                GIT_REPOSITORY https://gitlab.com/sgl-ut/gnsstk
                 GIT_TAG v${GNSSSDR_GNSSTK_LOCAL_VERSION}
                 SOURCE_DIR ${GNSSSDR_BINARY_DIR}/thirdparty/gnsstk-${GNSSSDR_GNSSTK_LOCAL_VERSION}
                 BINARY_DIR ${GNSSSDR_BINARY_DIR}/gnsstk-${GNSSSDR_GNSSTK_LOCAL_VERSION}
@@ -1120,6 +1119,7 @@ if(NOT ENABLE_PACKAGING AND NOT ENABLE_FPGA)
         ${CMAKE_CURRENT_SOURCE_DIR}/unit-tests/signal-processing-blocks/filter/pulse_blanking_filter_test.cc
         ${CMAKE_CURRENT_SOURCE_DIR}/unit-tests/signal-processing-blocks/filter/notch_filter_test.cc
         ${CMAKE_CURRENT_SOURCE_DIR}/unit-tests/signal-processing-blocks/filter/notch_filter_lite_test.cc
+        ${CMAKE_CURRENT_SOURCE_DIR}/unit-tests/signal-processing-blocks/adapter/stream_batcher_test.cc
         ${CMAKE_CURRENT_SOURCE_DIR}/unit-tests/signal-processing-blocks/adapter/pass_through_test.cc
         ${CMAKE_CURRENT_SOURCE_DIR}/unit-tests/signal-processing-blocks/adapter/adapter_test.cc
         ${CMAKE_CURRENT_SOURCE_DIR}/unit-tests/control-plane/gnss_block_factory_test.cc
@@ -1145,6 +1145,7 @@ if(NOT ENABLE_PACKAGING AND NOT ENABLE_FPGA)
             data_type_adapters
             input_filter_adapters
             channel_adapters
+            conditioner_adapters
             core_receiver
             algorithms_libs
     )

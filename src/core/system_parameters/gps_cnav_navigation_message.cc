@@ -69,7 +69,7 @@ int64_t Gps_CNAV_Navigation_Message::read_navigation_signed(const std::bitset<GP
         {
             for (int32_t j = 0; j < p.second; j++)
                 {
-                    value = (value << 1) | static_cast<int64_t>(bits[GPS_CNAV_DATA_PAGE_BITS - p.first - j]);
+                    value = value * 2 + static_cast<int64_t>(bits[GPS_CNAV_DATA_PAGE_BITS - p.first - j]);
                 }
         }
     return value;
@@ -287,16 +287,17 @@ void Gps_CNAV_Navigation_Message::decode_page(const std::bitset<GPS_CNAV_DATA_PA
             utc_model_record.DeltaT_LS = static_cast<int32_t>(read_navigation_signed(data_bits, CNAV_DELTA_TLS));
             utc_model_record.DeltaT_LS = utc_model_record.DeltaT_LS * CNAV_DELTA_TLS_LSB;
 
-            utc_model_record.tot = static_cast<int32_t>(read_navigation_signed(data_bits, CNAV_TOT));
+            // tot, WNot, WNLSF and DN are unsigned (IS-GPS-200N, Table 30-IX)
+            utc_model_record.tot = static_cast<int32_t>(read_navigation_unsigned(data_bits, CNAV_TOT));
             utc_model_record.tot = utc_model_record.tot * CNAV_TOT_LSB;
 
-            utc_model_record.WN_T = static_cast<int32_t>(read_navigation_signed(data_bits, CNAV_WN_OT));
+            utc_model_record.WN_T = static_cast<int32_t>(read_navigation_unsigned(data_bits, CNAV_WN_OT));
             utc_model_record.WN_T = utc_model_record.WN_T * CNAV_WN_OT_LSB;
 
-            utc_model_record.WN_LSF = static_cast<int32_t>(read_navigation_signed(data_bits, CNAV_WN_LSF));
+            utc_model_record.WN_LSF = static_cast<int32_t>(read_navigation_unsigned(data_bits, CNAV_WN_LSF));
             utc_model_record.WN_LSF = utc_model_record.WN_LSF * CNAV_WN_LSF_LSB;
 
-            utc_model_record.DN = static_cast<int32_t>(read_navigation_signed(data_bits, CNAV_DN));
+            utc_model_record.DN = static_cast<int32_t>(read_navigation_unsigned(data_bits, CNAV_DN));
             utc_model_record.DN = utc_model_record.DN * CNAV_DN_LSB;
 
             utc_model_record.DeltaT_LSF = static_cast<int32_t>(read_navigation_signed(data_bits, CNAV_DELTA_TLSF));
