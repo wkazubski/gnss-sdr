@@ -17,6 +17,7 @@
 #ifndef GNSS_SDR_RTKLIB_PVT_GS_H
 #define GNSS_SDR_RTKLIB_PVT_GS_H
 
+#include "deterministic_clock.h"
 #include "gnss_block_interface.h"
 #include "gnss_sdr_make_unique.h"
 #include "gnss_synchro.h"
@@ -190,6 +191,17 @@ private:
 
     void msg_handler_telemetry(const pmt::pmt_t& msg);
 
+    // GNSS-SDR.deterministic=true: telemetry data stamped with the sample of
+    // the symbol that carried it, applied at the first epoch past that sample
+    struct StampedTelemetry
+    {
+        uint64_t stamp;
+        int64_t channel;
+        pmt::pmt_t msg;
+    };
+    void apply_deterministic_telemetry(uint64_t epoch_sample);
+    pmt::pmt_t stamp_observables_message(const pmt::pmt_t& msg) const;
+
     void msg_handler_has_data(const pmt::pmt_t& msg);
 
     void msg_handler_osnma(const pmt::pmt_t& msg);
@@ -327,6 +339,7 @@ private:
     const size_t d_gps_iono_sptr_type_hash_code;
     const size_t d_gps_utc_model_sptr_type_hash_code;
     const size_t d_gps_cnav_ephemeris_sptr_type_hash_code;
+    const size_t d_gps_cnav2_ephemeris_sptr_type_hash_code;
     const size_t d_gps_cnav_eop_sptr_type_hash_code;
     const size_t d_gps_cnav_iono_sptr_type_hash_code;
     const size_t d_gps_cnav_utc_model_sptr_type_hash_code;
@@ -410,6 +423,10 @@ private:
     const bool d_use_has_corrections;
     const bool d_use_unhealthy_sats;
     const bool d_osnma_strict;
+
+    std::vector<StampedTelemetry> d_det_telemetry;
+    uint64_t d_det_epoch_sample{NO_SAMPLE_STAMP};
+    bool d_deterministic{false};
 };
 
 

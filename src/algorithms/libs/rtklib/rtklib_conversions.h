@@ -39,6 +39,7 @@ class Glonass_Gnav_Utc_Model;
 class Gnss_Synchro;
 class Gps_Almanac;
 class Gps_CNAV_Ephemeris;
+class Gps_CNAV2_Ephemeris;
 class Gps_Ephemeris;
 
 class HAS_clock_corrections
@@ -103,6 +104,12 @@ eph_t eph_to_rtklib(const Gps_Ephemeris& gps_eph,
 
 eph_t eph_to_rtklib(const Gps_CNAV_Ephemeris& gps_cnav_eph);
 
+/*!
+ * \brief GPS L1C CNAV-2 ephemeris. The first ISC slot holds ISC_L1CP, the
+ * correction of the L1C pilot observations (IS-GPS-800J, 3.5.3.9.1).
+ */
+eph_t eph_to_rtklib(const Gps_CNAV2_Ephemeris& gps_cnav2_eph);
+
 eph_t eph_to_rtklib(const Beidou_Dnav_Ephemeris& bei_eph);
 
 eph_t eph_to_rtklib(const Beidou_Cnav1_Ephemeris& bei_eph);
@@ -145,6 +152,15 @@ bool glonass_gnav_is_healthy(const Glonass_Gnav_Ephemeris& glonass_gnav_eph, boo
  * \return Ephemeris structure for RTKLIB parsing
  */
 geph_t eph_to_rtklib(const Glonass_Gnav_Ephemeris& glonass_gnav_eph, const Glonass_Gnav_Utc_Model& gnav_clock_model, bool glonass_strict_health = true);
+
+/*!
+ * \brief RTKLIB observation code that insert_obs_to_rtklib() stores for a signal
+ * \param system GNSS-SDR system identifier ('G', 'E', 'R', 'C', 'J', 'S')
+ * \param signal GNSS-SDR two-character signal identifier (e.g. "1C", "5X", "B3")
+ * \param band RTKLIB band slot the signal is stored in
+ * \return observation code, CODE_NONE if the signal has no code for that slot
+ */
+unsigned char rtklib_obs_code(char system, const std::string& signal, int band);
 
 obsd_t insert_obs_to_rtklib(obsd_t& rtklib_obs,
     const Gnss_Synchro& gnss_synchro,

@@ -29,6 +29,7 @@
 #include "gnss_obs_codes.h"          // for CODE_L1C, CODE_L2S, CODE_L5X
 #include "gnss_synchro.h"            // for Gnss_Synchro
 #include "gps_almanac.h"             // for Gps_Almanac
+#include "gps_cnav2_ephemeris.h"     // for Gps_CNAV2_Ephemeris
 #include "gps_cnav_ephemeris.h"      // for Gps_CNAV_Ephemeris
 #include "gps_ephemeris.h"           // for Gps_Ephemeris
 #include "rtklib_rtkcmn.h"
@@ -166,6 +167,73 @@ static int32_t gps_cnav_ura_to_rtklib_sva(int32_t uraed, int32_t uraned0)
 }
 
 
+unsigned char rtklib_obs_code(char system, const std::string& signal, int band)
+{
+    auto code = static_cast<unsigned char>(CODE_NONE);
+    switch (band)
+        {
+        case 0:
+            code = static_cast<unsigned char>(CODE_L1C);
+            break;
+        case 1:
+            code = static_cast<unsigned char>(CODE_L2S);
+            break;
+        case 2:
+            code = static_cast<unsigned char>(CODE_L5X);
+            break;
+        default:
+            break;
+        }
+    switch (system)
+        {
+        case 'G':
+            if (signal == "1S")
+                {
+                    // the L1C pilot provides code and carrier measurements
+                    code = static_cast<unsigned char>(CODE_L1L);
+                }
+            break;
+        case 'E':
+            if (signal == "7X")
+                {
+                    code = static_cast<unsigned char>(CODE_L7X);
+                }
+            if (signal == "E6")
+                {
+                    code = static_cast<unsigned char>(CODE_L6B);
+                }
+            break;
+        case 'R':
+            if (signal == "2G")
+                {
+                    code = static_cast<unsigned char>(CODE_L2C);
+                }
+            break;
+        case 'C':
+            if (signal == "B1")
+                {
+                    code = static_cast<unsigned char>(CODE_L2I);
+                }
+            else if (signal == "B3")
+                {
+                    code = static_cast<unsigned char>(CODE_L6I);
+                }
+            else if (signal == "1D")
+                {
+                    code = static_cast<unsigned char>(CODE_L1P);
+                }
+            else if (signal == "5D")
+                {
+                    code = static_cast<unsigned char>(CODE_L5D);
+                }
+            break;
+        default:
+            break;
+        }
+    return code;
+}
+
+
 obsd_t insert_obs_to_rtklib(obsd_t& rtklib_obs,
     const Gnss_Synchro& gnss_synchro,
     const std::map<std::string, std::map<int, HAS_obs_corrections>>& has_obs_corr,
@@ -194,18 +262,7 @@ obsd_t insert_obs_to_rtklib(obsd_t& rtklib_obs,
     rtklib_obs.LLI[band] = static_cast<unsigned char>(
         (gnss_synchro.Flag_cycle_slip || gnss_synchro.Flag_half_cycle_slip) ? 1U : 0U);
 
-    switch (band)
-        {
-        case 0:
-            rtklib_obs.code[band] = static_cast<unsigned char>(CODE_L1C);
-            break;
-        case 1:
-            rtklib_obs.code[band] = static_cast<unsigned char>(CODE_L2S);
-            break;
-        case 2:
-            rtklib_obs.code[band] = static_cast<unsigned char>(CODE_L5X);
-            break;
-        }
+    rtklib_obs.code[band] = rtklib_obs_code(gnss_synchro.System, sig_, band);
     double CN0_dB_Hz_est = gnss_synchro.CN0_dB_hz;
     if (CN0_dB_Hz_est > 63.75)
         {
@@ -225,42 +282,12 @@ obsd_t insert_obs_to_rtklib(obsd_t& rtklib_obs,
             break;
         case 'E':
             rtklib_obs.sat = gnss_synchro.PRN + NSATGPS + NSATGLO;
-            if (sig_ == "7X")
-                {
-                    rtklib_obs.code[band] = static_cast<unsigned char>(CODE_L7X);
-                }
-            if (sig_ == "E6")
-                {
-                    rtklib_obs.code[band] = static_cast<unsigned char>(CODE_L6B);
-                }
             break;
         case 'R':
             rtklib_obs.sat = satno(SYS_GLO, gnss_synchro.PRN);
-            if (sig_ == "2G")
-                {
-                    rtklib_obs.code[band] = static_cast<unsigned char>(CODE_L2C);
-                }
             break;
         case 'C':
             rtklib_obs.sat = gnss_synchro.PRN + NSATGPS + NSATGLO + NSATGAL + NSATQZS;
-            // Update signal code
-            if (sig_ == "B1")
-                {
-                    rtklib_obs.code[band] = static_cast<unsigned char>(CODE_L2I);
-                }
-            else if (sig_ == "B3")
-                {
-                    rtklib_obs.code[band] = static_cast<unsigned char>(CODE_L6I);
-                }
-            else if (sig_ == "1D")
-                {
-                    rtklib_obs.code[band] = static_cast<unsigned char>(CODE_L1P);
-                }
-            else if (sig_ == "5D")
-                {
-                    rtklib_obs.code[band] = static_cast<unsigned char>(CODE_L5D);
-                }
-
             break;
         case 'J':
             rtklib_obs.sat = satno(SYS_QZS, gnss_synchro.PRN);
@@ -891,6 +918,17 @@ eph_t eph_to_rtklib(const Gps_CNAV_Ephemeris& gps_cnav_eph)
     rtklib_sat.has_clock_correction_m = 0.0;
     rtklib_sat.apply_has_corrections = false;
 
+    return rtklib_sat;
+}
+
+
+eph_t eph_to_rtklib(const Gps_CNAV2_Ephemeris& gps_cnav2_eph)
+{
+    // Orbit and clock parameters are those of CNAV, with toc = toe
+    eph_t rtklib_sat = eph_to_rtklib(static_cast<const Gps_CNAV_Ephemeris&>(gps_cnav2_eph));
+    rtklib_sat.isc[0] = gps_cnav2_eph.ISCL1CP;
+    // L1C health is checked before the observation reaches RTKLIB, as for
+    // LNAV, so that PVT.use_unhealthy_sats applies
     return rtklib_sat;
 }
 

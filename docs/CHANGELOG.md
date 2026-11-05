@@ -12,6 +12,217 @@ SPDX-FileCopyrightText: 2011-2026 Carles Fernandez-Prades <carles.fernandez@cttc
 
 All notable changes to GNSS-SDR will be documented in this file.
 
+## [Unreleased](https://github.com/gnss-sdr/gnss-sdr/tree/next)
+
+### Improvements in Accuracy:
+
+- Fixed a double frequency-band scaling of the broadcast ionospheric delay, for
+  single-band measurements outside the L1/E1 band in the single-point solution
+  (GPS L2C or L5, QZSS L5, Galileo E5a or E5b, GLONASS L2). The factor
+  `(f_L1/f_band)^2` was applied twice, so L2C and L5 corrections were
+  over-scaled by 1.65x and 1.79x respectively, biasing the height solution by
+  several meters. BeiDou was not affected.
+- Fixed the Galileo E5b BGD scaling and the ionospheric scaling of E5b
+  measurements in GPS L5 + Galileo E5b receivers, where the factors were
+  referenced to the E5a wavelength held in the first slot instead of to E1.
+
+### Improvements in Availability:
+
+- Fixed the GPS L5 I5 and Q5 local code replicas. The XB sequence was wrapped
+  modulo the 10230-chip code length instead of its natural 8191-chip period
+  (IS-GPS-705J, Section 3.3.2.2), so the last chips of every code (as many as
+  its XB code advance) were taken from the wrong XB phase. Depending on the PRN,
+  this cost between 0.2 and 13.5 dB (about 5 dB on average) of correlation gain
+  in acquisition and tracking, also in FPGA-offloaded receivers. Reported by
+  @ObvMamut.
+- Fixed a Doppler bias in the PCPS acquisition when a secondary-code or data
+  sign transition falls inside the one-code-period search window. The
+  correlation peak split up to ±0.74/T away from the true Doppler, so about 40 %
+  of the GPS L5 acquisitions (the I5 NH10 code changes sign at 6 of every 10
+  code epochs) started tracking 250–900 Hz off. Tracking then either held a
+  Costas false lock at ±500 Hz, never achieved secondary-code synchronization
+  and dropped the satellite after `bit_synchronization_time_limit_s`, or lost
+  lock a few seconds after `pull_in_time_s`. Positive acquisitions now
+  re-estimate the Doppler on their own dwells, split at the detected code epoch
+  and combined under both sign hypotheses, at negligible cost. This applies to
+  all signals acquired over one code period without `bit_transition_flag`.
+  Setting the new `Acquisition_XX.refine_doppler` parameter to `false` (default:
+  `true`) disables it.
+- GPS L2C acquisition (`GPS_L2_M_PCPS_Acquisition`) now correlates with the CM
+  code with the CL slots zeroed, the same replica that tracking already uses,
+  instead of holding each CM chip across the CL slot. The CL half of the signal
+  no longer adds noise to the correlation.
+
+### Improvements in Efficiency:
+
+- Improved Signal Conditioner scheduling with portable, configuration-aware
+  sample batching and redundant pass-through removal, reducing channel
+  scheduling overhead without configuration changes. Preserves samples and
+  stream tags, flushes partial batches on deadlines or EOF, and improves
+  flowgraph connection cleanup. The new `SignalConditioner.batch_size_ms`,
+  `SignalConditioner.max_batch_latency_ms`,
+  `SignalConditioner.remove_pass_through` and
+  `SignalConditioner.output_buffer_ms` parameters override the automatic
+  choices, and the new
+  [`Bypass`](https://gnss-sdr.org/docs/sp-blocks/signal-conditioner/#implementation-bypass)
+  Signal Conditioner implementation connects the channels directly to the signal
+  source. See the
+  [Signal Conditioner documentation](https://gnss-sdr.org/docs/sp-blocks/signal-conditioner/#batching-and-buffering).
+- `EVK1029_Signal_Source` can now translate, filter, and decimate each band
+  inside the source block (`enable_freq_xlating=true`), emitting one baseband
+  `gr_complex` output per band and running each band's filter on its own worker
+  thread, while decoding the next chunk of the capture in parallel. Combined
+  with `Bypass` Signal Conditioners, this removes the per-band
+  `Freq_Xlating_Fir_Filter` blocks. Each band is configured with `band<n>_IF`,
+  `band<n>_decimation_factor` (the same for all bands), `band<n>_bw`,
+  `band<n>_tw`, `band<n>_window`, `band<n>_attenuation_dB`, and
+  `band<n>_kaiser_beta`. Bands with filters of different lengths are aligned to
+  the same group delay, so they do not bias pseudoranges between bands. When
+  built with `-DENABLE_CUDA=ON`, `band<n>_cuda=true` computes that band's filter
+  on an NVIDIA GPU, falling back to the CPU if no device is available or a GPU
+  call fails. Contributed by @joebre.
+- `ION_GSMS_Signal_Source` resolves the decoding parameters of each stream once
+  instead of for every chunk, which removes string comparisons and memory
+  allocations from the per-sample path, and decodes one-byte chunks through a
+  256-entry lookup table. The decoded samples are unchanged. A four-band 2-bit
+  capture at 53 Msps now runs about 15 times faster, as fast as with
+  `NTLab_File_Signal_Source`. The source also asks the scheduler for room for at
+  least one whole chunk cycle. Before, when it was offered less (for instance,
+  one item for complex streams, or fewer than the 20 samples of a 5-byte IFEN
+  chunk), it produced nothing and GNU Radio polled it again only after 250 ms,
+  which could stall a file replay for seconds.
+
+### Improvements in Interoperability:
+
+- Added the GPS L1C receiver chain (IS-GPS-800J), with signal identifier `1S`:
+  PCPS acquisition (`GPS_L1C_PCPS_Ambiguous_Acquisition`), VEML DLL+PLL tracking
+  (`GPS_L1C_DLL_PLL_VEML_Tracking`) of the L1CP pilot with synchronization of
+  its 1800-chip overlay code, or of the L1CD data component, and CNAV-2
+  telemetry decoding (`GPS_L1C_Telemetry_Decoder`). Replicas can use the full
+  TMBOC(6,1,4/33) pilot waveform (`Acquisition_1S.tmboc`, `Tracking_1S.tmboc`,
+  default `false`). When a satellite is tracked on both L1 C/A and L1C,
+  positioning uses L1 C/A. RINEX observation files contain
+  `C1L`/`L1L`/`D1L`/`S1L` observables, and RINEX 4.02 navigation files contain
+  CNV2 records. A sample configuration file is provided at
+  `conf/File_input/GPS/gnss-sdr_GPS_L1C_file.conf`. Based on initial work by
+  @tatjam.
+- Fixed `Labsat_Signal_Source` for LabSat 4 (`.LS4`) recordings whose RF
+  channels have different bandwidths (different `BW_DIV` values). Hardened the
+  parsing of LabSat 4 (`.LS4`) `.ini` files. The source now exits with a
+  configuration error, instead of crashing or reading out of bounds, when a
+  channel stored in the file lacks its `BW_DIV_x` value, or when a selected
+  channel lacks a valid `BUF_SIZE_x` (which, with 12-bit quantization, must be a
+  multiple of 24 bytes). Also, `seconds_to_skip` no longer lands in the middle
+  of a frame when channels have bandwidth dividers that are not powers of two.
+
+### Improvements in Reliability:
+
+- The SUPL client now verifies the server certificate and DNS name or IP address
+  with OpenSSL and GnuTLS. It rejects assistance data that exceeds the
+  fixed-size acquisition, almanac, or ephemeris arrays, including across
+  multiple responses, and discards partial assistance on failure. SUPL framing
+  and malformed RRLP payload handling have also been hardened. Reported by Harry
+  Burgess of Countersight.
+- Fixed a heap buffer overflow in `Galileo_E1_PCPS_8ms_Ambiguous_Acquisition`.
+  The block always correlates with two local replicas that span two code
+  periods, but its coherent integration time defaulted to one code period (4
+  ms), so every local code load read and wrote 4 ms of samples beyond the end of
+  its buffers. This corrupted the heap and randomly crashed the receiver at
+  startup, during processing, or at exit. The coherent integration time of this
+  implementation is now always 8 ms.
+- Fixed `GPS_L1_CA_PCPS_OpenCl_Acquisition` with more than one dwell
+  (`Acquisition_1C.max_dwells` greater than 1, or
+  `Acquisition_1C.bit_transition_flag=true`). The block read its second and
+  later dwells from input ports that do not exist, which crashed the receiver
+  right after the first search started. Also fixed races between the block and
+  the worker thread that processes its dwells: a new search could start while
+  the previous one was still being processed, and a stopped search could still
+  report a result.
+- Fixed the fail-safes of the DLL/PLL VEML (CPU and FPGA) and KF tracking
+  implementations that force a loss of lock: the bit or secondary code
+  synchronization time limit (`Tracking_XX.bit_synchronization_time_limit_s`)
+  and the telemetry fault sent by the telemetry decoders when they stop finding
+  valid frames. They no longer dropped the channel when
+  `Tracking_XX.max_carrier_lock_fail` was set above 300000 or 200000,
+  respectively, so a false lock that the carrier lock test did not drop kept its
+  channel until the end of the run.
+
+### Improvements in Reproducibility:
+
+- Added a deterministic processing mode for recorded signals
+  (`GNSS-SDR.deterministic=true`, default: `false`). Processing the same file
+  twice was not repeatable, even with `Acquisition_XX.blocking=true`: the
+  control thread started acquisitions, assigned satellites and applied channel
+  events at whatever sample each block had reached, and the observables and PVT
+  blocks applied each other's messages (navigation data, receiver clock
+  corrections) whenever they arrived. Thread timing then changed the
+  satellite-to-channel assignment, the first sample of every search and pull-in,
+  the epoch of the first fix, and the end of the outputs. In this mode, events
+  and messages carry the sample at which they happened, the control thread
+  handles channel events in sample order, and every action they cause takes
+  effect at a sample that depends only on those stamps. Channel actions take
+  effect a fixed lookahead later (`GNSS-SDR.deterministic_lookahead_ms`,
+  default: 100 ms), and a gate at the output of the Signal Conditioner keeps the
+  stream from running further ahead. Maintenance tasks run every
+  `GNSS-SDR.deterministic_tick_ms` (default: 100 ms) of signal instead of every
+  100 ms of wall-clock time, and the receiver stops only when the whole input
+  has gone through the PVT. Tracking, telemetry, observables and PVT dumps, and
+  RINEX, NMEA, KML, GPX and GeoJSON files, are then bit-identical from run to
+  run (except for the creation time written in the RINEX, KML and GPX headers),
+  whatever the CPU load, with `Acquisition_XX.blocking` set to either value, as
+  long as the machine, its FFTW wisdom (GNU Radio plans its FFTs with
+  `FFTW_MEASURE`) and its VOLK configuration do not change. The mode supports
+  all the acquisition implementations except the assisted and FPGA ones; the
+  DLL/PLL VEML, KF and Gaussian tracking implementations; and the signal sources
+  that read files, throttled or not (including LabSat, EVK1029 and ION GNSS SDR
+  metadata recordings). It refuses radio front ends and network or named-pipe
+  (`Fifo_Signal_Source`) inputs, whose samples could be lost while the stream is
+  held back, FPGA offloading, visibility-aware search, GNSS assistance, an
+  explicit `GNSS-SDR.assist_dual_frequency_acq=true`,
+  `GNSS-SDR.osnma_mode=strict`, Galileo HAS corrections
+  (`PVT.use_has_corrections=true`, the default with Galileo E6 channels) and
+  NTRIP corrections (`PVT.ntrip_client_enabled=true`), whose effects the PVT
+  applies when the messages arrive, `Acquisition_XX.blocking_on_standby=true`, a
+  lookahead that is not positive, a control tick below 1 ms, and lookaheads that
+  leave the observables block no margin (220 ms with the default
+  `GNSS-SDR.observable_interval_ms`). Multiband configurations do not use
+  dual-frequency acquisition assistance in this mode, and the receiver does not
+  stop channels that track a satellite already tracked in another channel, since
+  both decisions depend on the live tracking status. With
+  `GNSS-SDR.tow_to_trk=true`, the DLL/PLL VEML tracking blocks do not compute
+  the TOW and week number, since the telemetry messages would reach them at a
+  timing-dependent sample. The Galileo E6 telemetry decoders take the time of
+  week that the E1, E5a or E5b decoders set for the same satellite once the
+  stream has gone one lookahead past the symbol that set it.
+
+### Improvements in Usability:
+
+- Fixed the Monitor (`Monitor.enable_monitor=true`) for channels without a valid
+  time of week. The GPS L1 C/A, GPS L5, Galileo, BeiDou B1I/B3I, and BeiDou B1C
+  telemetry decoders produced no output until they decoded the time of week, so
+  Galileo E6-only configurations sent nothing to the Monitor. All telemetry
+  decoders now forward every symbol, flagging those without a valid time of
+  week, so that channels are reported as soon as tracking locks. This also lets
+  the secondary-band acquisition assistance start once the primary-band signal
+  is locked, instead of after its time of week is decoded.
+- `EVK1029_Signal_Source` can now read directly from a live shared-memory stream
+  published by EVK1029_CtrlApp, instead of only a recorded capture file. Set
+  `SignalSource.input=shared_memory` and, optionally, `SignalSource.shm_name`
+  (default `/evk1029_stream`). The stream ends if EVK1029_CtrlApp publishes
+  nothing for `SignalSource.shm_stall_timeout_s` seconds (default 5, 0 waits
+  forever) and, with `SignalSource.shm_stop_on_buffer_overflow=true`, when it
+  reports a buffer overflow. Linux only. Contributed by @joebre.
+- The accumulated carrier phase is now stored as a `double` in the tracking
+  dumps (binary and `.mat`) of all tracking implementations, instead of a
+  `float` whose resolution drops to 0.0625 rad at 10^6 rad. Each binary record
+  is now 4 bytes longer, and the MATLAB and Python readers in `utils/` are
+  updated accordingly.
+
+See the definitions of concepts and metrics at
+https://gnss-sdr.org/design-forces/
+
+&nbsp;
+
 ## [GNSS-SDR v0.0.22](https://github.com/gnss-sdr/gnss-sdr/releases/tag/v0.0.22) - 2026-10-04
 
 [![DOI](https://zenodo.org/badge/DOI/10.5281/zenodo.23182959.svg)](https://doi.org/10.5281/zenodo.23182959)

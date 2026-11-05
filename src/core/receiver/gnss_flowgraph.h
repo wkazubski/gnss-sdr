@@ -26,6 +26,7 @@
 
 #include "channel_status_msg_receiver.h"
 #include "concurrent_queue.h"
+#include "conditioner_scheduling_policy.h"
 #include "galileo_e6_has_msg_receiver.h"
 #include "galileo_tow_map.h"
 #include "gnss_sdr_sample_counter.h"
@@ -63,6 +64,7 @@ class ConfigurationInterface;
 class GNSSBlockInterface;
 class Gnss_Satellite;
 class SignalSourceInterface;
+class StreamBatcherDeadline;
 
 /*! \brief This class represents a GNSS flow graph.
  *
@@ -133,6 +135,8 @@ public:
      */
     void set_configuration(const std::shared_ptr<ConfigurationInterface>& configuration);
 
+    const std::vector<ConditionerSchedulingPolicy::Plan>& conditioner_scheduling_plans() const { return conditioner_plans_; }
+
     bool connected() const
     {
         return connected_;
@@ -196,6 +200,21 @@ public:
      */
     void stop_duplicated_satellite_channels();
 
+    /*!
+     * \brief Whether GNSS-SDR.deterministic=true: events are handled in
+     * sample-stamp order, see DeterministicClock.
+     */
+    bool deterministic() const
+    {
+        return deterministic_;
+    }
+
+    /*!
+     * \brief Whether the PVT block has processed its whole input, after the
+     * signal source has finished.
+     */
+    bool data_path_done() const;
+
 #if ENABLE_FPGA
     void start_acquisition_helper();
 
@@ -204,6 +223,9 @@ public:
 
 private:
     uint32_t doppler_bins_for_uncertainty(const std::string& acq_role, double uncertainty_hz) const;
+    bool deterministic_configuration_is_supported();
+    bool assist_dual_frequency_acq() const;
+    double control_receiver_time_s() const;
     void init();  // Populates the SV PRN list available for acquisition and tracking
     int connect_desktop_flowgraph();
 
@@ -215,6 +237,27 @@ private:
     int connect_sample_counter();
     int connect_galileo_tow_map();
 
+    struct StreamEndpoint
+    {
+        gr::basic_block_sptr block;
+        int port = 0;
+    };
+    void connect_conditioner_output(size_t conditioner_id, StreamEndpoint upstream);
+    void plan_signal_conditioners();
+    void clear_stream_connections();
+    void connect_block(GNSSBlockInterface& block);
+    void connect_message(const gr::basic_block_sptr& source, const pmt::pmt_t& source_port,
+        const gr::basic_block_sptr& destination, const pmt::pmt_t& destination_port);
+    struct MessageConnection
+    {
+        gr::basic_block_sptr source;
+        pmt::pmt_t source_port;
+        gr::basic_block_sptr destination;
+        pmt::pmt_t destination_port;
+    };
+    size_t conditioner_id_for_channel(size_t channel) const;
+    double acquisition_rate_for_signal(const std::string& signal) const;
+    unsigned int acquisition_decimation_for_signal(const std::string& signal) const;
     int connect_signal_sources_to_signal_conditioners();
     int connect_signal_conditioners_to_channels();
     int connect_channels_to_observables();
@@ -272,6 +315,11 @@ private:
 
     std::vector<std::shared_ptr<SignalSourceInterface>> sig_source_;
     std::vector<std::shared_ptr<GNSSBlockInterface>> sig_conditioner_;
+    std::vector<GNSSBlockInterface*> connected_blocks_;
+    std::vector<MessageConnection> message_connections_;
+    std::vector<StreamEndpoint> conditioned_outputs_;
+    std::vector<ConditionerSchedulingPolicy::Plan> conditioner_plans_;
+    std::shared_ptr<StreamBatcherDeadline> conditioner_deadlines_;
     std::vector<std::shared_ptr<ChannelInterface>> channels_;
     std::shared_ptr<GNSSBlockInterface> observables_;
     std::shared_ptr<GNSSBlockInterface> pvt_;
@@ -319,6 +367,7 @@ private:
         evGPS_1C,
         evGPS_2S,
         evGPS_L5,
+        evGPS_L1C,
         evSBAS_1C,
         evGAL_1B,
         evGAL_5X,
@@ -356,6 +405,7 @@ private:
     bool enable_osnma_rx_;
     bool enable_e6_has_rx_;
     bool enable_secondary_signal_status_gating_;
+    bool deterministic_;
 };
 
 

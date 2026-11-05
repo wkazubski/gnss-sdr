@@ -73,12 +73,13 @@ private:
 
     // Callers must hold d_setlock while resetting or checking decoder state.
     void reset_decoder_state();
-    void check_tlm_separation();
+    void check_tlm_separation(uint64_t sample_stamp);
 
     void msg_handler_read_galileo_tow_map(const pmt::pmt_t &msg);
     void clear_galileo_tow_map_entry();
     void publish_galileo_tow_map_entry(uint32_t week, uint32_t tow_ms, uint64_t sample_counter);
     void publish_current_galileo_tow_map_entry(uint64_t sample_counter);
+    void read_galileo_tow_history(uint64_t sample_counter);
     bool update_known_galileo_week(int32_t week);
     bool set_current_tow_from_preamble(uint32_t preamble_week, uint32_t preamble_tow_ms, int64_t delay_ms);
     void advance_current_tow(int64_t delta_ms);
